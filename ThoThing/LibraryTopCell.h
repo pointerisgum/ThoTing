@@ -1,0 +1,16 @@
+//
+//  LibraryTopCell.h
+//  ThoThing
+//
+//  Created by KimYoung-Min on 2017. 6. 7..
+//  Copyright © 2017년 youngmin.kim. All rights reserved.
+//
+
+#import <UIKit/UIKit.h>
+
+@interface LibraryTopCell : UITableViewCell
+@property (nonatomic, weak) IBOutlet UIImageView *iv_Icon;
+@property (nonatomic, weak) IBOutlet UILabel *lb_Title;
+@property (nonatomic, weak) IBOutlet UILabel *lb_Count;
+@property (nonatomic, weak) IBOutlet UIImageView *iv_UnderBar;
+@end

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="9060" systemVersion="15B42" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES">
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="9051"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <view contentMode="scaleToFill" id="Wg5-ut-xSB" customClass="KeyboardAccViewNonArrow">
+            <rect key="frame" x="0.0" y="0.0" width="320" height="45"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <subviews>
+                <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="Cps-17-lzm">
+                    <rect key="frame" x="0.0" y="0.0" width="320" height="1"/>
+                    <animations/>
+                    <color key="backgroundColor" white="0.66666666666666663" alpha="1" colorSpace="calibratedWhite"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="1" id="gNY-wW-2cd"/>
+                    </constraints>
+                </imageView>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="right" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="EtR-Kv-UDh">
+                    <rect key="frame" x="240" y="1" width="80" height="45"/>
+                    <animations/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="45" id="9ZN-GH-z4o"/>
+                        <constraint firstAttribute="width" constant="80" id="EJU-b1-0qv"/>
+                    </constraints>
+                    <fontDescription key="fontDescription" type="system" pointSize="15"/>
+                    <inset key="contentEdgeInsets" minX="0.0" minY="0.0" maxX="10" maxY="0.0"/>
+                    <state key="normal" image="keyboard53.png">
+                        <color key="titleColor" white="0.33333333333333331" alpha="1" colorSpace="calibratedWhite"/>
+                        <color key="titleShadowColor" white="0.0" alpha="0.0" colorSpace="calibratedWhite"/>
+                    </state>
+                    <connections>
+                        <action selector="goDone:" destination="Wg5-ut-xSB" eventType="touchUpInside" id="bDL-9g-E8z"/>
+                    </connections>
+                </button>
+            </subviews>
+            <animations/>
+            <color key="backgroundColor" red="0.98039215690000003" green="0.98039215690000003" blue="0.98039215690000003" alpha="1" colorSpace="calibratedRGB"/>
+            <constraints>
+                <constraint firstAttribute="centerY" secondItem="EtR-Kv-UDh" secondAttribute="centerY" constant="-1" id="K0h-5A-7wf"/>
+                <constraint firstItem="Cps-17-lzm" firstAttribute="top" secondItem="Wg5-ut-xSB" secondAttribute="top" id="VaN-vF-AWm"/>
+                <constraint firstAttribute="trailing" secondItem="EtR-Kv-UDh" secondAttribute="trailing" id="YEc-TN-5Rq"/>
+                <constraint firstItem="Cps-17-lzm" firstAttribute="leading" secondItem="Wg5-ut-xSB" secondAttribute="leading" id="nGD-IR-zTm"/>
+                <constraint firstAttribute="trailing" secondItem="Cps-17-lzm" secondAttribute="trailing" id="tKA-i4-9GY"/>
+            </constraints>
+            <nil key="simulatedStatusBarMetrics"/>
+            <freeformSimulatedSizeMetrics key="simulatedDestinationMetrics"/>
+            <connections>
+                <outlet property="btn_Done" destination="EtR-Kv-UDh" id="0si-mj-bdr"/>
+            </connections>
+            <point key="canvasLocation" x="600" y="206.5"/>
+        </view>
+    </objects>
+    <resources>
+        <image name="keyboard53.png" width="20" height="20"/>
+    </resources>
+</document>

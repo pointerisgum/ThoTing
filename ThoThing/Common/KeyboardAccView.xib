@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="6254" systemVersion="14C109" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES">
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="6247"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <view contentMode="scaleToFill" id="iN0-l3-epB" customClass="KeyboardAccView">
+            <rect key="frame" x="0.0" y="0.0" width="320" height="45"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <subviews>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="uFn-Gh-w2K">
+                    <rect key="frame" x="0.0" y="0.0" width="50" height="45"/>
+                    <constraints>
+                        <constraint firstAttribute="width" constant="50" id="2Ia-PH-bNk"/>
+                        <constraint firstAttribute="height" constant="45" id="HCI-DU-Qmb"/>
+                    </constraints>
+                    <fontDescription key="fontDescription" type="system" pointSize="15"/>
+                    <state key="normal" title="&lt;">
+                        <color key="titleColor" white="0.33333333333333331" alpha="1" colorSpace="calibratedWhite"/>
+                        <color key="titleShadowColor" white="0.0" alpha="0.0" colorSpace="calibratedWhite"/>
+                    </state>
+                </button>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="0Cj-6q-ZL1">
+                    <rect key="frame" x="50" y="0.0" width="50" height="45"/>
+                    <constraints>
+                        <constraint firstAttribute="width" constant="50" id="Q5R-Je-gQx"/>
+                        <constraint firstAttribute="height" constant="45" id="Q88-di-STm"/>
+                    </constraints>
+                    <fontDescription key="fontDescription" type="system" pointSize="15"/>
+                    <state key="normal" title="&gt;">
+                        <color key="titleColor" white="0.33333333333333331" alpha="1" colorSpace="calibratedWhite"/>
+                        <color key="titleShadowColor" white="0.0" alpha="0.0" colorSpace="calibratedWhite"/>
+                    </state>
+                </button>
+                <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="Fkh-kn-Uxz">
+                    <rect key="frame" x="0.0" y="0.0" width="320" height="1"/>
+                    <color key="backgroundColor" white="0.66666666666666663" alpha="1" colorSpace="calibratedWhite"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="1" id="Nya-0V-2b7"/>
+                    </constraints>
+                </imageView>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="right" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="NRP-VO-jTg">
+                    <rect key="frame" x="240" y="1" width="80" height="45"/>
+                    <constraints>
+                        <constraint firstAttribute="width" constant="80" id="c3d-k8-mWr"/>
+                        <constraint firstAttribute="height" constant="45" id="rX4-Uf-hG9"/>
+                    </constraints>
+                    <fontDescription key="fontDescription" type="system" pointSize="15"/>
+                    <inset key="contentEdgeInsets" minX="0.0" minY="0.0" maxX="10" maxY="0.0"/>
+                    <state key="normal" image="keyboard53.png">
+                        <color key="titleColor" white="0.33333333333333331" alpha="1" colorSpace="calibratedWhite"/>
+                        <color key="titleShadowColor" white="0.0" alpha="0.0" colorSpace="calibratedWhite"/>
+                    </state>
+                    <connections>
+                        <action selector="goDone:" destination="iN0-l3-epB" eventType="touchUpInside" id="xMi-R1-ha8"/>
+                    </connections>
+                </button>
+            </subviews>
+            <color key="backgroundColor" red="0.98039215686274506" green="0.98039215686274506" blue="0.98039215686274506" alpha="1" colorSpace="calibratedRGB"/>
+            <constraints>
+                <constraint firstAttribute="centerY" secondItem="0Cj-6q-ZL1" secondAttribute="centerY" id="3qr-HL-csA"/>
+                <constraint firstItem="Fkh-kn-Uxz" firstAttribute="top" secondItem="iN0-l3-epB" secondAttribute="top" id="IJB-AJ-i14"/>
+                <constraint firstAttribute="centerY" secondItem="uFn-Gh-w2K" secondAttribute="centerY" id="MrO-3n-QYr"/>
+                <constraint firstItem="uFn-Gh-w2K" firstAttribute="leading" secondItem="iN0-l3-epB" secondAttribute="leading" id="UBu-m5-4xp"/>
+                <constraint firstAttribute="trailing" secondItem="NRP-VO-jTg" secondAttribute="trailing" id="cSD-dT-ukG"/>
+                <constraint firstItem="Fkh-kn-Uxz" firstAttribute="leading" secondItem="iN0-l3-epB" secondAttribute="leading" id="k2n-rw-Flr"/>
+                <constraint firstAttribute="trailing" secondItem="Fkh-kn-Uxz" secondAttribute="trailing" id="n43-iy-qnd"/>
+                <constraint firstItem="0Cj-6q-ZL1" firstAttribute="leading" secondItem="uFn-Gh-w2K" secondAttribute="trailing" id="oIU-JO-4jp"/>
+                <constraint firstAttribute="centerY" secondItem="NRP-VO-jTg" secondAttribute="centerY" constant="-1" id="stN-RD-0WV"/>
+            </constraints>
+            <nil key="simulatedStatusBarMetrics"/>
+            <freeformSimulatedSizeMetrics key="simulatedDestinationMetrics"/>
+            <connections>
+                <outlet property="btn_Done" destination="NRP-VO-jTg" id="3Ka-qD-u0G"/>
+                <outlet property="btn_Next" destination="0Cj-6q-ZL1" id="BTz-ND-Kkq"/>
+                <outlet property="btn_Prev" destination="uFn-Gh-w2K" id="pad-8H-I2G"/>
+            </connections>
+            <point key="canvasLocation" x="600" y="206.5"/>
+        </view>
+    </objects>
+    <resources>
+        <image name="keyboard53.png" width="20" height="20"/>
+    </resources>
+</document>

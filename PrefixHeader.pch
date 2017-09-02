@@ -1,0 +1,17 @@
+//
+//  PrefixHeader.pch
+//  Salt09
+//
+//  Created by KimYoung-Min on 2016. 4. 28..
+//  Copyright © 2016년 youngmin.kim. All rights reserved.
+//
+
+#ifndef PrefixHeader_pch
+#define PrefixHeader_pch
+
+#import "Defines.h"
+
+// Include any system framework and library headers here that should be included in all compilation units.
+// You will also need to set the Prefix Header build setting of one or more of your targets to reference this file.
+
+#endif /* PrefixHeader_pch */
