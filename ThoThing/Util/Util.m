@@ -948,7 +948,7 @@ static UIView *v_Indi = nil;
         str_ImageUrl = [NSString stringWithFormat:@"%@://%@", ar_Sep[0], str_Footer];
     }
     
-    NSLog(@"str_ImageUrl : %@", str_ImageUrl);
+//    NSLog(@"str_ImageUrl : %@", str_ImageUrl);
     return [NSURL URLWithString:str_ImageUrl];
 }
 

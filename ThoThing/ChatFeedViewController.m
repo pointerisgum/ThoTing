@@ -67,6 +67,12 @@
 @import MediaPlayer;
 
 static NSInteger kMoreCount = 50;
+static AVPlayer *currentPlayer = nil;
+static NSURL *currentUrl = nil;
+static AutoChatAudioCell *currentCell = nil;
+static NSInteger currentEId = -1;
+static NSInteger currentTag = 0;
+static long long currentCreateTime = -1;
 
 typedef enum {
     kLeaveChat      = -1,
@@ -89,8 +95,13 @@ typedef enum {
     BOOL isFirstLoad;   //첫 로드인지 기억했다가 첫로드면 로드중 추가된 메세지는 로드후 애드 시키기 위함
     BOOL hasNext;
     BOOL isShowInRoomMsg;
+    BOOL isPlay;
+    BOOL bLastKeybaordStatus;
     
+    NSInteger nPlayEId;
+    NSInteger nTmpPlayEId;
     NSInteger nTotalCnt;
+    NSInteger nTmpPlayTag;
     
     CGFloat fKeyboardHeight;
     
@@ -111,6 +122,7 @@ typedef enum {
     
     NSInteger nAutoAnswerIdx;
 }
+@property (nonatomic, strong) id timeObserver;
 @property (nonatomic, strong) NSMutableArray *ar_Photo;
 @property (nonatomic, strong) NSMutableArray *thumbs;
 @property (nonatomic, strong) NSMutableArray *arM_List;
@@ -158,7 +170,7 @@ typedef enum {
 
 //음성문제 관련
 @property (nonatomic, strong) AVPlayerItem *playerItem;
-@property (nonatomic, strong) AVPlayer *player;
+//@property (nonatomic, strong) AVPlayer *player;
 @property (nonatomic, strong) YmExtendButton *btn_QuestionPlay;
 @property (nonatomic, strong) AudioView *v_Audio;
 /////////
@@ -303,6 +315,12 @@ typedef enum {
     [self.v_CommentKeyboardAccView.btn_KeyboardChange addTarget:self action:@selector(onKeyboardChange:) forControlEvents:UIControlEventTouchUpInside];
     
     nAutoAnswerIdx = -1;
+    nPlayEId = -1;
+    currentEId = -1;
+    nTmpPlayEId = -1;
+    nTmpPlayTag = -1;
+    currentCreateTime = -1;
+    
     self.arM_AutoAnswer = [NSMutableArray array];
     
     //    [self.arM_AutoAnswer addObject:@"고1 전국연합학력평가고1 전국연합학력평가고1 전국연합학력평가고1 전국연합학력평가고1 전국연합학력평가고1 전국연합학력평가고1 전국연합학력평가고1 전국연합학력평가고1 전국연합학력평가"];
@@ -1233,6 +1251,11 @@ typedef enum {
         [UIView setAnimationCurve:[curve intValue]];
         if([notification name] == UIKeyboardWillShowNotification)
         {
+            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = bLastKeybaordStatus;
+            if( bLastKeybaordStatus )
+            {
+                [self showTempleteKeyboard];
+            }
             self.v_CommentKeyboardAccView.lc_Bottom.constant = keyboardBounds.size.height;
             //            self.v_CommentKeyboardAccView.lc_AddWidth.constant = 63.f;
             if (self.tbv_List.contentSize.height > self.tbv_List.frame.size.height)
@@ -1243,6 +1266,8 @@ typedef enum {
         }
         else if([notification name] == UIKeyboardWillHideNotification)
         {
+            bLastKeybaordStatus = self.v_CommentKeyboardAccView.btn_KeyboardChange.selected;
+            
             UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
             UIView *view_Tmp = [window viewWithTag:1982];
             [view_Tmp removeFromSuperview];
@@ -1727,17 +1752,13 @@ typedef enum {
 
 - (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView
 {
-    if( scrollView.contentOffset.y <= 0 && isLoding == NO && self.messages.count > 0 )
-    {
-        //up
-        //        if( nTotalCnt > 0 && self.arM_List.count >= nTotalCnt )
-        //        {
-        //            return;
-        //        }
-        
-        [self updateChatList:NO];
-        //        [self updateList:NO];
-    }
+//    if( scrollView == self.tbv_List )
+//    {
+        if( scrollView.contentOffset.y <= 0 && isLoding == NO && self.messages.count > 0 )
+        {
+            [self updateChatList:NO];
+        }
+//    }
 }
 
 - (void)addTapGesture:(UIView *)view
@@ -2277,50 +2298,78 @@ typedef enum {
                                     NSURL *url = [Util createImageUrl:[dic_Body objectForKey:@"image_prefix"] withFooter:[dic_Body objectForKey:@"qnaBody"]];
                                     
                                     //                                    aaaaaa
-                                    NSString *str_Key = [NSString stringWithFormat:@"%ld", indexPath.row];
-                                    NSDictionary *dic_PlayerData = [self.dicM_AutoAudio objectForKey:str_Key];
-                                    AVPlayer *player = [dic_PlayerData objectForKey:@"player"];
-                                    if( player == nil )
+                                    cell.url = url;
+                                    cell.nEId = [[dic_Body objectForKey:@"eId"] integerValue];
+//                                    if( cell.nEId == nPlayEId )
+//                                    {
+//                                        [self onAutoAudioPlayAndPause:cell.btn_PlayPause];
+//                                        nPlayEId = -1;
+//                                    }
+                                    
+                                    long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
+                                    cell.createTime = llCreateTime;
+                                    
+//                                    if( cell.nEId != currentEId )
+                                    if( currentCreateTime != llCreateTime )
                                     {
                                         AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:url];
-                                        player = [AVPlayer playerWithPlayerItem:playerItem];
-                                        player = [AVPlayer playerWithURL:url];
-                                        
-                                        CGFloat fDuration = CMTimeGetSeconds(playerItem.asset.duration);
-                                        NSLog(@"%f", fDuration);
-                                        
+                                        cell.player = [AVPlayer playerWithPlayerItem:playerItem];
+                                        cell.player = [AVPlayer playerWithURL:url];
                                         cell.lb_Time.text = @"00:00";
-                                        
-                                        __weak AutoChatAudioCell *weakCell = cell;
-                                        [cell.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 2)
-                                                                                  queue:dispatch_get_main_queue()
-                                                                             usingBlock:^(CMTime time)
-                                         {
-                                             CGFloat fCurrentTime = CMTimeGetSeconds(time);
-                                             NSInteger nMinute = (NSInteger)fCurrentTime / 60;
-                                             NSInteger nSecond = (NSInteger)fCurrentTime % 60;
-                                             weakCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
-                                             
-                                             NSLog(@"%f", CMTimeGetSeconds(time));
-                                         }];
-                                        
-                                        [self.dicM_AutoAudio setObject:@{@"cell":cell, @"player":player} forKey:str_Key];
+                                        cell.btn_PlayPause.selected = NO;
                                     }
                                     else
                                     {
-                                        if ((player.rate != 0) && (player.error == nil))
-                                        {
-                                            cell.btn_PlayPause.selected = YES;
-                                        }
-                                        else
-                                        {
-                                            cell.btn_PlayPause.selected = NO;
-                                        }
+                                        NSLog(@"indexPath.row : %ld", indexPath.row);
+                                        cell.btn_PlayPause.selected = isPlay;
                                     }
                                     
-                                    cell.player = player;
+//                                    NSString *str_Key = [NSString stringWithFormat:@"%ld", indexPath.row];
+//                                    NSDictionary *dic_PlayerData = [self.dicM_AutoAudio objectForKey:str_Key];
+//                                    AVPlayer *player = [dic_PlayerData objectForKey:@"player"];
+//                                    if( player == nil )
+//                                    {
+//                                        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:url];
+//                                        player = [AVPlayer playerWithPlayerItem:playerItem];
+//                                        player = [AVPlayer playerWithURL:url];
+//                                        
+//                                        CGFloat fDuration = CMTimeGetSeconds(playerItem.asset.duration);
+//                                        NSLog(@"%f", fDuration);
+//                                        
+//                                        cell.lb_Time.text = @"00:00";
+//                                        
+//                                        __weak AutoChatAudioCell *weakCell = cell;
+//                                        [cell.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 2)
+//                                                                                  queue:dispatch_get_main_queue()
+//                                                                             usingBlock:^(CMTime time)
+//                                         {
+//                                             CGFloat fCurrentTime = CMTimeGetSeconds(time);
+//                                             NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+//                                             NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+//                                             weakCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+//                                             
+//                                             NSLog(@"%f", CMTimeGetSeconds(time));
+//                                         }];
+//                                        
+//                                        [self.dicM_AutoAudio setObject:@{@"cell":cell, @"player":player} forKey:str_Key];
+//                                    }
+//                                    else
+//                                    {
+//                                        if ((player.rate != 0) && (player.error == nil))
+//                                        {
+//                                            cell.btn_PlayPause.selected = YES;
+//                                        }
+//                                        else
+//                                        {
+//                                            cell.btn_PlayPause.selected = NO;
+//                                        }
+//                                    }
+//                                    
+//                                    cell.player = player;
                                     
                                     cell.tag = cell.btn_PlayPause.tag = cell.btn_Replay.tag = indexPath.row;
+                                    [cell.btn_PlayPause removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+                                    [cell.btn_Replay removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
                                     [cell.btn_PlayPause addTarget:self action:@selector(onAutoAudioPlayAndPause:) forControlEvents:UIControlEventTouchUpInside];
                                     [cell.btn_Replay addTarget:self action:@selector(onAutoAudioReplay:) forControlEvents:UIControlEventTouchUpInside];
                                     
@@ -2540,6 +2589,21 @@ typedef enum {
         
         self.v_CommentKeyboardAccView.tv_Contents.text = str_AutoAnswer;
         
+        if( [str_AutoAnswer rangeOfString:@"다음"].location != NSNotFound )
+        {
+            if( currentPlayer )
+            {
+                if( self.timeObserver )
+                {
+                    [currentPlayer removeTimeObserver:self.timeObserver];
+                    self.timeObserver = nil;
+                }
+                
+                [currentPlayer pause];
+                currentPlayer = nil;
+            }
+        }
+        
         [self goSendMsg:nil];
         [tableView reloadData];
     }
@@ -2547,37 +2611,141 @@ typedef enum {
 
 - (void)onAutoAudioPlayAndPause:(UIButton *)btn
 {
-    NSString *str_Key = [NSString stringWithFormat:@"%ld", btn.tag];
-    NSDictionary *dic_PlayerData = [self.dicM_AutoAudio objectForKey:str_Key];
-    //    AVPlayer *player = [dic_PlayerData objectForKey:@"player"];
-    
-    AutoChatAudioCell *cell = [dic_PlayerData objectForKey:@"cell"];
-    if ((cell.player.rate != 0) && (cell.player.error == nil))
+    NSIndexPath* indexPath = [NSIndexPath indexPathForRow:btn.tag inSection:0];
+    AutoChatAudioCell* cell = [self.tbv_List cellForRowAtIndexPath:indexPath];
+    if( cell.nEId != currentEId )
     {
-        [cell.player pause];
+        //다른 플레이어를 선택했을때
+        isPlay = NO;
+    }
+
+    if( isPlay == NO )
+    {
+        if( cell.nEId == currentEId )
+        {
+            if ((currentPlayer.rate == 0) && (currentPlayer.error == nil))
+            {
+                isPlay = YES;
+                [currentPlayer play];
+                [self.tbv_List reloadData];
+                return;
+            }
+        }
+        
+        SBDBaseMessage *baseMessage = self.messages[indexPath.row];
+        SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+        NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+        NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+
+        long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
+
+        currentCell = cell;
+        currentUrl = cell.url;
+        currentEId = cell.nEId; //42940
+        currentTag = cell.tag;
+        currentCreateTime = llCreateTime;
+//        nPlayEId = currentEId;
+        
+        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:currentUrl];
+        currentPlayer = [AVPlayer playerWithPlayerItem:playerItem];
+        currentPlayer = [AVPlayer playerWithURL:cell.url];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemDidFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
+
+        CGFloat fDuration = CMTimeGetSeconds(playerItem.asset.duration);
+        //    NSLog(@"%f", fDuration);
+        
+        
+        
+        self.timeObserver = [currentPlayer addPeriodicTimeObserverForInterval:CMTimeMake(1, 2)
+                                                    queue:dispatch_get_main_queue()
+                                               usingBlock:^(CMTime time)
+         {
+             NSLog(@"11111");
+             NSLog(@"cell.nEId : %ld", cell.nEId);
+             NSLog(@"22222");
+             NSLog(@"cell.nEId : %ld", currentEId);
+             NSLog(@"currentCell : %@", currentCell);
+             if( cell.nEId == currentEId )
+             {
+                 NSLog(@"@@@@@@@@@@@@@@@@@@@@@@");
+                 CGFloat fCurrentTime = CMTimeGetSeconds(time);
+                 NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+                 NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+                 currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+             }
+         }];
+        
+        [currentPlayer play];
+        isPlay = YES;
     }
     else
     {
-//        id observer = [dic_PlayerData objectForKey:@"observer"];
-
-        [cell.player play];
+        [currentPlayer pause];
+        isPlay = NO;
     }
     
-    btn.selected = !btn.selected;
+    [self.tbv_List reloadData];
+    
+    
+    
+    
+    
+    
+    
+//    player
+    
+//    AutoChatAudioCell *cell = [dic_PlayerData objectForKey:@"cell"];
+//    if ((cell.player.rate != 0) && (cell.player.error == nil))
+//    {
+//        [cell.player pause];
+//    }
+//    else
+//    {
+////        id observer = [dic_PlayerData objectForKey:@"observer"];
+//
+//        [cell.player play];
+//    }
+//    
+//    btn.selected = !btn.selected;
 }
 
 - (void)onAutoAudioReplay:(UIButton *)btn
 {
-    NSString *str_Key = [NSString stringWithFormat:@"%ld", btn.tag];
-    NSDictionary *dic_PlayerData = [self.dicM_AutoAudio objectForKey:str_Key];
-    //    AVPlayer *player = [dic_PlayerData objectForKey:@"player"];
+    if( currentPlayer == nil )  return;
     
-    AutoChatAudioCell *cell = [dic_PlayerData objectForKey:@"cell"];
-    if ((cell.player.rate != 0) && (cell.player.error == nil))
+    NSIndexPath* indexPath = [NSIndexPath indexPathForRow:btn.tag inSection:0];
+    AutoChatAudioCell* cell = [self.tbv_List cellForRowAtIndexPath:indexPath];
+    if( cell.nEId != currentEId )
     {
-        [cell.player seekToTime:CMTimeMake(0, 1)];
-        [cell.player play];
+        //다른 플레이어를 선택했을때
+        return;
     }
+
+    isPlay = YES;
+    [currentPlayer seekToTime:CMTimeMake(0, 1)];
+    [currentPlayer play];
+    [self.tbv_List reloadData];
+    
+//    NSString *str_Key = [NSString stringWithFormat:@"%ld", btn.tag];
+//    NSDictionary *dic_PlayerData = [self.dicM_AutoAudio objectForKey:str_Key];
+//    //    AVPlayer *player = [dic_PlayerData objectForKey:@"player"];
+//    
+//    AutoChatAudioCell *cell = [dic_PlayerData objectForKey:@"cell"];
+//    if ((currentPlayer.rate != 0) && (currentPlayer.error == nil))
+//    {
+//        [currentPlayer seekToTime:CMTimeMake(0, 1)];
+//        [currentPlayer play];
+//    }
+}
+
+- (void)itemDidFinishPlaying:(NSNotification *)noti
+{
+    isPlay = NO;
+    currentCell = nil;
+    currentUrl = nil;
+    currentEId = -1;
+    currentTag = -1;
+    [self.tbv_List reloadData];
 }
 
 - (void)onKeyboardShowInterval
@@ -2708,8 +2876,8 @@ typedef enum {
                         //                    CGSize size = [Util getTextSize:self.c_MyChatBasicCell.lb_Contents.text];
                         CGRect rect = [self.c_MyChatBasicCell.lb_Contents.attributedText boundingRectWithSize:CGSizeMake(self.c_MyChatBasicCell.lb_Contents.frame.size.width, FLT_MAX) options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading | NSStringDrawingTruncatesLastVisibleLine context:nil];
                         
-                        NSLog(@"text hieght : %f", rect.size.height);
-                        NSLog(@"c_MyChatBasicCell height : %f", [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
+//                        NSLog(@"text hieght : %f", rect.size.height);
+//                        NSLog(@"c_MyChatBasicCell height : %f", [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
                         
                         return [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
                     }
@@ -3008,32 +3176,119 @@ typedef enum {
     return 0;
 }
 
-//- (void)tableView:(UITableView *)tableView willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
-//{
-//    id message = self.messages[indexPath.row];
-//
-//    if( [message isKindOfClass:[SBDBaseMessage class]] )
-//    {
-//        SBDBaseMessage *baseMessage = self.messages[indexPath.row];
-//        SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-//
-//        if( [userMessage.customType isEqualToString:@"audio"] )
-//        {
-//            NSString *str = [NSString stringWithFormat:@"willDisplayCell : %ld", indexPath.row];
-//            NSLog(@"%@", str);
-//
-////            AutoChatAudioCell *audioCell = (AutoChatAudioCell *)cell;
-////            if ((audioCell.player.rate != 0) && (audioCell.player.error == nil))
-////            {
-////                NSLog(@"will play");
-////            }
-////            else
-////            {
-////                NSLog(@"will stop");
-////            }
-//        }
-//    }
-//}
+- (void)tableView:(UITableView *)tableView didEndDisplayingCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath*)indexPath
+{
+    if( indexPath == nil )  return;
+    
+    id message = self.messages[indexPath.row];
+    
+    if( [message isKindOfClass:[SBDBaseMessage class]] )
+    {
+        SBDBaseMessage *baseMessage = self.messages[indexPath.row];
+        SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+        NSLog(@"mesage: %@, customType: %@", userMessage.message, userMessage.customType);
+        if( [userMessage.customType isEqualToString:@"audio"] )
+        {
+            if( nPlayEId > -1 && nTmpPlayEId == nPlayEId )
+            {
+                NSLog(@"ININININININININININININININININ");
+                if( currentPlayer )
+                {
+                    if( self.timeObserver )
+                    {
+                        [currentPlayer removeTimeObserver:self.timeObserver];
+                        self.timeObserver = nil;
+                    }
+
+                    [currentPlayer pause];
+                    currentPlayer = nil;
+                }
+                
+                AutoChatAudioCell* currentCell = (AutoChatAudioCell *)cell;
+                
+//                [self performSelector:@selector(playInterval:) withObject:currentCell.btn_PlayPause afterDelay:1.7f];
+//                [self onAutoAudioPlayAndPause:currentCell.btn_PlayPause];
+                
+                SBDBaseMessage *baseMessage = message;
+                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                
+                long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
+                if( currentCreateTime == llCreateTime )
+                {
+                    nTmpPlayTag = cell.tag;
+
+                    currentCell = currentCell;
+                    currentUrl = currentCell.url;
+                    currentEId = currentCell.nEId; //42940
+                    currentTag = currentCell.tag;
+                    //                currentCell.createTime = llCreateTime;
+                    //                currentCreateTime = llCreateTime;
+                    
+                    //        nPlayEId = currentEId;
+                    
+                    AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:currentUrl];
+                    currentPlayer = [AVPlayer playerWithPlayerItem:playerItem];
+                    currentPlayer = [AVPlayer playerWithURL:currentCell.url];
+                    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemDidFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
+                    
+                    CGFloat fDuration = CMTimeGetSeconds(playerItem.asset.duration);
+                    //    NSLog(@"%f", fDuration);
+                    
+                    
+                    if( currentPlayer && self.timeObserver )
+                    {
+                        [currentPlayer removeTimeObserver:self.timeObserver];
+                        self.timeObserver = nil;
+                    }
+                    
+                    self.timeObserver = [currentPlayer addPeriodicTimeObserverForInterval:CMTimeMake(1, 2)
+                                                                queue:dispatch_get_main_queue()
+                                                           usingBlock:^(CMTime time)
+                     {
+                         NSLog(@"11111");
+                         NSLog(@"cell.nEId : %ld", currentCell.nEId);
+                         NSLog(@"22222");
+                         NSLog(@"cell.nEId : %ld", currentEId);
+                         NSLog(@"currentCell : %@", currentCell);
+//                         if( currentCell.nEId == currentEId )
+//                             //                     if( currentCreateTime == currentCell.createTime )
+//                         {
+//                             NSLog(@"@@@@@@@@@@@@@@@@@@@@@@");
+//                             CGFloat fCurrentTime = CMTimeGetSeconds(time);
+//                             NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+//                             NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+//                             currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+//                         }
+                         CGFloat fCurrentTime = CMTimeGetSeconds(time);
+                         NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+                         NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+                         currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+
+                     }];
+                    
+                    [currentPlayer play];
+                    isPlay = YES;
+                    
+                    nPlayEId = -1;
+                    [self.tbv_List reloadData];
+                }
+            }
+        }
+    }
+}
+
+- (void)playInterval:(UIButton *)btn
+{
+    [self onAutoAudioPlayAndPause:btn];
+    nPlayEId = -1;
+}
+
+- (void)tableView:(UITableView *)tableView willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    
+}
 
 //- (void)tableView:(UITableView *)tableView didEndDisplayingCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath*)indexPath NS_AVAILABLE_IOS(6_0);
 //{
@@ -6162,6 +6417,16 @@ typedef enum {
 {
     [self.channel markAsRead];
     
+    if( self.timeObserver )
+    {
+        [currentPlayer removeTimeObserver:self.timeObserver];
+        self.timeObserver = nil;
+    }
+
+    [currentPlayer pause];
+    currentPlayer = nil;
+    
+    
     NSMutableArray *arM_Temp = [NSMutableArray arrayWithArray:self.arM_List];
     //    if( arM_Temp.count > 40 )
     //    {
@@ -6584,6 +6849,7 @@ typedef enum {
 - (void)chatTap:(UIGestureRecognizer *)gestureRecognizer
 {
     [self.view endEditing:YES];
+    bLastKeybaordStatus = self.v_CommentKeyboardAccView.btn_KeyboardChange.selected;
 }
 
 - (void)topImageTap:(UIGestureRecognizer *)gestureRecognizer
@@ -7242,6 +7508,25 @@ typedef enum {
                                                                 }
                                                                 else if( [str_UserInputMsg rangeOfString:@"다음"].location != NSNotFound )
                                                                 {
+//                                                                    if( currentPlayer )
+//                                                                    {
+//                                                                        if( self.timeObserver )
+//                                                                        {
+//                                                                            [currentPlayer removeTimeObserver:self.timeObserver];
+//                                                                            self.timeObserver = nil;
+//                                                                        }
+//
+//                                                                        [currentPlayer pause];
+//                                                                        currentPlayer = nil;
+//                                                                    }
+                                                                    
+                                                                    nAutoAnswerIdx = -1;
+                                                                    nPlayEId = -1;
+                                                                    currentEId = -1;
+                                                                    nTmpPlayEId = -1;
+                                                                    nTmpPlayTag = -1;
+                                                                    currentCreateTime = -1;
+                                                                    
                                                                     [weakSelf.arM_AutoAnswer removeObject:dic_SelectedAutoAnswer];
                                                                     [dicM_Tmp setObject:@"showNextQuestion" forKey:@"mesgAction"];
                                                                     [dicM_Tmp setObject:@"N" forKey:@"readReport"];
@@ -9259,7 +9544,11 @@ typedef enum {
         
         if( [data.customType isEqualToString:@"audio"] )
         {
+            nPlayEId = [[dic objectForKey:@"eId"] integerValue];//43106
+            nTmpPlayEId = nPlayEId;
             
+            long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
+            currentCreateTime = llCreateTime;
         }
         
         [self.channel markAsRead];
