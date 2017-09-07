@@ -7,8 +7,9 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "SWTableViewCell.h"
 
-@interface NormalQuestionCell : UITableViewCell
+@interface NormalQuestionCell : SWTableViewCell
 @property (nonatomic, weak) IBOutlet UIScrollView *sv_Contents;
 @property (nonatomic, weak) IBOutlet UIButton *btn_Origin;
 @property (nonatomic, weak) IBOutlet UIImageView *iv_User;

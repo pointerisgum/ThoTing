@@ -46,8 +46,11 @@
 //        self.lb_Contents.preferredMaxLayoutWidth = CGRectGetWidth(self.lb_Contents.frame);
 
 //    self.lb_Msg.preferredMaxLayoutWidth = CGRectGetWidth(self.lb_Msg.frame);
-    self.lb_Msg.preferredMaxLayoutWidth = self.frame.size.width - 111;
-    self.lb_Contents.preferredMaxLayoutWidth = self.frame.size.width - 190;
+//    self.lb_Msg.preferredMaxLayoutWidth = self.frame.size.width - 111;
+//    self.lb_Contents.preferredMaxLayoutWidth = self.frame.size.width - 190;
+    
+    self.lb_Contents.preferredMaxLayoutWidth = self.frame.size.width - kChatMargin;
+    self.lb_Msg.preferredMaxLayoutWidth = self.frame.size.width - kChatMargin;
 }
 
 @end

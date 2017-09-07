@@ -60,6 +60,7 @@ static NSInteger const kInfinityTimeInterval = 5.0f;
 static NSInteger kTabBarBadgeIdx = 1;
 static NSInteger kTabBarMyIdx = 3;
 
+static CGFloat kChatMargin = 110.f;
 
 #define HanLog(string, ...) NSLog(@“%@”,[NSString stringWithCString:[[string description] cStringUsingEncoding:NSASCIIStringEncoding] encoding:NSNonLossyASCIIStringEncoding])
 

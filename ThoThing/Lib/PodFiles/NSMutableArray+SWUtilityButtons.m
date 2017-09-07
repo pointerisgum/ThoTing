@@ -42,6 +42,12 @@
 //    button.frame = CGRectMake(0, 0, normalIcon.size.width, normalIcon.size.height);
     button.backgroundColor = color;
 
+    [button setTitleColor:[UIColor lightGrayColor] forState:0];
+    [button.titleLabel setFont:[UIFont fontWithName:@"Helvetica" size:12]];
+    [button setContentVerticalAlignment:UIControlContentVerticalAlignmentBottom];
+    [button setContentVerticalAlignment:UIControlContentVerticalAlignmentCenter];
+    [button setTitleEdgeInsets:UIEdgeInsetsMake(8, 0, 0, 0)];
+    
     [button setImage:normalIcon forState:UIControlStateNormal];
     button.imageView.contentMode = UIViewContentModeScaleAspectFill;
     [button setImage:selectedIcon forState:UIControlStateHighlighted];

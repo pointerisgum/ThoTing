@@ -66,9 +66,37 @@
         self.lb_PlaceHolder.hidden = YES;
     }
 
-
     return YES;
 }
+
+- (BOOL)textViewShouldBeginEditing:(UITextView *)textView
+{
+    if( self.btn_KeyboardChange.selected )
+    {
+        if( self.completionBlock )
+        {
+            self.completionBlock(nil);
+        }
+        
+        if( self.fKeyboardHeight > 0 )
+        {
+            self.lc_Bottom.constant = self.fKeyboardHeight;
+        }
+        else
+        {
+            self.lc_Bottom.constant = 258.f;
+        }
+        
+        [UIView animateWithDuration:0.25f animations:^{
+            [self.superview layoutIfNeeded];
+        }];
+        
+        return NO;
+    }
+    
+    return YES;
+}
+
 
 - (void)onChangeInterval
 {

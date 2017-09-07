@@ -46,7 +46,9 @@
     [self.contentView layoutIfNeeded];
     
 //    self.lb_Contents.preferredMaxLayoutWidth = CGRectGetWidth(self.lb_Contents.frame);
-    self.lb_Contents.preferredMaxLayoutWidth = self.frame.size.width - 180;
+//    self.lb_Contents.preferredMaxLayoutWidth = self.frame.size.width - 180;
+    
+    self.lb_Contents.preferredMaxLayoutWidth = self.frame.size.width - kChatMargin;
 }
 
 @end

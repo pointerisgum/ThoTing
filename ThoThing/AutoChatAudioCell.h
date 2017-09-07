@@ -9,13 +9,16 @@
 #import <UIKit/UIKit.h>
 #import <MediaPlayer/MediaPlayer.h>
 #import <AVKit/AVKit.h>
+#import "SWTableViewCell.h"
 
-@interface AutoChatAudioCell : UITableViewCell
+@interface AutoChatAudioCell : SWTableViewCell
 @property (nonatomic, assign) NSInteger nEId;
 @property (nonatomic, assign) long long createTime;
+@property (nonatomic, assign) long long messageId;
 @property (nonatomic, strong) AVPlayer *player;
 @property (nonatomic, strong) NSURL *url;
 @property (nonatomic, weak) IBOutlet UIButton *btn_PlayPause;
 @property (nonatomic, weak) IBOutlet UILabel *lb_Time;
+@property (nonatomic, weak) IBOutlet UILabel *lb_BgTime;
 @property (nonatomic, weak) IBOutlet UIButton *btn_Replay;
 @end

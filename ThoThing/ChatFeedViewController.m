@@ -70,9 +70,13 @@ static NSInteger kMoreCount = 50;
 static AVPlayer *currentPlayer = nil;
 static NSURL *currentUrl = nil;
 static AutoChatAudioCell *currentCell = nil;
+static UILabel *lb_PlayerTime = nil;
 static NSInteger currentEId = -1;
 static NSInteger currentTag = 0;
 static long long currentCreateTime = -1;
+static long long llCurrentMessageId = -1;
+
+static NSInteger kReJoinInterval = 3;
 
 typedef enum {
     kLeaveChat      = -1,
@@ -89,20 +93,22 @@ typedef enum {
     kPrintContinue  = 3,    //계속풀기
 } AutoChatMode;
 
-@interface ChatFeedViewController () <UIActionSheetDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, MWPhotoBrowserDelegate, SBDChannelDelegate, SBDConnectionDelegate, TTTAttributedLabelDelegate, UIGestureRecognizerDelegate, UITableViewDelegate, UITableViewDataSource>
+@interface ChatFeedViewController () <UIActionSheetDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, MWPhotoBrowserDelegate, SBDChannelDelegate, SBDConnectionDelegate, TTTAttributedLabelDelegate, UIGestureRecognizerDelegate, UITableViewDelegate, UITableViewDataSource, SWTableViewCellDelegate, UITextFieldDelegate>
 {
     BOOL isLoding;
     BOOL isFirstLoad;   //첫 로드인지 기억했다가 첫로드면 로드중 추가된 메세지는 로드후 애드 시키기 위함
     BOOL hasNext;
     BOOL isShowInRoomMsg;
     BOOL isPlay;
-    BOOL bLastKeybaordStatus;
+//    BOOL bLastKeybaordStatus;
+    BOOL isSendPassible;
     
     NSInteger nPlayEId;
     NSInteger nTmpPlayEId;
     NSInteger nTotalCnt;
     NSInteger nTmpPlayTag;
-    
+    NSInteger nTmpEId;
+
     CGFloat fKeyboardHeight;
     
     NSString *str_UserImagePrefix;
@@ -129,6 +135,7 @@ typedef enum {
 @property (nonatomic, strong) NSMutableArray *arM_TempList;
 @property (nonatomic, strong) NSMutableArray *arM_MessageQ;
 @property (nonatomic, strong) NSMutableDictionary *dicM_TempMyContents;
+@property (nonatomic, strong) NSMutableDictionary *dicM_NextPlayInfo;
 @property (nonatomic, strong) NSDictionary *dic_PrintItemInfo;
 @property (nonatomic, strong) NSTimer *tm_MessageQ;
 @property (nonatomic, strong) NSDictionary *dic_Data;
@@ -182,19 +189,29 @@ typedef enum {
 
 @property (nonatomic, strong) AutoAnswerCell *c_AutoAnswerCell;
 
+@property (nonatomic, weak) IBOutlet UITableView *tbv_TempleteList;
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_BotomListHeight;
+
 @end
 
 @implementation ChatFeedViewController
 
 - (void)onEnterForegroundNoti
 {
+    NSLog(@"BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK ");
     if( self.dic_BotInfo )
     {
+        isSendPassible = YES;
         [self sendBotWelcome];
     }
     else
     {
         [self.view endEditing:YES];
+        self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+        [UIView animateWithDuration:0.25f animations:^{
+            [self.view layoutIfNeeded];
+        }];
+
     }
 }
 
@@ -219,9 +236,33 @@ typedef enum {
     
     //    [self startSendBird];
     
+    isSendPassible = YES;
+
     NSLog(@"self.str_PdfImageUrl : %@", self.str_PdfImageUrl);
     
+//    self.v_CommentKeyboardAccView.tv_Contents.autocorrectionType = UITextAutocorrectionTypeNo;
+
+    __weak typeof(self)weakSelf = self;
+
+    [self.v_CommentKeyboardAccView setCompletionBlock:^(id completeResult) {
+    
+        [weakSelf moveToScroll:YES];
+    }];
+    
     self.autoChatMode = kPrintExam;
+    
+    if( fKeyboardHeight <= 0 )
+    {
+        if( self.v_CommentKeyboardAccView.tv_Contents.autocorrectionType == UITextAutocorrectionTypeDefault ||
+           self.v_CommentKeyboardAccView.tv_Contents.autocorrectionType == UITextAutocorrectionTypeYes )
+        {
+            fKeyboardHeight = 258.f;
+        }
+        else
+        {
+            fKeyboardHeight = 216.f;
+        }
+    }
     
     /*
      SBDUserConnectionStatusNonAvailable = 0,
@@ -288,9 +329,8 @@ typedef enum {
     inputView.userInteractionEnabled = NO;
     
     
-    self.v_CommentKeyboardAccView.tv_Contents.inputAccessoryView = inputView;
+//    self.v_CommentKeyboardAccView.tv_Contents.inputAccessoryView = inputView;
     
-    __weak typeof(self)weakSelf = self;
     
     inputView.inputAcessoryViewFrameChangedBlock = ^(CGRect inputAccessoryViewFrame){
         
@@ -320,6 +360,7 @@ typedef enum {
     nTmpPlayEId = -1;
     nTmpPlayTag = -1;
     currentCreateTime = -1;
+    lb_PlayerTime = nil;
     
     self.arM_AutoAnswer = [NSMutableArray array];
     
@@ -339,6 +380,9 @@ typedef enum {
     
     self.tbv_List.tableHeaderView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tbv_List.frame.size.width, 27.f)];
     self.tbv_List.tableFooterView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tbv_List.frame.size.width, 10.f)];
+    
+    self.tbv_TempleteList.tableHeaderView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tbv_List.frame.size.width, 8.f)];
+    self.tbv_TempleteList.tableFooterView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.tbv_List.frame.size.width, 8.f)];
     
     self.c_MyChatBasicCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([MyChatBasicCell class])];
     self.c_OtherChatBasicCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([OtherChatBasicCell class])];
@@ -364,9 +408,10 @@ typedef enum {
     
     self.c_NormalQuestionCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([NormalQuestionCell class])];
     
-    //    self.c_AutoAnswerCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([AutoAnswerCell class])];
-    NSArray *topLevelObjects = [[NSBundle mainBundle]loadNibNamed:@"AutoAnswerCell" owner:self options:nil];
-    self.c_AutoAnswerCell = [topLevelObjects objectAtIndex:0];
+    self.c_AutoAnswerCell = [self.tbv_TempleteList dequeueReusableCellWithIdentifier:NSStringFromClass([AutoAnswerCell class])];
+    
+//    NSArray *topLevelObjects = [[NSBundle mainBundle]loadNibNamed:@"AutoAnswerCell" owner:self options:nil];
+//    self.c_AutoAnswerCell = [topLevelObjects objectAtIndex:0];
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onEnterForegroundNoti) name:@"EnterForegroundNoti" object:nil];
     
@@ -561,63 +606,113 @@ typedef enum {
 
 - (void)onKeyboardChange:(UIButton *)btn
 {
+    if( self.arM_AutoAnswer.count <= 0 )
+    {
+        btn.selected = NO;
+        [self.v_CommentKeyboardAccView becomeFirstResponder];
+        return;
+    }
+    
     btn.selected = !btn.selected;
     
-    UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
+//    UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
     
     if( btn.selected )
     {
-        UIView *view = [[UIView alloc] initWithFrame:CGRectMake(0, self.view.frame.size.height - fKeyboardHeight, window.bounds.size.width, fKeyboardHeight)];
-        view.tag = 1982;
-        view.backgroundColor = [UIColor colorWithRed:240.f/255.f green:240.f/255.f blue:240.f/255.f alpha:1];
-        
-        UITableView *tbv_AutoAnswer = [[UITableView alloc] initWithFrame:CGRectMake(0, 0, view.frame.size.width, view.frame.size.height)];
-        tbv_AutoAnswer.tableHeaderView = [[UIView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, self.view.bounds.size.width, 8.f)];
-        tbv_AutoAnswer.tag = 1983;
-        tbv_AutoAnswer.backgroundColor = [UIColor clearColor];
-        tbv_AutoAnswer.separatorStyle = UITableViewCellSeparatorStyleNone;
-        tbv_AutoAnswer.delegate = self;
-        tbv_AutoAnswer.dataSource = self;
-        [tbv_AutoAnswer reloadData];
-        [view addSubview:tbv_AutoAnswer];
-        
-        [window addSubview:view];
-        [window bringSubviewToFront:view];
+//        UIView *view = [[UIView alloc] initWithFrame:CGRectMake(0, self.view.frame.size.height - fKeyboardHeight, window.bounds.size.width, fKeyboardHeight)];
+//        view.tag = 1982;
+//        view.backgroundColor = [UIColor colorWithRed:240.f/255.f green:240.f/255.f blue:240.f/255.f alpha:1];
+//        
+//        UITableView *tbv_AutoAnswer = [[UITableView alloc] initWithFrame:CGRectMake(0, 0, view.frame.size.width, view.frame.size.height)];
+//        tbv_AutoAnswer.tableHeaderView = [[UIView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, self.view.bounds.size.width, 8.f)];
+//        tbv_AutoAnswer.tag = 1983;
+//        tbv_AutoAnswer.backgroundColor = [UIColor clearColor];
+//        tbv_AutoAnswer.separatorStyle = UITableViewCellSeparatorStyleNone;
+//        tbv_AutoAnswer.delegate = self;
+//        tbv_AutoAnswer.dataSource = self;
+//        [tbv_AutoAnswer reloadData];
+//        [view addSubview:tbv_AutoAnswer];
+//        
+//        [window addSubview:view];
+//        [window bringSubviewToFront:view];
+
+        [self.v_CommentKeyboardAccView.tv_Contents resignFirstResponder];
+
+//        [UIView animateWithDuration:0.3f animations:^{
+//            
+//            [self.v_CommentKeyboardAccView resignFirstResponder];
+//        }];
+
     }
     else
     {
-        UIView *view = [window viewWithTag:1982];
-        [view removeFromSuperview];
+//        UIView *view = [window viewWithTag:1982];
+//        [view removeFromSuperview];
+
+        [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
+        
+//        [UIView animateWithDuration:0.3f animations:^{
+//           
+//            [self.v_CommentKeyboardAccView becomeFirstResponder];
+//        }];
+        
     }
 }
 
 - (void)showTempleteKeyboard
 {
+    [self.tbv_TempleteList reloadData];
+    
     self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = YES;
     
-    UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
-    UIView *view_Tmp = [window viewWithTag:1982];
-    if( view_Tmp )
+    [self moveToScroll:YES];
+    
+    if( fKeyboardHeight > 0 )
     {
-        [view_Tmp removeFromSuperview];
+        self.v_CommentKeyboardAccView.lc_Bottom.constant = fKeyboardHeight;
+    }
+    else
+    {
+        if( self.v_CommentKeyboardAccView.tv_Contents.autocorrectionType == UITextAutocorrectionTypeDefault ||
+           self.v_CommentKeyboardAccView.tv_Contents.autocorrectionType == UITextAutocorrectionTypeYes )
+        {
+            self.v_CommentKeyboardAccView.lc_Bottom.constant = 258.f;
+        }
+        else
+        {
+            self.v_CommentKeyboardAccView.lc_Bottom.constant = 216.f;
+        }
+        
     }
     
-    UIView *view = [[UIView alloc] initWithFrame:CGRectMake(0, self.view.frame.size.height - fKeyboardHeight, window.bounds.size.width, fKeyboardHeight)];
-    view.tag = 1982;
-    view.backgroundColor = [UIColor colorWithRed:240.f/255.f green:240.f/255.f blue:240.f/255.f alpha:1];
     
-    UITableView *tbv_AutoAnswer = [[UITableView alloc] initWithFrame:CGRectMake(0, 0, view.frame.size.width, view.frame.size.height)];
-    tbv_AutoAnswer.tableHeaderView = [[UIView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, self.view.bounds.size.width, 8.f)];
-    tbv_AutoAnswer.tag = 1983;
-    tbv_AutoAnswer.backgroundColor = [UIColor clearColor];
-    tbv_AutoAnswer.separatorStyle = UITableViewCellSeparatorStyleNone;
-    tbv_AutoAnswer.delegate = self;
-    tbv_AutoAnswer.dataSource = self;
-    [tbv_AutoAnswer reloadData];
-    [view addSubview:tbv_AutoAnswer];
     
-    [window addSubview:view];
-    [window bringSubviewToFront:view];
+//    [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
+//    [self.v_CommentKeyboardAccView.tv_Contents resignFirstResponder];
+    
+//    UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
+//    UIView *view_Tmp = [window viewWithTag:1982];
+//    if( view_Tmp )
+//    {
+//        [view_Tmp removeFromSuperview];
+//    }
+//    
+//    UIView *view = [[UIView alloc] initWithFrame:CGRectMake(0, self.view.frame.size.height - fKeyboardHeight, window.bounds.size.width, fKeyboardHeight)];
+//    view.tag = 1982;
+//    view.backgroundColor = [UIColor colorWithRed:240.f/255.f green:240.f/255.f blue:240.f/255.f alpha:1];
+//    
+//    UITableView *tbv_AutoAnswer = [[UITableView alloc] initWithFrame:CGRectMake(0, 0, view.frame.size.width, view.frame.size.height)];
+//    tbv_AutoAnswer.tableHeaderView = [[UIView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, self.view.bounds.size.width, 8.f)];
+//    tbv_AutoAnswer.tag = 1983;
+//    tbv_AutoAnswer.backgroundColor = [UIColor clearColor];
+//    tbv_AutoAnswer.separatorStyle = UITableViewCellSeparatorStyleNone;
+//    tbv_AutoAnswer.delegate = self;
+//    tbv_AutoAnswer.dataSource = self;
+//    [tbv_AutoAnswer reloadData];
+//    [view addSubview:tbv_AutoAnswer];
+//    
+//    [window addSubview:view];
+//    [window bringSubviewToFront:view];
 }
 
 - (void)onKeyboardShow
@@ -627,57 +722,69 @@ typedef enum {
 
 - (void)sendBotWelcome
 {
-    NSString *str_UserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
-    NSString *str_UserName = [[NSUserDefaults standardUserDefaults] objectForKey:@"userName"];
-    
-    
-    NSMutableDictionary *dicM_Param = [NSMutableDictionary dictionary];
-    [dicM_Param setObject:@"ADMM" forKey:@"message_type"];
-    [dicM_Param setObject:@"test" forKey:@"message"];
-    [dicM_Param setObject:@"cmd" forKey:@"custom_type"];
-    [dicM_Param setObject:@"enterBotRoom" forKey:@"custom_type"];
-    
-    NSMutableDictionary *dicM_Data = [NSMutableDictionary dictionary];
-    [dicM_Data setObject:@"enterBotRoom" forKey:@"type"];
-    
-    NSMutableDictionary *dicM_Inviter = [NSMutableDictionary dictionary];
-    [dicM_Inviter setObject:str_UserId forKey:@"user_id"];
-    [dicM_Inviter setObject:str_UserName forKey:@"nickname"];
-    [dicM_Data setObject:dicM_Inviter forKey:@"sender"];
-    
-    
-    //    NSMutableArray *arM_Users = [NSMutableArray array];
-    //    [dicM_Data setObject:arM_Users forKey:@"users"];
-    
-    [dicM_Data setObject:@"test" forKey:@"message"];
-    [dicM_Data setObject:[NSString stringWithFormat:@"%@", [self.dic_BotInfo objectForKey:@"userId"]] forKey:@"botUserId"];
-    [dicM_Data setObject:@"botChat" forKey:@"roomType"];
-    [dicM_Data setObject:@"user" forKey:@"userType"];
-    [dicM_Data setObject:@"" forKey:@"chatScreen"];
-    [dicM_Data setObject:@"" forKey:@"mesgAction"];
-    
-    NSError *error;
-    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_Data
-                                                       options:NSJSONWritingPrettyPrinted
-                                                         error:&error];
-    NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-    
-    [dicM_Param setObject:jsonString forKey:@"data"];
-    
-    [dicM_Param setObject:@"true" forKey:@"is_silent"];
-    
-    
-    NSString *str_Path = [NSString stringWithFormat:@"v3/group_channels/%@/messages", self.channel.channelUrl];
-    [[WebAPI sharedData] callAsyncSendBirdAPIBlock:str_Path
-                                             param:dicM_Param
-                                        withMethod:@"POST"
-                                         withBlock:^(id resulte, NSError *error) {
-                                             
-                                             if( resulte )
-                                             {
+    if( isSendPassible )
+    {
+        isSendPassible = NO;
+        
+        NSString *str_UserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+        NSString *str_UserName = [[NSUserDefaults standardUserDefaults] objectForKey:@"userName"];
+        
+        
+        NSMutableDictionary *dicM_Param = [NSMutableDictionary dictionary];
+        [dicM_Param setObject:@"ADMM" forKey:@"message_type"];
+        [dicM_Param setObject:@"test" forKey:@"message"];
+        [dicM_Param setObject:@"cmd" forKey:@"custom_type"];
+        [dicM_Param setObject:@"enterBotRoom" forKey:@"custom_type"];
+        
+        NSMutableDictionary *dicM_Data = [NSMutableDictionary dictionary];
+        [dicM_Data setObject:@"enterBotRoom" forKey:@"type"];
+        
+        NSMutableDictionary *dicM_Inviter = [NSMutableDictionary dictionary];
+        [dicM_Inviter setObject:str_UserId forKey:@"user_id"];
+        [dicM_Inviter setObject:str_UserName forKey:@"nickname"];
+        [dicM_Data setObject:dicM_Inviter forKey:@"sender"];
+        
+        
+        //    NSMutableArray *arM_Users = [NSMutableArray array];
+        //    [dicM_Data setObject:arM_Users forKey:@"users"];
+        
+        [dicM_Data setObject:@"test" forKey:@"message"];
+        [dicM_Data setObject:[NSString stringWithFormat:@"%@", [self.dic_BotInfo objectForKey:@"userId"]] forKey:@"botUserId"];
+        [dicM_Data setObject:@"botChat" forKey:@"roomType"];
+        [dicM_Data setObject:@"user" forKey:@"userType"];
+        [dicM_Data setObject:@"" forKey:@"chatScreen"];
+        [dicM_Data setObject:@"" forKey:@"mesgAction"];
+        
+        NSError *error;
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_Data
+                                                           options:NSJSONWritingPrettyPrinted
+                                                             error:&error];
+        NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+        
+        [dicM_Param setObject:jsonString forKey:@"data"];
+        
+        [dicM_Param setObject:@"true" forKey:@"is_silent"];
+        
+        
+        NSString *str_Path = [NSString stringWithFormat:@"v3/group_channels/%@/messages", self.channel.channelUrl];
+        [[WebAPI sharedData] callAsyncSendBirdAPIBlock:str_Path
+                                                 param:dicM_Param
+                                            withMethod:@"POST"
+                                             withBlock:^(id resulte, NSError *error) {
                                                  
-                                             }
-                                         }];
+                                                 if( resulte )
+                                                 {
+                                                     
+                                                 }
+                                             }];
+        
+        [self performSelector:@selector(onSendPassibleChange) withObject:nil afterDelay:kReJoinInterval];
+    }
+}
+
+- (void)onSendPassibleChange
+{
+    isSendPassible = YES;
 }
 
 - (void)scrollToBottomInterval:(NSNumber *)num
@@ -1017,10 +1124,15 @@ typedef enum {
     
     //    [self.v_CommentKeyboardAccView.tv_Contents resignFirstResponder];
     [self.view endEditing:YES];
+    self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    [UIView animateWithDuration:0.25f animations:^{
+        [self.view layoutIfNeeded];
+    }];
+
     
-    UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
-    UIView *view_Tmp = [window viewWithTag:1982];
-    [view_Tmp removeFromSuperview];
+//    UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
+//    UIView *view_Tmp = [window viewWithTag:1982];
+//    [view_Tmp removeFromSuperview];
     
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:UIKeyboardWillShowNotification
@@ -1246,33 +1358,46 @@ typedef enum {
     
     keyboardBounds = [self.view convertRect:keyboardBounds toView:nil];
     fKeyboardHeight = keyboardBounds.size.height;
-    
+    self.v_CommentKeyboardAccView.fKeyboardHeight = fKeyboardHeight;
+    self.lc_BotomListHeight.constant = fKeyboardHeight;
+
     [UIView animateWithDuration:[duration doubleValue] animations:^{
         [UIView setAnimationCurve:[curve intValue]];
         if([notification name] == UIKeyboardWillShowNotification)
         {
-            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = bLastKeybaordStatus;
-            if( bLastKeybaordStatus )
-            {
-                [self showTempleteKeyboard];
-            }
+//            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = bLastKeybaordStatus;
+//            if( bLastKeybaordStatus )
+//            {
+//                [self showTempleteKeyboard];
+//            }
+            
             self.v_CommentKeyboardAccView.lc_Bottom.constant = keyboardBounds.size.height;
+            
             //            self.v_CommentKeyboardAccView.lc_AddWidth.constant = 63.f;
-            if (self.tbv_List.contentSize.height > self.tbv_List.frame.size.height)
-            {
-                CGPoint offset = CGPointMake(0, self.tbv_List.contentOffset.y + keyboardBounds.size.height);
-                [self.tbv_List setContentOffset:offset animated:NO];
-            }
+            
+            [self moveToScroll:NO];
         }
         else if([notification name] == UIKeyboardWillHideNotification)
         {
-            bLastKeybaordStatus = self.v_CommentKeyboardAccView.btn_KeyboardChange.selected;
+//            if( bLastKeybaordStatus )
+//            {
+//                //템플릿 키보드면
+//                return ;
+//            }
+//            else
+//            {
+//                
+//            }
             
-            UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
-            UIView *view_Tmp = [window viewWithTag:1982];
-            [view_Tmp removeFromSuperview];
+//            bLastKeybaordStatus = self.v_CommentKeyboardAccView.btn_KeyboardChange.selected;
             
-            self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+//            UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
+//            UIView *view_Tmp = [window viewWithTag:1982];
+//            [view_Tmp removeFromSuperview];
+            
+//            self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+            
+            
             //            self.v_CommentKeyboardAccView.lc_AddWidth.constant = 0.f;
             //            self.v_CommentKeyboardAccView.tv_Contents.placeholder = @"질문하기...";
             
@@ -1287,6 +1412,24 @@ typedef enum {
         [self.v_CommentKeyboardAccView setNeedsLayout];
         
     }];
+}
+
+- (void)moveToScroll:(BOOL)isAnimation
+{
+    if (self.tbv_List.contentSize.height > self.tbv_List.frame.size.height &&
+        self.tbv_List.contentOffset.y < (self.tbv_List.contentSize.height - self.tbv_List.frame.size.height))
+    {
+        if( self.tbv_List.contentOffset.y + fKeyboardHeight > self.tbv_List.contentSize.height - self.tbv_List.frame.size.height )
+        {
+            CGPoint offset = CGPointMake(0, self.tbv_List.contentSize.height - self.tbv_List.frame.size.height);
+            [self.tbv_List setContentOffset:offset animated:isAnimation];
+        }
+        else
+        {
+            CGPoint offset = CGPointMake(0, self.tbv_List.contentOffset.y + fKeyboardHeight);
+            [self.tbv_List setContentOffset:offset animated:isAnimation];
+        }
+    }
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification
@@ -1752,20 +1895,20 @@ typedef enum {
 
 - (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView
 {
-//    if( scrollView == self.tbv_List )
-//    {
+    if( scrollView == self.tbv_List )
+    {
         if( scrollView.contentOffset.y <= 0 && isLoding == NO && self.messages.count > 0 )
         {
             [self updateChatList:NO];
         }
-//    }
+    }
 }
 
 - (void)addTapGesture:(UIView *)view
 {
-    UITapGestureRecognizer *chatTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(chatTap:)];
-    [chatTap setNumberOfTapsRequired:1];
-    [view addGestureRecognizer:chatTap];
+//    UITapGestureRecognizer *chatTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(chatTap:)];
+//    [chatTap setNumberOfTapsRequired:1];
+//    [view addGestureRecognizer:chatTap];
 }
 
 
@@ -1776,8 +1919,6 @@ typedef enum {
 {
     [[UIApplication sharedApplication] openURL:url];
 }
-
-
 
 
 #pragma mark - Table view methods
@@ -1832,12 +1973,14 @@ typedef enum {
     if( tableView == self.tbv_List )
     {
         id message = self.messages[indexPath.row];
+        long long llMessageId = 0;
         
         NSDictionary *dic = nil;
         if( [message isKindOfClass:[SBDBaseMessage class]] )
         {
             SBDBaseMessage *baseMessage = self.messages[indexPath.row];
             SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+            llMessageId = baseMessage.messageId;
             NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
             dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
             
@@ -1845,6 +1988,8 @@ typedef enum {
             {
                 //조인
                 CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
+//                cell.rightUtilityButtons = [self rightButtons];
+//                cell.delegate = self;
                 [tableView deselectRowAtIndexPath:indexPath animated:YES];
                 [self cmdCell:cell forRowAtIndexPath:indexPath];
                 [self addTapGesture:cell];
@@ -1854,6 +1999,9 @@ typedef enum {
             if( [userMessage.customType isEqualToString:@"cmd"] )
             {
                 CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
+//                cell.rightUtilityButtons = [self rightButtons];
+//                cell.delegate = self;
+
                 [tableView deselectRowAtIndexPath:indexPath animated:YES];
                 [self cmdCell:cell forRowAtIndexPath:indexPath];
                 [self addTapGesture:cell];
@@ -1868,6 +2016,9 @@ typedef enum {
             {
                 //조인
                 CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
+//                cell.rightUtilityButtons = [self rightButtons];
+//                cell.delegate = self;
+
                 [tableView deselectRowAtIndexPath:indexPath animated:YES];
                 [self cmdCell:cell forRowAtIndexPath:indexPath];
                 [self addTapGesture:cell];
@@ -1878,6 +2029,9 @@ typedef enum {
         if( dic == nil )
         {
             MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
+            cell.rightUtilityButtons = [self rightButtons];
+            cell.delegate = self;
+
             [tableView deselectRowAtIndexPath:indexPath animated:YES];
             
             return cell;
@@ -1892,6 +2046,9 @@ typedef enum {
         if( [[dic objectForKey:@"type"] isEqualToString:@"date"] )
         {
             CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
+//            cell.rightUtilityButtons = [self rightButtons];
+//            cell.delegate = self;
+
             [tableView deselectRowAtIndexPath:indexPath animated:YES];
             cell.v_Bg.backgroundColor = [UIColor clearColor];
             cell.lb_Cmd.text = [dic objectForKey:@"contents"];
@@ -1907,6 +2064,9 @@ typedef enum {
             if( [[dic objectForKey:@"type"] isEqualToString:@"text"] )
             {
                 MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
+                cell.rightUtilityButtons = [self rightButtons];
+                cell.delegate = self;
+
                 [tableView deselectRowAtIndexPath:indexPath animated:YES];
                 
                 //        cell.contentView.backgroundColor = [UIColor redColor];
@@ -1927,6 +2087,9 @@ typedef enum {
                 //        else if( [[dic objectForKey:@"type"] isEqualToString:@"image"] )
             {
                 MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
+                cell.rightUtilityButtons = [self rightButtons];
+                cell.delegate = self;
+
                 [tableView deselectRowAtIndexPath:indexPath animated:YES];
                 
                 cell.tag = cell.btn_Origin.tag = indexPath.row;
@@ -1948,8 +2111,13 @@ typedef enum {
                 NSData *data = [NSData dataWithData:[dic objectForKey:@"obj"]];
                 cell.iv_Contents.image = [UIImage imageWithData:data];
                 
-                cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+//                cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+                NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+                cell.lb_Date.text = @"";
                 
+                UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+                [btn_Date setTitle:str_Date forState:0];
+
                 if( [[dic objectForKey_YM:@"isFail"] isEqualToString:@"YES"] )
                 {
                     [cell.btn_Read setImage:BundleImage(@"chat_check_fail.png") forState:UIControlStateNormal];
@@ -1976,6 +2144,9 @@ typedef enum {
             else if( [[dic objectForKey:@"type"] isEqualToString:@"pdfQuestion"] )
             {
                 NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
+                cell.rightUtilityButtons = [self rightButtons];
+                cell.delegate = self;
+
                 [tableView deselectRowAtIndexPath:indexPath animated:YES];
                 
                 [self pdfQuestionCell:cell forRowAtIndexPath:indexPath withMy:YES];
@@ -1985,6 +2156,9 @@ typedef enum {
             else if( [[dic objectForKey:@"type"] isEqualToString:@"normalQuestion"] )
             {
                 NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
+                cell.rightUtilityButtons = [self rightButtons];
+                cell.delegate = self;
+
                 [tableView deselectRowAtIndexPath:indexPath animated:YES];
                 
                 [self normalQuestionCell:cell forRowAtIndexPath:indexPath withMy:YES];
@@ -1994,6 +2168,9 @@ typedef enum {
             else if( [[dic objectForKey:@"type"] isEqualToString:@"video"] )
             {
                 MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
+                cell.rightUtilityButtons = [self rightButtons];
+                cell.delegate = self;
+
                 [tableView deselectRowAtIndexPath:indexPath animated:YES];
                 
                 cell.tag = indexPath.row;
@@ -2007,7 +2184,13 @@ typedef enum {
                 NSData *data = [NSData dataWithData:[dic objectForKey:@"obj"]];
                 cell.iv_Contents.image = [UIImage imageWithData:data];
                 
-                cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+//                cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+                NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+                cell.lb_Date.text = @"";
+                
+                UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+                [btn_Date setTitle:str_Date forState:0];
+
                 
                 if( [[dic objectForKey_YM:@"isFail"] isEqualToString:@"YES"] )
                 {
@@ -2039,6 +2222,9 @@ typedef enum {
                     if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"image"] )
                     {
                         MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
+                        cell.rightUtilityButtons = [self rightButtons];
+                        cell.delegate = self;
+
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         cell.tag = indexPath.row;
@@ -2057,6 +2243,9 @@ typedef enum {
                     else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"pdfQuestion"] )
                     {
                         NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
+                        cell.rightUtilityButtons = [self rightButtons];
+                        cell.delegate = self;
+
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         [self pdfQuestionCell:cell forRowAtIndexPath:indexPath withMy:YES];
@@ -2066,6 +2255,9 @@ typedef enum {
                     else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"video"] )
                     {
                         MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
+                        cell.rightUtilityButtons = [self rightButtons];
+                        cell.delegate = self;
+
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         cell.tag = indexPath.row;
@@ -2078,6 +2270,9 @@ typedef enum {
                     else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"normalQuestion"] )
                     {
                         NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
+                        cell.rightUtilityButtons = [self rightButtons];
+                        cell.delegate = self;
+
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         [self normalQuestionCell:cell forRowAtIndexPath:indexPath withMy:YES];
@@ -2089,6 +2284,9 @@ typedef enum {
                         if( [[dic objectForKey_YM:@"itemType"] isEqualToString:@"cmd"] )
                         {
                             CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             [self cmdCell:cell forRowAtIndexPath:indexPath];
                             [self addTapGesture:cell];
@@ -2097,6 +2295,9 @@ typedef enum {
                         else
                         {
                             MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             
                             cell.tag = indexPath.row;
@@ -2123,6 +2324,9 @@ typedef enum {
                         {
                             //공유한 메세지가 있으면
                             MyShareExamCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyShareExamCell"];
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             
                             cell.tag = indexPath.row;
@@ -2135,6 +2339,9 @@ typedef enum {
                         else
                         {
                             MyShareExamNoMsgCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyShareExamNoMsgCell"];
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             
                             cell.tag = indexPath.row;
@@ -2167,6 +2374,9 @@ typedef enum {
                         {
                             //공유한 내용이 없으면
                             MyDirectChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyDirectChatCell"];
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             
                             cell.tag = indexPath.row;
@@ -2183,6 +2393,9 @@ typedef enum {
                     else if( [str_MsgType isEqualToString:@"channel-follow"] || [str_MsgType isEqualToString:@"regist-member"] )
                     {
                         MyCmdFollowingCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyCmdFollowingCell"];
+//                        cell.rightUtilityButtons = [self rightButtons];
+//                        cell.delegate = self;
+
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         [self myFollowingCell:cell forRowAtIndexPath:indexPath];
                         return cell;
@@ -2214,9 +2427,50 @@ typedef enum {
         {
             if( 1 )
             {
+                BOOL isUserIconHidden = NO;
+                
                 NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
                 if( ar_Body && ar_Body.count > 0 )
                 {
+                    //다음 메세지가 봇 메세지면 이미지 안보이게 하기
+                    if( self.dic_BotInfo )
+                    {
+                        if( self.messages.count > indexPath.row + 1 )
+                        {
+                            BOOL isAudioMsg = NO;
+                            id message = self.messages[indexPath.row + 1];
+                            NSDictionary *dic_Next = nil;
+                            if( [message isKindOfClass:[SBDBaseMessage class]] )
+                            {
+                                SBDBaseMessage *baseMessage = self.messages[indexPath.row + 1];
+                                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+                                if( [userMessage.customType isEqualToString:@"audio"] )
+                                {
+                                    isAudioMsg = YES;
+                                }
+                                
+                                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+                                dic_Next = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                            }
+                            else
+                            {
+                                isAudioMsg = YES;
+                                dic_Next = message;
+                            }
+                            
+                            NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
+                            NSInteger nNextUserId = [[dic_Next objectForKey_YM:@"userId"] integerValue];
+                            if( nUserId == nNextUserId && isAudioMsg == NO )
+                            {
+                                isUserIconHidden = YES;
+                            }
+                            else
+                            {
+                                isUserIconHidden = NO;
+                            }
+                        }
+                    }
+                    
                     NSDictionary *dic_ActionMap = [dic objectForKey:@"actionMap"];
                     //                NSString *str_ShareMsg = [dic_ActionMap objectForKey_YM:@"shareMsg"];
                     
@@ -2226,6 +2480,11 @@ typedef enum {
                     if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"image"] )
                     {
                         OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
+                        cell.rightUtilityButtons = [self rightButtons];
+                        cell.delegate = self;
+                        
+                        cell.iv_User.hidden = isUserIconHidden;
+                        
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         cell.tag = indexPath.row;
@@ -2239,11 +2498,19 @@ typedef enum {
                         cell.lb_Date.hidden = NO;
                         
                         [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:NO];
+                        
+                        cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
+
                         return cell;
                     }
                     else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"pdfQuestion"] )
                     {
                         NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
+                        cell.rightUtilityButtons = [self rightButtons];
+                        cell.delegate = self;
+
+                        cell.iv_User.hidden = isUserIconHidden;
+                        
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         [self pdfQuestionCell:cell forRowAtIndexPath:indexPath withMy:NO];
@@ -2253,6 +2520,11 @@ typedef enum {
                     else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"video"] )
                     {
                         OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
+                        cell.rightUtilityButtons = [self rightButtons];
+                        cell.delegate = self;
+
+                        cell.iv_User.hidden = isUserIconHidden;
+
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         cell.tag = indexPath.row;
@@ -2260,11 +2532,19 @@ typedef enum {
                         [cell addGestureRecognizer:longPress];
                         
                         [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:YES];
+                        
+                        cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
+                        
                         return cell;
                     }
                     else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"normalQuestion"] )
                     {
                         NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
+                        cell.rightUtilityButtons = [self rightButtons];
+                        cell.delegate = self;
+
+                        cell.iv_User.hidden = isUserIconHidden;
+
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         [self normalQuestionCell:cell forRowAtIndexPath:indexPath withMy:NO];
@@ -2276,6 +2556,9 @@ typedef enum {
                         if( [[dic objectForKey_YM:@"itemType"] isEqualToString:@"cmd"] )
                         {
                             CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
+//                            cell.rightUtilityButtons = [self rightButtons];
+//                            cell.delegate = self;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             [self cmdCell:cell forRowAtIndexPath:indexPath];
                             [self addTapGesture:cell];
@@ -2293,6 +2576,9 @@ typedef enum {
                                 if( [userMessage.customType isEqualToString:@"audio"] )
                                 {
                                     AutoChatAudioCell *cell = [tableView dequeueReusableCellWithIdentifier:@"AutoChatAudioCell"];
+//                                    cell.rightUtilityButtons = [self rightButtons];
+//                                    cell.delegate = self;
+
                                     [tableView deselectRowAtIndexPath:indexPath animated:YES];
                                     
                                     NSURL *url = [Util createImageUrl:[dic_Body objectForKey:@"image_prefix"] withFooter:[dic_Body objectForKey:@"qnaBody"]];
@@ -2306,22 +2592,40 @@ typedef enum {
 //                                        nPlayEId = -1;
 //                                    }
                                     
-                                    long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
-                                    cell.createTime = llCreateTime;
-                                    
+//                                    long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
+//                                    cell.createTime = llCreateTime;
+                                    cell.messageId = llMessageId;
 //                                    if( cell.nEId != currentEId )
-                                    if( currentCreateTime != llCreateTime )
+//                                    if( currentCreateTime != llCreateTime )
+                                    if( llCurrentMessageId == -1 || llCurrentMessageId != llMessageId )
                                     {
                                         AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:url];
                                         cell.player = [AVPlayer playerWithPlayerItem:playerItem];
                                         cell.player = [AVPlayer playerWithURL:url];
                                         cell.lb_Time.text = @"00:00";
+                                        cell.lb_Time.hidden = YES;
+                                        cell.lb_BgTime.hidden = NO;
                                         cell.btn_PlayPause.selected = NO;
+                                        
+                                        if( cell.player && self.timeObserver )
+                                        {
+                                            @try{
+                                                
+                                                [cell.player removeTimeObserver:self.timeObserver];
+                                                self.timeObserver = nil;
+
+                                            }@catch(id anException){
+                                                
+                                            }
+                                        }
                                     }
                                     else
                                     {
                                         NSLog(@"indexPath.row : %ld", indexPath.row);
+                                        cell.lb_Time.hidden = NO;
+                                        cell.lb_BgTime.hidden = YES;
                                         cell.btn_PlayPause.selected = isPlay;
+//                                        currentCell = cell;
                                     }
                                     
 //                                    NSString *str_Key = [NSString stringWithFormat:@"%ld", indexPath.row];
@@ -2378,6 +2682,11 @@ typedef enum {
                                 else if( [userMessage.customType isEqualToString:@"image"] )
                                 {
                                     OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
+                                    cell.rightUtilityButtons = [self rightButtons];
+                                    cell.delegate = self;
+
+                                    cell.iv_User.hidden = isUserIconHidden;
+
                                     [tableView deselectRowAtIndexPath:indexPath animated:YES];
                                     
                                     cell.tag = indexPath.row;
@@ -2391,11 +2700,20 @@ typedef enum {
                                     cell.lb_Date.hidden = NO;
                                     
                                     [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:NO];
+                                    
+                                    cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
+                                    
                                     return cell;
                                 }
                             }
                             
+                            //aaaaaaa
                             OtherChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherChatBasicCell"];
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+
+                            cell.iv_User.hidden = isUserIconHidden;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             
                             cell.tag = indexPath.row;
@@ -2403,7 +2721,12 @@ typedef enum {
                             [cell addGestureRecognizer:longPress];
                             
                             [self otherTextCell:cell forRowAtIndexPath:indexPath];
+                            
+                            cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 10.f;
                             //                            [self addTapGesture:cell];
+                            
+                      
+
                             
                             return cell;
                         }
@@ -2419,6 +2742,9 @@ typedef enum {
                         if( str_ShareMsg.length > 0 )
                         {
                             OtherShareExamCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherShareExamCell"];
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             
                             cell.tag = indexPath.row;
@@ -2426,11 +2752,15 @@ typedef enum {
                             [cell addGestureRecognizer:longPress];
                             
                             [self otherShareExamCell:cell forRowAtIndexPath:indexPath];
+                            
                             return cell;
                         }
                         else
                         {
                             OtherShareExamNoMsgCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherShareExamNoMsgCell"];
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             
                             cell.tag = indexPath.row;
@@ -2444,6 +2774,9 @@ typedef enum {
                     else if( [str_MsgType isEqualToString:@"channel-follow"] || [str_MsgType isEqualToString:@"regist-member"] )
                     {
                         OtherCmdFollowingCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherCmdFollowingCell"];
+//                        cell.rightUtilityButtons = [self rightButtons];
+//                        cell.delegate = self;
+
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         [self otherFollowingCell:cell forRowAtIndexPath:indexPath];
                         return cell;
@@ -2453,6 +2786,9 @@ typedef enum {
                         if( str_ShareMsg.length > 0 )
                         {
                             OtherDirectChatMsgCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherDirectChatMsgCell"];
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             
                             cell.tag = indexPath.row;
@@ -2467,6 +2803,9 @@ typedef enum {
                         else
                         {
                             OtherDirectChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherDirectChatCell"];
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             
                             cell.tag = indexPath.row;
@@ -2483,6 +2822,9 @@ typedef enum {
                     {
                         //남이 쓴 다이렉트 질문일 경우
                         OtherDirectChatMsgCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherDirectChatMsgCell"];
+                        cell.rightUtilityButtons = [self rightButtons];
+                        cell.delegate = self;
+
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         cell.tag = indexPath.row;
@@ -2497,6 +2839,9 @@ typedef enum {
                     else
                     {
                         MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
+                        cell.rightUtilityButtons = [self rightButtons];
+                        cell.delegate = self;
+
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         return cell;
@@ -2512,6 +2857,9 @@ typedef enum {
     else
     {
         AutoAnswerCell *cell = [tableView dequeueReusableCellWithIdentifier:@"AutoAnswerCell"];
+        cell.rightUtilityButtons = [self rightButtons];
+        cell.delegate = self;
+
         [tableView deselectRowAtIndexPath:indexPath animated:YES];
         
         if (cell == nil)
@@ -2526,11 +2874,13 @@ typedef enum {
         {
             cell.lb_Title.textColor = [UIColor whiteColor];
             cell.v_Bg.backgroundColor = [UIColor colorWithHexString:@"#343B57"];
+            cell.userInteractionEnabled = NO;
         }
         else
         {
             cell.lb_Title.textColor = [UIColor colorWithHexString:@"#343B57"];
             cell.v_Bg.backgroundColor = [UIColor whiteColor];
+            cell.userInteractionEnabled = YES;
         }
         
         return cell;
@@ -2570,14 +2920,15 @@ typedef enum {
         {
             str_AutoAnswer = [dic objectForKey:@"examTitle"];
             
-            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = NO;
+//            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = NO;
             [self performSelector:@selector(onKeyboardDownInterval) withObject:nil afterDelay:0.3f];
         }
         else if( self.autoChatMode == kPrintItem )
         {
             str_AutoAnswer = [NSString stringWithFormat:@"%@ %@", [dic objectForKey:@"itemNo"], [dic objectForKey:@"itemBody"]];
             
-            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = NO;
+//            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = NO;
+            
             [self performSelector:@selector(onKeyboardDownInterval) withObject:nil afterDelay:0.3f];
         }
         else if( self.autoChatMode == kPrintAnswer || self.autoChatMode == kNextExam || self.autoChatMode == kPrintContinue )
@@ -2595,8 +2946,14 @@ typedef enum {
             {
                 if( self.timeObserver )
                 {
-                    [currentPlayer removeTimeObserver:self.timeObserver];
-                    self.timeObserver = nil;
+                    @try{
+                        
+                        [currentPlayer removeTimeObserver:self.timeObserver];
+                        self.timeObserver = nil;
+                        
+                    }@catch(id anException){
+                        
+                    }
                 }
                 
                 [currentPlayer pause];
@@ -2627,7 +2984,12 @@ typedef enum {
             {
                 isPlay = YES;
                 [currentPlayer play];
-                [self.tbv_List reloadData];
+//                [self.tbv_List reloadData];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self.tbv_List reloadData];
+                    [self.tbv_List layoutIfNeeded];
+                });
+
                 return;
             }
         }
@@ -2637,13 +2999,16 @@ typedef enum {
         NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
         NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
 
-        long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
+//        long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
 
         currentCell = cell;
         currentUrl = cell.url;
         currentEId = cell.nEId; //42940
         currentTag = cell.tag;
-        currentCreateTime = llCreateTime;
+        llCurrentMessageId = cell.messageId;
+        lb_PlayerTime = cell.lb_Time;
+        
+//        currentCreateTime = llCreateTime;
 //        nPlayEId = currentEId;
         
         AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:currentUrl];
@@ -2651,7 +3016,7 @@ typedef enum {
         currentPlayer = [AVPlayer playerWithURL:cell.url];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemDidFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
 
-        CGFloat fDuration = CMTimeGetSeconds(playerItem.asset.duration);
+//        CGFloat fDuration = CMTimeGetSeconds(playerItem.asset.duration);
         //    NSLog(@"%f", fDuration);
         
         
@@ -2660,23 +3025,39 @@ typedef enum {
                                                     queue:dispatch_get_main_queue()
                                                usingBlock:^(CMTime time)
          {
-             NSLog(@"11111");
-             NSLog(@"cell.nEId : %ld", cell.nEId);
-             NSLog(@"22222");
-             NSLog(@"cell.nEId : %ld", currentEId);
-             NSLog(@"currentCell : %@", currentCell);
-             if( cell.nEId == currentEId )
-             {
-                 NSLog(@"@@@@@@@@@@@@@@@@@@@@@@");
+//             NSLog(@"11111");
+//             NSLog(@"cell.nEId : %ld", cell.nEId);
+//             NSLog(@"22222");
+//             NSLog(@"cell.nEId : %ld", currentEId);
+//             NSLog(@"currentCell : %@", currentCell);
+//             if( cell.messageId == llCurrentMessageId )
+//             {
+                 NSLog(@"onAutoAudioPlay");
                  CGFloat fCurrentTime = CMTimeGetSeconds(time);
                  NSInteger nMinute = (NSInteger)fCurrentTime / 60;
                  NSInteger nSecond = (NSInteger)fCurrentTime % 60;
                  currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
-             }
+             cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+             lb_PlayerTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+//             }
          }];
         
-        [currentPlayer play];
         isPlay = YES;
+
+        __weak __typeof(&*self)weakSelf = self;
+        [currentPlayer addBoundaryTimeObserverForTimes:@[[NSValue valueWithCMTime:CMTimeMake(1, 2)]]
+                                                 queue:dispatch_get_main_queue()
+                                            usingBlock:^{
+                                                
+//                                                [weakSelf.tbv_List reloadData];
+                                                dispatch_async(dispatch_get_main_queue(), ^{
+                                                    [weakSelf.tbv_List reloadData];
+                                                    [weakSelf.tbv_List layoutIfNeeded];
+                                                });
+
+                                            }];
+
+        [currentPlayer play];
     }
     else
     {
@@ -2684,8 +3065,12 @@ typedef enum {
         isPlay = NO;
     }
     
-    [self.tbv_List reloadData];
-    
+//    [self.tbv_List reloadData];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.tbv_List reloadData];
+        [self.tbv_List layoutIfNeeded];
+    });
+
     
     
     
@@ -2722,9 +3107,17 @@ typedef enum {
     }
 
     isPlay = YES;
+    
+    [Util rotationImage:btn withRadian:-180];
+    [Util rotationImage:btn withRadian:0];
+
+    
+    
+    
+    
     [currentPlayer seekToTime:CMTimeMake(0, 1)];
     [currentPlayer play];
-    [self.tbv_List reloadData];
+    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
     
 //    NSString *str_Key = [NSString stringWithFormat:@"%ld", btn.tag];
 //    NSDictionary *dic_PlayerData = [self.dicM_AutoAudio objectForKey:str_Key];
@@ -2738,14 +3131,181 @@ typedef enum {
 //    }
 }
 
+- (void)onReloadInterval
+{
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.tbv_List reloadData];
+        [self.tbv_List layoutIfNeeded];
+    });
+}
+
 - (void)itemDidFinishPlaying:(NSNotification *)noti
 {
+    NSInteger nTempTag = currentTag;
     isPlay = NO;
     currentCell = nil;
     currentUrl = nil;
     currentEId = -1;
     currentTag = -1;
-    [self.tbv_List reloadData];
+    llCurrentMessageId = -1;
+    
+    if( self.dicM_NextPlayInfo )
+    { 
+        llCurrentMessageId = [[self.dicM_NextPlayInfo objectForKey:@"messageId"] longLongValue];
+        currentUrl = [self.dicM_NextPlayInfo objectForKey:@"url"];
+        self.dicM_NextPlayInfo = nil;
+        
+        
+        
+        
+        
+        for (UIView *view in self.tbv_List.subviews)
+        {
+            for (UITableViewCell *cell in view.subviews)
+            {
+                if( [cell isKindOfClass:[AutoChatAudioCell class]] )
+                {
+                    AutoChatAudioCell *findCell = (AutoChatAudioCell *)cell;
+                    if( llCurrentMessageId == findCell.messageId )
+                    {
+                        nTmpPlayTag = findCell.tag;
+                        
+                        currentCell = findCell;
+                        currentUrl = findCell.url;
+                        currentEId = findCell.nEId; //42940
+                        currentTag = findCell.tag;
+                        lb_PlayerTime = findCell.lb_Time;
+
+                        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:currentUrl];
+                        currentPlayer = [AVPlayer playerWithPlayerItem:playerItem];
+                        currentPlayer = [AVPlayer playerWithURL:currentCell.url];
+                        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemDidFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
+                        
+                        isPlay = YES;
+                        [currentPlayer play];
+                        
+                        if( currentPlayer && self.timeObserver )
+                        {
+                            @try{
+                                
+                                [currentPlayer removeTimeObserver:self.timeObserver];
+                                self.timeObserver = nil;
+                                
+                            }@catch(id anException){
+                                
+                            }
+                        }
+                        
+                        self.timeObserver = [currentPlayer addPeriodicTimeObserverForInterval:CMTimeMake(1, 2)
+                                                                                        queue:dispatch_get_main_queue()
+                                                                                   usingBlock:^(CMTime time)
+                                             {
+                                                 NSLog(@"didEndDisplay");
+
+                                                 CGFloat fCurrentTime = CMTimeGetSeconds(time);
+                                                 NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+                                                 NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+                                                 currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                                 findCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                                 lb_PlayerTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                                 
+                                                 for (UIView *view in self.tbv_List.subviews)
+                                                 {
+                                                     for (UITableViewCell *cell in view.subviews)
+                                                     {
+                                                         if( [cell isKindOfClass:[AutoChatAudioCell class]] )
+                                                         {
+                                                             AutoChatAudioCell *findCell = (AutoChatAudioCell *)cell;
+                                                             findCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                                         }
+                                                     }
+                                                 }
+                                             }];
+                        
+                        
+                        __weak __typeof(&*self)weakSelf = self;
+                        [currentPlayer addBoundaryTimeObserverForTimes:@[[NSValue valueWithCMTime:CMTimeMake(1, 2)]]
+                                                                 queue:dispatch_get_main_queue()
+                                                            usingBlock:^{
+                                                                
+                                                                nPlayEId = -1;
+                                                                isPlay = YES;
+//                                                                [weakSelf.tbv_List reloadData];
+                                                                dispatch_async(dispatch_get_main_queue(), ^{
+                                                                    [weakSelf.tbv_List reloadData];
+                                                                    [weakSelf.tbv_List layoutIfNeeded];
+                                                                });
+
+                                                            }];
+                        
+                        nPlayEId = -1;
+                        isPlay = YES;
+//                        [weakSelf.tbv_List reloadData];
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            [weakSelf.tbv_List reloadData];
+                            [weakSelf.tbv_List layoutIfNeeded];
+                        });
+
+                        
+                        [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.3f];
+                        [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
+                        [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:5.0f];
+                    }
+                }
+            }
+        }
+        
+        
+//        NSIndexPath* indexPath = [NSIndexPath indexPathForRow:nTempTag+1 inSection:0];
+//        AutoChatAudioCell* cell = [self.tbv_List cellForRowAtIndexPath:indexPath];
+//        currentCell = cell;
+//        
+//        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:currentUrl];
+//        currentPlayer = [AVPlayer playerWithPlayerItem:playerItem];
+//        currentPlayer = [AVPlayer playerWithURL:currentUrl];
+//        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemDidFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
+//        
+////        CGFloat fDuration = CMTimeGetSeconds(playerItem.asset.duration);
+//        //    NSLog(@"%f", fDuration);
+//        
+//        
+//        if( currentPlayer && self.timeObserver )
+//        {
+//            @try{
+//                
+//                [currentPlayer removeTimeObserver:self.timeObserver];
+//                self.timeObserver = nil;
+//                
+//            }@catch(id anException){
+//                
+//            }
+//        }
+//        
+//        self.timeObserver = [currentPlayer addPeriodicTimeObserverForInterval:CMTimeMake(1, 2)
+//                                                                        queue:dispatch_get_main_queue()
+//                                                                   usingBlock:^(CMTime time)
+//                             {
+//                                 CGFloat fCurrentTime = CMTimeGetSeconds(time);
+//                                 NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+//                                 NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+//                                 currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+//                                 cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+//                                 lb_PlayerTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+//                                 
+//                             }];
+//        
+//        [currentPlayer play];
+//        isPlay = YES;
+//        
+//        nPlayEId = -1;
+    }
+    
+//    [self.tbv_List reloadData];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.tbv_List reloadData];
+        [self.tbv_List layoutIfNeeded];
+    });
+
 }
 
 - (void)onKeyboardShowInterval
@@ -2755,16 +3315,20 @@ typedef enum {
 
 - (void)onKeyboardDownInterval
 {
-    UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
-    __block UIView *view = [window viewWithTag:1982];
-    //    __block UITableView *tbv = [view viewWithTag:1983];
+//    UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
+//    __block UIView *view = [window viewWithTag:1982];
+//    //    __block UITableView *tbv = [view viewWithTag:1983];
+//    
+//    [UIView animateWithDuration:0.3f animations:^{
+//        
+//        view.frame = CGRectMake(0, self.view.frame.size.height, view.frame.size.width, view.frame.size.height);
+//    }];
     
-    [UIView animateWithDuration:0.3f animations:^{
-        
-        view.frame = CGRectMake(0, self.view.frame.size.height, view.frame.size.width, view.frame.size.height);
+    self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    [UIView animateWithDuration:0.25f animations:^{
+        [self.view layoutIfNeeded];
     }];
-    
-    [self.v_CommentKeyboardAccView.tv_Contents resignFirstResponder];
+
     nAutoAnswerIdx = -1;
 }
 
@@ -3023,7 +3587,7 @@ typedef enum {
                             
                             if( [userMessage.customType isEqualToString:@"audio"] )
                             {
-                                return 60.f;
+                                return 50.f;
                             }
                             else if( [userMessage.customType isEqualToString:@"image"] )
                             {
@@ -3189,6 +3753,8 @@ typedef enum {
         NSLog(@"mesage: %@, customType: %@", userMessage.message, userMessage.customType);
         if( [userMessage.customType isEqualToString:@"audio"] )
         {
+            NSLog(@"audio cell didEndDisplaying");
+            
             if( nPlayEId > -1 && nTmpPlayEId == nPlayEId )
             {
                 NSLog(@"ININININININININININININININININ");
@@ -3196,33 +3762,44 @@ typedef enum {
                 {
                     if( self.timeObserver )
                     {
-                        [currentPlayer removeTimeObserver:self.timeObserver];
-                        self.timeObserver = nil;
+                        @try{
+                            
+                            [currentPlayer removeTimeObserver:self.timeObserver];
+                            self.timeObserver = nil;
+                            
+                        }@catch(id anException){
+                            
+                        }
                     }
 
                     [currentPlayer pause];
                     currentPlayer = nil;
                 }
                 
-                AutoChatAudioCell* currentCell = (AutoChatAudioCell *)cell;
+                AutoChatAudioCell* nowCell = (AutoChatAudioCell *)cell;
                 
 //                [self performSelector:@selector(playInterval:) withObject:currentCell.btn_PlayPause afterDelay:1.7f];
 //                [self onAutoAudioPlayAndPause:currentCell.btn_PlayPause];
+
+//                SBDBaseMessage *baseMessage = message;
+//                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+//                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+//                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
                 
-                SBDBaseMessage *baseMessage = message;
-                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                
-                long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
-                if( currentCreateTime == llCreateTime )
+//                long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
+                long long llMessageId = baseMessage.messageId;
+
+                if( llCurrentMessageId == llMessageId )
+//                if( 0 )
                 {
                     nTmpPlayTag = cell.tag;
 
-                    currentCell = currentCell;
-                    currentUrl = currentCell.url;
-                    currentEId = currentCell.nEId; //42940
-                    currentTag = currentCell.tag;
+                    currentCell = nowCell;
+                    currentUrl = nowCell.url;
+                    currentEId = nowCell.nEId; //42940
+                    currentTag = nowCell.tag;
+                    lb_PlayerTime = nowCell.lb_Time;
+
                     //                currentCell.createTime = llCreateTime;
                     //                currentCreateTime = llCreateTime;
                     
@@ -3233,46 +3810,81 @@ typedef enum {
                     currentPlayer = [AVPlayer playerWithURL:currentCell.url];
                     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemDidFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
                     
-                    CGFloat fDuration = CMTimeGetSeconds(playerItem.asset.duration);
-                    //    NSLog(@"%f", fDuration);
-                    
-                    
+                    isPlay = YES;
+                    [currentPlayer play];
+
                     if( currentPlayer && self.timeObserver )
                     {
-                        [currentPlayer removeTimeObserver:self.timeObserver];
-                        self.timeObserver = nil;
+                        @try{
+                            
+                            [currentPlayer removeTimeObserver:self.timeObserver];
+                            self.timeObserver = nil;
+                            
+                        }@catch(id anException){
+                            
+                        }
                     }
                     
                     self.timeObserver = [currentPlayer addPeriodicTimeObserverForInterval:CMTimeMake(1, 2)
                                                                 queue:dispatch_get_main_queue()
                                                            usingBlock:^(CMTime time)
                      {
-                         NSLog(@"11111");
-                         NSLog(@"cell.nEId : %ld", currentCell.nEId);
-                         NSLog(@"22222");
-                         NSLog(@"cell.nEId : %ld", currentEId);
-                         NSLog(@"currentCell : %@", currentCell);
-//                         if( currentCell.nEId == currentEId )
-//                             //                     if( currentCreateTime == currentCell.createTime )
-//                         {
-//                             NSLog(@"@@@@@@@@@@@@@@@@@@@@@@");
-//                             CGFloat fCurrentTime = CMTimeGetSeconds(time);
-//                             NSInteger nMinute = (NSInteger)fCurrentTime / 60;
-//                             NSInteger nSecond = (NSInteger)fCurrentTime % 60;
-//                             currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
-//                         }
+                         NSLog(@"didEndDisplay");
+
                          CGFloat fCurrentTime = CMTimeGetSeconds(time);
                          NSInteger nMinute = (NSInteger)fCurrentTime / 60;
                          NSInteger nSecond = (NSInteger)fCurrentTime % 60;
                          currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                         nowCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                         lb_PlayerTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
 
+                         for (UIView *view in self.tbv_List.subviews)
+                         {
+                             for (UITableViewCell *cell in view.subviews)
+                             {
+                                 if( [cell isKindOfClass:[AutoChatAudioCell class]] )
+                                 {
+                                     AutoChatAudioCell *findCell = (AutoChatAudioCell *)cell;
+                                     findCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                 }
+                             }
+                         }
                      }];
                     
-                    [currentPlayer play];
-                    isPlay = YES;
+
+                    __weak __typeof(&*self)weakSelf = self;
+                    [currentPlayer addBoundaryTimeObserverForTimes:@[[NSValue valueWithCMTime:CMTimeMake(1, 2)]]
+                                                             queue:dispatch_get_main_queue()
+                                                        usingBlock:^{
+                                                           
+                                                            nPlayEId = -1;
+                                                            isPlay = YES;
+//                                                            [weakSelf.tbv_List reloadData];
+                                                            dispatch_async(dispatch_get_main_queue(), ^{
+                                                                [weakSelf.tbv_List reloadData];
+                                                                [weakSelf.tbv_List layoutIfNeeded];
+                                                            });
+
+                                                        }];
                     
                     nPlayEId = -1;
-                    [self.tbv_List reloadData];
+                    isPlay = YES;
+//                    [weakSelf.tbv_List reloadData];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [weakSelf.tbv_List reloadData];
+                        [weakSelf.tbv_List layoutIfNeeded];
+                    });
+
+                    
+                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.3f];
+                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
+                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.9f];
+                }
+                else
+                {
+                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.3f];
+                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
+                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.9f];
                 }
             }
         }
@@ -3652,8 +4264,25 @@ typedef enum {
                 
                 [self presentViewController:self.vc_Movie animated:YES completion:nil];
             }
+            else
+            {
+                self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+                [UIView animateWithDuration:0.25f animations:^{
+                    [self.view layoutIfNeeded];
+                }];
+                
+                [self.view endEditing:YES];
+            }
         }
-        
+        else
+        {
+            self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+            [UIView animateWithDuration:0.25f animations:^{
+                [self.view layoutIfNeeded];
+            }];
+            
+            [self.view endEditing:YES];
+        }
     }
 }
 
@@ -3662,7 +4291,12 @@ typedef enum {
     if (gesture.state == UIGestureRecognizerStateBegan)
     {
         [self.view endEditing:YES];
-        
+
+        self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+        [UIView animateWithDuration:0.25f animations:^{
+            [self.view layoutIfNeeded];
+        }];
+
         UIView *view = (UIView *)gesture.view;
         
         NSDictionary *dic = nil;
@@ -4980,7 +5614,13 @@ typedef enum {
             [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
         }
         
-        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+//        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+        cell.lb_Date.text = @"";
+        
+        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+        [btn_Date setTitle:str_Date forState:0];
+
     }
 }
 
@@ -5162,7 +5802,13 @@ typedef enum {
             [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
         }
         
-        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+//        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+        cell.lb_Date.text = @"";
+        
+        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+        [btn_Date setTitle:str_Date forState:0];
+
     }
 }
 
@@ -5329,7 +5975,13 @@ typedef enum {
             NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
             cell.lb_Msg.text = str_Contents;
             //            cell.lb_Contents.text = str_Contents;
-            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+//            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            cell.lb_Date.text = @"";
+            
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:str_Date forState:0];
+
         }
         else if( [str_QnaType isEqualToString:@""] )
         {
@@ -5386,7 +6038,13 @@ typedef enum {
         {
             NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
             cell.lb_Contents.text = str_Contents;
-            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+//            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            cell.lb_Date.text = @"";
+            
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:str_Date forState:0];
+
             
             NSURL *url = [Util createImageUrl:str_ImagePrefix withFooter:[dic objectForKey_YM:@"userThumbnail"]];
             [cell.iv_User sd_setImageWithURL:url placeholderImage:BundleImage(@"no_image.png")];
@@ -5726,7 +6384,13 @@ typedef enum {
         NSString *str_QnaType = [dic_Body objectForKey:@"qnaType"];
         if( [str_QnaType isEqualToString:@"text"] )
         {
-            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+//            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            cell.lb_Date.text = @"";
+            
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:str_Date forState:0];
+
             
             [self addContent:cell withString:[dic_Body objectForKey:@"qnaBody"]];
         }
@@ -5806,7 +6470,13 @@ typedef enum {
         {
             //            NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
             cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
-            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+//            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            cell.lb_Date.text = @"";
+            
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:str_Date forState:0];
+
             cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
         }
         else if( [str_QnaType isEqualToString:@""] )
@@ -5818,7 +6488,13 @@ typedef enum {
     {
         NSDictionary *dic_Action = [dic objectForKey:@"actionMap"];
         cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
-        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+//        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        cell.lb_Date.text = @"";
+        
+        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+        [btn_Date setTitle:str_Date forState:0];
+
         cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
     }
 }
@@ -5881,7 +6557,13 @@ typedef enum {
         
         cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
         cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
-        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"createDate"]]];
+//        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"createDate"]]];
+        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        cell.lb_Date.text = @"";
+        
+        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+        [btn_Date setTitle:str_Date forState:0];
+
         if( [[dic_Action objectForKey_YM:@"msgType"] isEqualToString:@"shareQuestion"] )
         {
             cell.lb_Msg.text = [dic_Action objectForKey_YM:@"shareMsg"];
@@ -5934,7 +6616,13 @@ typedef enum {
         [cell.btn_Read setImage:BundleImage(@"chat_no_check.png") forState:UIControlStateNormal];
     }
     
-    cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+//    cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+    NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+    cell.lb_Date.text = @"";
+    
+    UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+    [btn_Date setTitle:str_Date forState:0];
+
     [self addContent:cell withString:[dic objectForKey:@"contents"]];
     
     //    cell.lb_Contents.text = [dic objectForKey:@"contents"];
@@ -6012,7 +6700,7 @@ typedef enum {
 //    if( self.dic_BotInfo )
     if( 1 ) //20170901 챗봇처럼 상대방 메세지를 하얗게 표시해 달라고 피터님이 요청함
     {
-        cell.lb_Contents.textColor = [UIColor darkGrayColor];
+        cell.lb_Contents.textColor = [UIColor blackColor];
         cell.v_ContentsBg.backgroundColor = [UIColor whiteColor];
         cell.v_ContentsBg.layer.borderColor = [UIColor colorWithRed:220.f/255.f green:220.f/255.f blue:220.f/255.f alpha:1].CGColor;
         cell.v_ContentsBg.layer.borderWidth = 1.f;
@@ -6025,6 +6713,8 @@ typedef enum {
         cell.v_ContentsBg.layer.borderWidth = 1.f;
     }
     
+    cell.nUserId = [[dic objectForKey_YM:@"botUserId"] integerValue];
+    
     NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
     if( ar_Body.count > 0 )
     {
@@ -6035,8 +6725,12 @@ typedef enum {
             NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
             [self addContent:cell withString:str_Contents];
             //            cell.lb_Contents.text = str_Contents;
-            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            cell.lb_Date.text = @"";
             
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:str_Date forState:0];
+
             NSURL *url = [Util createImageUrl:str_ImagePrefix withFooter:[dic objectForKey_YM:@"userThumbnail"]];
             [cell.iv_User sd_setImageWithURL:url placeholderImage:BundleImage(@"no_image.png")];
             
@@ -6109,7 +6803,13 @@ typedef enum {
         {
             //            NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
             cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
-            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+//            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            cell.lb_Date.text = @"";
+            
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:str_Date forState:0];
+
             cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
             
             NSURL *url = [Util createImageUrl:str_ImagePrefix withFooter:[dic objectForKey_YM:@"userThumbnail"]];
@@ -6154,7 +6854,13 @@ typedef enum {
         NSDictionary *dic_Action = [dic objectForKey:@"actionMap"];
         
         cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
-        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+//        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        cell.lb_Date.text = @"";
+        
+        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+        [btn_Date setTitle:str_Date forState:0];
+
         cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
         
         NSURL *url = [Util createImageUrl:str_ImagePrefix withFooter:[dic objectForKey_YM:@"userThumbnail"]];
@@ -6223,7 +6929,13 @@ typedef enum {
             //            NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
             cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
             cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
-            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+//            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            cell.lb_Date.text = @"";
+            
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:str_Date forState:0];
+
             if( [[dic_Action objectForKey_YM:@"msgType"] isEqualToString:@"shareQuestion"] )
             {
                 cell.lb_Msg.text = [dic_Action objectForKey_YM:@"shareMsg"];
@@ -6276,7 +6988,13 @@ typedef enum {
         cell.lb_Name.text = [dic_Action objectForKey_YM:@"name"];
         cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
         cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
-        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+//        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        cell.lb_Date.text = @"";
+        
+        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+        [btn_Date setTitle:str_Date forState:0];
+
         if( [[dic_Action objectForKey_YM:@"msgType"] isEqualToString:@"shareQuestion"] )
         {
             cell.lb_Msg.text = [dic_Action objectForKey_YM:@"shareMsg"];
@@ -6419,8 +7137,14 @@ typedef enum {
     
     if( self.timeObserver )
     {
-        [currentPlayer removeTimeObserver:self.timeObserver];
-        self.timeObserver = nil;
+        @try{
+            
+            [currentPlayer removeTimeObserver:self.timeObserver];
+            self.timeObserver = nil;
+            
+        }@catch(id anException){
+            
+        }
     }
 
     [currentPlayer pause];
@@ -6849,7 +7573,13 @@ typedef enum {
 - (void)chatTap:(UIGestureRecognizer *)gestureRecognizer
 {
     [self.view endEditing:YES];
-    bLastKeybaordStatus = self.v_CommentKeyboardAccView.btn_KeyboardChange.selected;
+
+    self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    [UIView animateWithDuration:0.25f animations:^{
+        [self.view layoutIfNeeded];
+    }];
+
+//    bLastKeybaordStatus = self.v_CommentKeyboardAccView.btn_KeyboardChange.selected;
 }
 
 - (void)topImageTap:(UIGestureRecognizer *)gestureRecognizer
@@ -7508,17 +8238,23 @@ typedef enum {
                                                                 }
                                                                 else if( [str_UserInputMsg rangeOfString:@"다음"].location != NSNotFound )
                                                                 {
-//                                                                    if( currentPlayer )
-//                                                                    {
-//                                                                        if( self.timeObserver )
-//                                                                        {
-//                                                                            [currentPlayer removeTimeObserver:self.timeObserver];
-//                                                                            self.timeObserver = nil;
-//                                                                        }
-//
-//                                                                        [currentPlayer pause];
-//                                                                        currentPlayer = nil;
-//                                                                    }
+                                                                    if( currentPlayer )
+                                                                    {
+                                                                        if( self.timeObserver )
+                                                                        {
+                                                                            @try{
+                                                                                
+                                                                                [currentPlayer removeTimeObserver:self.timeObserver];
+                                                                                self.timeObserver = nil;
+                                                                                
+                                                                            }@catch(id anException){
+                                                                                
+                                                                            }
+                                                                        }
+
+                                                                        [currentPlayer pause];
+                                                                        currentPlayer = nil;
+                                                                    }
                                                                     
                                                                     nAutoAnswerIdx = -1;
                                                                     nPlayEId = -1;
@@ -7544,10 +8280,12 @@ typedef enum {
                                                                 
                                                                 nAutoAnswerIdx = -1;
                                                                 
-                                                                UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
-                                                                UIView *view = [window viewWithTag:1982];
-                                                                UITableView *tbv = [view viewWithTag:1983];
-                                                                [tbv reloadData];
+                                                                [weakSelf.tbv_TempleteList reloadData];
+                                                                
+//                                                                UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
+//                                                                UIView *view = [window viewWithTag:1982];
+//                                                                UITableView *tbv = [view viewWithTag:1983];
+//                                                                [tbv reloadData];
                                                             }
                                                             else if( self.autoChatMode == kNextExam )
                                                             {
@@ -7588,10 +8326,12 @@ typedef enum {
                                                                 
                                                                 nAutoAnswerIdx = -1;
                                                                 
-                                                                UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
-                                                                UIView *view = [window viewWithTag:1982];
-                                                                UITableView *tbv = [view viewWithTag:1983];
-                                                                [tbv reloadData];
+                                                                [weakSelf.tbv_TempleteList reloadData];
+
+//                                                                UIWindow *window = [UIApplication sharedApplication].windows.lastObject;
+//                                                                UIView *view = [window viewWithTag:1982];
+//                                                                UITableView *tbv = [view viewWithTag:1983];
+//                                                                [tbv reloadData];
                                                             }
                                                             
                                                             NSInteger nMyId = [[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"] integerValue];
@@ -7652,7 +8392,11 @@ typedef enum {
                                                                 
                                                                 [weakSelf.navigationController.view makeToast:@"질문을 등록했습니다" withPosition:kPositionCenter];
                                                                 [weakSelf.view endEditing:YES];
-                                                                
+                                                                weakSelf.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+                                                                [UIView animateWithDuration:0.25f animations:^{
+                                                                    [weakSelf.view layoutIfNeeded];
+                                                                }];
+
                                                                 for( id message in self.messages )
                                                                 {
                                                                     if( [message isKindOfClass:[NSDictionary class]] )
@@ -8086,6 +8830,11 @@ typedef enum {
 {
     [self.view endEditing:YES];
     
+    self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    [UIView animateWithDuration:0.25f animations:^{
+        [self.view layoutIfNeeded];
+    }];
+
     [OHActionSheet showSheetInView:self.view
                              title:nil
                  cancelButtonTitle:@"취소"
@@ -8478,7 +9227,11 @@ typedef enum {
     
     [self.v_CommentKeyboardAccView removeContents];
     [self.view endEditing:YES];
-    
+    self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    [UIView animateWithDuration:0.25f animations:^{
+        [self.view layoutIfNeeded];
+    }];
+
     __weak __typeof(&*self)weakSelf = self;
     
     NSString *str_Key = [NSString stringWithFormat:@"DefaultChannelId_%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
@@ -8741,6 +9494,92 @@ typedef enum {
 
 
 
+#pragma mark - SWTableViewDelegate
+- (void)swipeableTableViewCell:(SWTableViewCell *)cell scrollingToState:(SWCellState)state
+{
+    switch (state) {
+        case 0:
+            NSLog(@"utility buttons closed");
+            break;
+        case 1:
+            NSLog(@"left utility buttons open");
+            break;
+        case 2:
+            NSLog(@"right utility buttons open");
+            break;
+        default:
+            break;
+    }
+}
+
+- (void)swipeableTableViewCell:(SWTableViewCell *)cell didTriggerLeftUtilityButtonWithIndex:(NSInteger)index
+{
+    switch (index) {
+        case 0:
+            NSLog(@"left button 0 was pressed");
+            break;
+        case 1:
+            NSLog(@"left button 1 was pressed");
+            break;
+        case 2:
+            NSLog(@"left button 2 was pressed");
+            break;
+        case 3:
+            NSLog(@"left btton 3 was pressed");
+        default:
+            break;
+    }
+}
+
+- (void)swipeableTableViewCell:(SWTableViewCell *)cell didTriggerRightUtilityButtonWithIndex:(NSInteger)index
+{
+    //버튼 선택시
+    SBDGroupChannel *groupChannel = self.arM_List[cell.tag];
+    
+    if( index == 0 )
+    {
+        
+    }
+}
+
+- (BOOL)swipeableTableViewCellShouldHideUtilityButtonsOnSwipe:(SWTableViewCell *)cell
+{
+    // allow just one cell's utility button to be open at once
+    return YES;
+}
+
+- (BOOL)swipeableTableViewCell:(SWTableViewCell *)cell canSwipeToState:(SWCellState)state
+{
+    switch (state) {
+        case 1:
+            // set to NO to disable all left utility buttons appearing
+            return YES;
+            break;
+        case 2:
+            // set to NO to disable all right utility buttons appearing
+            return YES;
+            break;
+        default:
+            break;
+    }
+    
+    return YES;
+}
+
+- (NSArray *)rightButtons
+{
+    NSMutableArray *rightUtilityButtons = [NSMutableArray new];
+    
+    [rightUtilityButtons sw_addUtilityButtonWithColor:[UIColor whiteColor]
+                                           normalIcon:BundleImage(@"")
+                                         selectedIcon:BundleImage(@"")];
+    
+//    [rightUtilityButtons sw_addUtilityButtonWithColor:kMainRedColor
+//                                           normalIcon:BundleImage(@"sw_leave.png")
+//                                         selectedIcon:BundleImage(@"sw_leave.png")];
+    
+    return rightUtilityButtons;
+}
 
 
 
@@ -9463,7 +10302,7 @@ typedef enum {
                     [self.arM_AutoAnswer addObject:dic_ExamList];
                 }
                 
-                [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
+//                [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
                 [self showTempleteKeyboard];
             }
         }
@@ -9477,7 +10316,7 @@ typedef enum {
             [self.arM_AutoAnswer addObject:@{@"title":@"계속 풀기"}];
             [self.arM_AutoAnswer addObject:@{@"title":@"다른 문제로"}];
 
-            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
+//            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
             [self showTempleteKeyboard];
         }
         else if( [str_Action isEqualToString:@"printQuestionItem"] )
@@ -9544,11 +10383,41 @@ typedef enum {
         
         if( [data.customType isEqualToString:@"audio"] )
         {
-            nPlayEId = [[dic objectForKey:@"eId"] integerValue];//43106
-            nTmpPlayEId = nPlayEId;
-            
-            long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
-            currentCreateTime = llCreateTime;
+            NSInteger nTmp = [[dic objectForKey:@"eId"] integerValue];
+            NSLog(@"eId : %ld", nTmp);
+            NSLog(@"nPlayEId : %ld", nPlayEId);
+
+            if( nTmpEId != nTmp - 1 )
+            {
+                NSLog(@"Tartget eId : %ld", nTmp);
+                
+                nTmpEId = nTmp;
+                nPlayEId = nTmp;
+                nTmpPlayEId = nPlayEId;
+                llCurrentMessageId = data.messageId;
+//                long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
+//                currentCreateTime = llCreateTime;
+                
+                NSLog(@"Tartget nPlayEId : %ld", nPlayEId);
+                [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:1.0f];
+            }
+            else if( nTmpEId == nTmp - 1 )
+            {
+                //두개일 경우
+                //연속 재생이 문제가 있어서 우선 막아둠
+                
+//                NSLog(@"!!!!!!!!!!!!!!!!!!!");
+//                self.dicM_NextPlayInfo = [NSMutableDictionary dictionary];
+//                [self.dicM_NextPlayInfo setObject:[NSString stringWithFormat:@"%lld", data.messageId] forKey:@"messageId"];
+//                
+//                NSString *str_Data = data.data;
+//                NSData *data = [str_Data dataUsingEncoding:NSUTF8StringEncoding];
+//                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//                NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
+//                NSDictionary *dic_Body = [ar_Body firstObject];
+//                NSURL *url = [Util createImageUrl:[dic_Body objectForKey:@"image_prefix"] withFooter:[dic_Body objectForKey:@"qnaBody"]];
+//                [self.dicM_NextPlayInfo setObject:url forKey:@"url"];
+            }
         }
         
         [self.channel markAsRead];
@@ -9653,11 +10522,13 @@ typedef enum {
                             //새로운 메세지
                             if( self.v_CommentKeyboardAccView.tv_Contents.isFirstResponder )
                             {
-                                [ALToastView toastKeyboardTop:[UIApplication sharedApplication].keyWindow withText:@"새로운 메세지"];
+                                [ALToastView toastKeyboardTop:self.view withText:@"새로운 메세지"];
                             }
                             else
                             {
-                                [Util showToast:@"새로운 메세지"];
+                                [ALToastView toastInView:self.view withText:@"새로운 메세지"];
+
+//                                [Util showToast:@"새로운 메세지"];
                             }
                         }
                         

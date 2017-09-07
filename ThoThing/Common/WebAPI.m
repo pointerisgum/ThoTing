@@ -1469,14 +1469,15 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             //중복된 팝업을 방지하기 위한 코드
             static BOOL isNowShowPopup = NO;
             
-            if( nRetry < kRetryCount )
-            {
-                NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
-                [self callAsyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {
-                    
-                }];
-            }
-            else if( !isNowShowPopup )
+//            if( nRetry < kRetryCount )
+//            {
+//                NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
+//                [self callAsyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {
+//                    
+//                }];
+//            }
+//            else if( !isNowShowPopup )
+            if( 1 )
             {
                 NSDictionary *userInfo = [error userInfo];
                 NSString *errorString = [[userInfo objectForKey:NSUnderlyingErrorKey] localizedDescription];

@@ -8,8 +8,10 @@
 
 #import <UIKit/UIKit.h>
 #import <TTTAttributedLabel.h>
+#import "SWTableViewCell.h"
 
-@interface OtherChatBasicCell : UITableViewCell
+@interface OtherChatBasicCell : SWTableViewCell
+@property (nonatomic, assign) NSInteger nUserId;
 @property (nonatomic, weak) IBOutlet UIImageView *iv_User;
 @property (nonatomic, weak) IBOutlet UILabel *lb_Name;
 @property (nonatomic, weak) IBOutlet UIView *v_ContentsBg;

@@ -7,8 +7,9 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "SWTableViewCell.h"
 
-@interface AutoAnswerCell : UITableViewCell
+@interface AutoAnswerCell : SWTableViewCell
 @property (nonatomic, weak) IBOutlet UIView *v_Bg;
 @property (nonatomic, weak) IBOutlet UILabel *lb_Title;
 @end
