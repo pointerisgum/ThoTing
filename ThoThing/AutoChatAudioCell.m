@@ -13,6 +13,8 @@
 - (void)awakeFromNib {
     [super awakeFromNib];
     // Initialization code
+    
+    self.v_Bg.layer.cornerRadius = self.v_Bg.frame.size.height / 2;
 }
 
 - (void)setSelected:(BOOL)selected animated:(BOOL)animated {

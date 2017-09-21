@@ -372,6 +372,11 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
                 str_MineType = @"video/mp4";
                 str_FileName = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld%@.mp4", (long)nYear, (long)nMonth, (long)nDay, (long)nHour, (long)nMinute, (long)nSecond, str_MillSec];
             }
+            else if( [str_Type isEqualToString:@"audio"] )
+            {
+                str_MineType = @"audio/m4a";
+                str_FileName = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld%@.m4a", (long)nYear, (long)nMonth, (long)nDay, (long)nHour, (long)nMinute, (long)nSecond, str_MillSec];
+            }
             else
             {
                 str_MineType = @"image/jpg";

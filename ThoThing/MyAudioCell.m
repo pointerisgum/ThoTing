@@ -1,21 +1,20 @@
 //
-//  MyImageCell.m
+//  MyAudioCell.m
 //  ThoThing
 //
-//  Created by KimYoung-Min on 2016. 12. 29..
-//  Copyright © 2016년 youngmin.kim. All rights reserved.
+//  Created by macpro15 on 2017. 9. 14..
+//  Copyright © 2017년 youngmin.kim. All rights reserved.
 //
 
-#import "MyImageCell.h"
+#import "MyAudioCell.h"
 
-@implementation MyImageCell
+@implementation MyAudioCell
 
 - (void)awakeFromNib {
     [super awakeFromNib];
     // Initialization code
     
-    [super awakeFromNib];
-    
+    self.v_Bg.layer.cornerRadius = self.v_Bg.frame.size.height / 2;
 }
 
 - (void)setSelected:(BOOL)selected animated:(BOOL)animated {

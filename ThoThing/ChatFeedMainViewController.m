@@ -1479,6 +1479,22 @@
 
         cell.lb_Disc2.text = @"";
     }
+    else if( [lastMessage.customType isEqualToString:@"pdf"] )
+    {
+        [cell.btn_Type setImage:BundleImage(@"camera_icon_small.png") forState:UIControlStateNormal];
+        [cell.btn_Type setTitle:@"PDF 문제" forState:UIControlStateNormal];
+        cell.btn_Type.hidden = NO;
+        
+        cell.lb_Disc2.text = @"";
+    }
+    else if( [lastMessage.customType isEqualToString:@"audio"] )
+    {
+        [cell.btn_Type setImage:BundleImage(@"audio_icon_samll.png") forState:UIControlStateNormal];
+        [cell.btn_Type setTitle:@"음성" forState:UIControlStateNormal];
+        cell.btn_Type.hidden = NO;
+        
+        cell.lb_Disc2.text = @"";
+    }
     else if( [lastMessage.customType isEqualToString:@"shareExam"] || [lastMessage.customType isEqualToString:@"shareQuestion"] )
     {
         cell.lb_Disc1.text = [dic objectForKey_YM:@"subjectName"];
@@ -1890,7 +1906,13 @@
                 {
                     //1:1 채팅일때 상대방 유저 사진
                     NSString *str_TargetName = [dic_Tmp objectForKey_YM:@"userName"];
-                    if( [str_TargetName isEqualToString:@"#영어듣기"] )
+                    if( [[dic objectForKey:@"roomType"] isEqualToString:@"chatBot"] )
+                    {
+                        vc.dic_BotInfo = @{@"userId":[NSString stringWithFormat:@"%@", [dic_Tmp objectForKey:@"userId"]]};
+                        break;
+                    }
+                    else if( [str_TargetName isEqualToString:@"#영어듣기"] || [str_TargetName isEqualToString:@"#PDF"] || [str_TargetName isEqualToString:@"#스피킹매트릭스"] ||
+                            [str_TargetName isEqualToString:@"#미술"] || [str_TargetName isEqualToString:@"#test"] )
                     {
                         //봇방
                         vc.dic_BotInfo = @{@"userId":[NSString stringWithFormat:@"%@", [dic_Tmp objectForKey:@"userId"]]};

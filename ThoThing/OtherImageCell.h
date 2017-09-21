@@ -11,7 +11,11 @@
 
 @interface OtherImageCell : OtherChatBasicCell
 @property (nonatomic, weak) IBOutlet UIImageView *iv_Contents;
+@property (nonatomic, weak) IBOutlet UIImageView *iv_ContentsBg;
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_ImageWidth;
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_ImageHeight;
 @property (nonatomic, weak) IBOutlet UIView *v_Video;
 @property (nonatomic, weak) IBOutlet UIButton *btn_Play;
 @property (nonatomic, weak) IBOutlet UIButton *btn_Origin;  //출처
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_OriginHeight;
 @end

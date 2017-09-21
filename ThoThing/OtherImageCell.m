@@ -22,6 +22,10 @@
     self.iv_User.layer.borderWidth = 1.f;
     
     self.btn_Play.userInteractionEnabled = NO;
+    
+    self.iv_Contents.layer.cornerRadius = 15.f;
+    self.iv_ContentsBg.layer.cornerRadius = 15.f;
+    self.iv_Contents.contentMode = UIViewContentModeScaleToFill;
 }
 
 - (void)setSelected:(BOOL)selected animated:(BOOL)animated {

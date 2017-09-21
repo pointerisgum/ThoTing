@@ -9,10 +9,16 @@
 #import <UIKit/UIKit.h>
 #import "UIPlaceHolderTextView.h"
 
+typedef enum {
+    kNormal         = 0,
+    kTemplete       = 1,
+} KeyboardStatus;
+
 typedef void (^CompletionBlock)(id completeResult);
 
 @interface CommentKeyboardAccView : UIView
 @property (nonatomic, copy) CompletionBlock completionBlock;
+@property (nonatomic, assign) KeyboardStatus keyboardStatus;
 @property (nonatomic, assign) CGFloat fKeyboardHeight;
 @property (nonatomic, weak) IBOutlet UIButton *btn_Add;
 @property (nonatomic, weak) IBOutlet UIButton *btn_Done;
@@ -24,6 +30,7 @@ typedef void (^CompletionBlock)(id completeResult);
 @property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_AddWidth;
 @property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_Height;
 @property (nonatomic, weak) IBOutlet UIButton *btn_KeyboardChange;
+@property (nonatomic, weak) IBOutlet UIButton *btn_TempleteKeyboard;
 - (void)setCompletionBlock:(CompletionBlock)completionBlock;
 - (void)removeContents;
 @end

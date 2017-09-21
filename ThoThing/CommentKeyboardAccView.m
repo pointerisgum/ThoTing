@@ -71,28 +71,43 @@
 
 - (BOOL)textViewShouldBeginEditing:(UITextView *)textView
 {
-    if( self.btn_KeyboardChange.selected )
+    if( self.lc_Bottom.constant > 0 )
     {
-        if( self.completionBlock )
+        //키보드가 올라와 있는 상태면
+        if( self.keyboardStatus == kTemplete )
         {
-            self.completionBlock(nil);
+            self.keyboardStatus = kNormal;
+            self.btn_TempleteKeyboard.hidden = NO;
+            return YES;
         }
-        
-        if( self.fKeyboardHeight > 0 )
-        {
-            self.lc_Bottom.constant = self.fKeyboardHeight;
-        }
-        else
-        {
-            self.lc_Bottom.constant = 258.f;
-        }
-        
-        [UIView animateWithDuration:0.25f animations:^{
-            [self.superview layoutIfNeeded];
-        }];
-        
-        return NO;
     }
+    else
+    {
+        if( self.keyboardStatus == kTemplete )
+        {
+            if( self.completionBlock )
+            {
+                self.completionBlock(nil);
+            }
+            
+            if( self.fKeyboardHeight > 0 )
+            {
+                self.lc_Bottom.constant = self.fKeyboardHeight;
+            }
+            else
+            {
+                self.lc_Bottom.constant = 258.f;
+            }
+            
+            [UIView animateWithDuration:0.25f animations:^{
+                [self.superview layoutIfNeeded];
+            }];
+            
+            return NO;
+        }
+    }
+    
+    self.btn_TempleteKeyboard.hidden = NO;
     
     return YES;
 }
@@ -101,13 +116,13 @@
 - (void)onChangeInterval
 {
     CGFloat fHeight = [Util getTextViewHeight:self.tv_Contents];
-    if( fHeight <= 75.f )
+    if( fHeight <= 45.f )
     {
-        self.lc_TfWidth.constant = 75.f;
+        self.lc_TfWidth.constant = 45.f;
     }
-    else if( fHeight > 130 )
+    else if( fHeight > 100 )
     {
-        self.lc_TfWidth.constant = 130.f;
+        self.lc_TfWidth.constant = 100.f;
     }
     else
     {

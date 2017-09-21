@@ -20,4 +20,5 @@
 @property (nonatomic, weak) IBOutlet UIButton *btn_Read;
 @property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_NameHeight;
 @property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_BottomHeight;
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_Top;
 @end

@@ -50,7 +50,7 @@ static NSInteger const kTitleButtonTag = 89;
 //구글 아날리틱스 아이디
 static NSString *const kTrackingId = @"UA-61448098-2";
 static NSString *const kAllowTracking = @"allowTracking";
-static NSString * const kChatPlaceHolder = @"";
+static NSString * const kChatPlaceHolder = @"메세지..";
 static NSString * const kStatusBarTappedNotification = @"statusBarTappedNotification";
 
 static NSInteger const kNaviTitleTag = 5613;

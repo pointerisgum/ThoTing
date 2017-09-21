@@ -6,6 +6,8 @@
 //  Copyright © 2016년 youngmin.kim. All rights reserved.
 //
 
+#define IMPEDE_PLAYBACK NO
+
 #import "ChatFeedViewController.h"
 #import "ChatFeedMemeberInviteViewController.h"
 #import "CommentKeyboardAccView.h"
@@ -62,6 +64,9 @@
 #import "TMImageZoom.h"
 #import "AutoAnswerCell.h"
 #import "AutoChatAudioCell.h"
+#import "ChatDateCell.h"
+#import "AudioSessionManager.h"
+#import "MyAudioCell.h"
 
 @import AVFoundation;
 @import MediaPlayer;
@@ -77,6 +82,10 @@ static long long currentCreateTime = -1;
 static long long llCurrentMessageId = -1;
 
 static NSInteger kReJoinInterval = 3;
+static CGFloat kImageMargin = 80;
+
+
+static MyAudioCell *myAudioCell = nil;
 
 typedef enum {
     kLeaveChat      = -1,
@@ -93,7 +102,7 @@ typedef enum {
     kPrintContinue  = 3,    //계속풀기
 } AutoChatMode;
 
-@interface ChatFeedViewController () <UIActionSheetDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, MWPhotoBrowserDelegate, SBDChannelDelegate, SBDConnectionDelegate, TTTAttributedLabelDelegate, UIGestureRecognizerDelegate, UITableViewDelegate, UITableViewDataSource, SWTableViewCellDelegate, UITextFieldDelegate>
+@interface ChatFeedViewController () <AVAudioPlayerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, MWPhotoBrowserDelegate, SBDChannelDelegate, SBDConnectionDelegate, TTTAttributedLabelDelegate, UIGestureRecognizerDelegate, UITableViewDelegate, UITableViewDataSource, SWTableViewCellDelegate, UITextFieldDelegate, MPMediaPickerControllerDelegate>
 {
     BOOL isLoding;
     BOOL isFirstLoad;   //첫 로드인지 기억했다가 첫로드면 로드중 추가된 메세지는 로드후 애드 시키기 위함
@@ -102,13 +111,15 @@ typedef enum {
     BOOL isPlay;
 //    BOOL bLastKeybaordStatus;
     BOOL isSendPassible;
+    BOOL isMicAni;
     
     NSInteger nPlayEId;
     NSInteger nTmpPlayEId;
     NSInteger nTotalCnt;
     NSInteger nTmpPlayTag;
     NSInteger nTmpEId;
-
+    NSInteger nMicTime;
+    
     CGFloat fKeyboardHeight;
     
     NSString *str_UserImagePrefix;
@@ -144,6 +155,7 @@ typedef enum {
 @property (nonatomic, strong) NSMutableDictionary *dicM_AutoAudio;
 @property (nonatomic, strong) MPMoviePlayerViewController *vc_Movie;
 @property (nonatomic, assign) AutoChatMode autoChatMode;
+@property (nonatomic, strong) NSTimer *tm_Mic;
 @property (nonatomic, weak) IBOutlet UILabel *lb_Title;
 @property (nonatomic, weak) IBOutlet UILabel *lb_TotalUserCount;
 @property (nonatomic, weak) IBOutlet UILabel *lb_GroupCount;
@@ -169,6 +181,7 @@ typedef enum {
 @property (nonatomic, strong) OtherDirectChatMsgCell *c_OtherDirectChatMsgCell;
 
 @property (nonatomic, strong) NormalQuestionCell *c_NormalQuestionCell;
+@property (nonatomic, strong) ChatDateCell *c_ChatDateCell;
 
 @property (atomic) long long minMessageTimestamp;
 //@property (strong, nonatomic) NSArray<SBDBaseMessage *> *dumpedMessages;
@@ -191,6 +204,20 @@ typedef enum {
 
 @property (nonatomic, weak) IBOutlet UITableView *tbv_TempleteList;
 @property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_BotomListHeight;
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_MicWidth;
+@property (nonatomic, weak) IBOutlet UIView *v_Mic;
+@property (nonatomic, weak) IBOutlet UIView *v_MicContent;
+
+@property (nonatomic, weak) IBOutlet UILabel *lb_MicTimer;
+@property (nonatomic, weak) IBOutlet UILabel *lb_MicDescription;
+@property (nonatomic, weak) IBOutlet UILabel *lb_MicCancelDescription;
+@property (nonatomic, weak) IBOutlet UIImageView *iv_MicAni;
+@property (nonatomic, weak) IBOutlet UIButton *btn_Mic;
+
+@property (nonatomic, strong)     AVAudioPlayer       *mic_Player;
+@property (nonatomic, strong)     AVAudioRecorder     *mic_Recorder;
+@property (nonatomic, strong)     NSString            *mic_RecordedAudioFileName;
+@property (nonatomic, strong)     NSURL               *mic_RecordedAudioURL;
 
 @end
 
@@ -208,6 +235,8 @@ typedef enum {
     {
         [self.view endEditing:YES];
         self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+        self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+
         [UIView animateWithDuration:0.25f animations:^{
             [self.view layoutIfNeeded];
         }];
@@ -236,6 +265,11 @@ typedef enum {
     
     //    [self startSendBird];
     
+    if (IMPEDE_PLAYBACK)
+    {
+        [AudioSessionManager setAudioSessionCategory:AVAudioSessionCategoryPlayAndRecord];
+    }
+
     isSendPassible = YES;
 
     NSLog(@"self.str_PdfImageUrl : %@", self.str_PdfImageUrl);
@@ -244,9 +278,17 @@ typedef enum {
 
     __weak typeof(self)weakSelf = self;
 
+    self.v_MicContent.layer.cornerRadius = self.v_MicContent.frame.size.width / 2;
+    self.iv_MicAni.layer.cornerRadius = self.iv_MicAni.frame.size.width / 2;
+    
     [self.v_CommentKeyboardAccView setCompletionBlock:^(id completeResult) {
     
-        [weakSelf moveToScroll:YES];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+          
+            [weakSelf scrollToTheBottom2:[NSNumber numberWithBool:YES]];
+//            [weakSelf performSelector:@selector(scrollToTheBottom2:) withObject:[NSNumber numberWithBool:YES] afterDelay:0.4f];
+        });
+//        [weakSelf moveToScroll:YES];
     }];
     
     self.autoChatMode = kPrintExam;
@@ -321,7 +363,15 @@ typedef enum {
     
     if( self.dic_BotInfo )
     {
+        self.v_CommentKeyboardAccView.btn_TempleteKeyboard.alpha = YES;
+        self.lc_MicWidth.constant = 45.f;
         [self sendBotWelcome];
+    }
+    else
+    {
+        self.v_CommentKeyboardAccView.btn_TempleteKeyboard.alpha = NO;
+        self.lc_MicWidth.constant = 0.f;
+        self.tbv_TempleteList.backgroundColor = [UIColor whiteColor];
     }
     
     //스크롤뷰 내릴때 키보드도 함께 내리기
@@ -345,14 +395,14 @@ typedef enum {
     
     if( self.dic_BotInfo )
     {
-        self.v_CommentKeyboardAccView.btn_KeyboardChange.hidden = NO;
+//        self.v_CommentKeyboardAccView.btn_KeyboardChange.hidden = NO;
     }
     else
     {
-        self.v_CommentKeyboardAccView.btn_KeyboardChange.hidden = YES;
+//        self.v_CommentKeyboardAccView.btn_KeyboardChange.hidden = YES;
     }
     
-    [self.v_CommentKeyboardAccView.btn_KeyboardChange addTarget:self action:@selector(onKeyboardChange:) forControlEvents:UIControlEventTouchUpInside];
+//    [self.v_CommentKeyboardAccView.btn_KeyboardChange addTarget:self action:@selector(onKeyboardChange:) forControlEvents:UIControlEventTouchUpInside];
     
     nAutoAnswerIdx = -1;
     nPlayEId = -1;
@@ -407,6 +457,7 @@ typedef enum {
     self.c_OtherDirectChatMsgCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([OtherDirectChatMsgCell class])];
     
     self.c_NormalQuestionCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([NormalQuestionCell class])];
+    self.c_ChatDateCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([ChatDateCell class])];
     
     self.c_AutoAnswerCell = [self.tbv_TempleteList dequeueReusableCellWithIdentifier:NSStringFromClass([AutoAnswerCell class])];
     
@@ -663,7 +714,10 @@ typedef enum {
 {
     [self.tbv_TempleteList reloadData];
     
-    self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = YES;
+    self.v_CommentKeyboardAccView.keyboardStatus = kTemplete;
+    self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+    
+//    self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = YES;
     
     [self moveToScroll:YES];
     
@@ -1073,6 +1127,8 @@ typedef enum {
     
     [self.v_CommentKeyboardAccView resignFirstResponder];
     self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+
     
     self.navigationController.navigationBarHidden = YES;
     //    self.hidesBottomBarWhenPushed = YES;
@@ -1120,11 +1176,12 @@ typedef enum {
     
     [self saveChattingMessage];
     
-    self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
     
     //    [self.v_CommentKeyboardAccView.tv_Contents resignFirstResponder];
     [self.view endEditing:YES];
     self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+
     [UIView animateWithDuration:0.25f animations:^{
         [self.view layoutIfNeeded];
     }];
@@ -1812,6 +1869,61 @@ typedef enum {
     }
 }
 
+- (void)scrollToTheBottom2:(NSNumber *)ani
+{
+    if( self.tbv_List.contentSize.height < self.tbv_List.frame.size.height )
+    {
+        return;
+    }
+    
+    if( self.messages.count > 0 )
+    {
+        if( self.tbv_List.contentSize.height > self.tbv_List.contentOffset.y + self.view.frame.size.height )
+        {
+//            CGPoint offset = CGPointMake(0, self.tbv_List.contentSize.height - self.tbv_List.frame.size.height);
+//            if( self.v_CommentKeyboardAccView.lc_Bottom.constant > 0 )
+//            {
+//                offset = CGPointMake(0, self.tbv_List.contentSize.height + 8);
+//            }
+            
+            [self.tbv_List setContentOffset:CGPointMake(0, self.tbv_List.contentOffset.y + fKeyboardHeight) animated:[ani boolValue]];
+        }
+        else
+        {
+            @try
+            {
+                NSIndexPath *indexPath = [NSIndexPath indexPathForRow:self.messages.count-1 inSection:0];
+                [self.tbv_List scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionBottom animated:[ani boolValue]];
+            }
+            @catch (NSException *exception)
+            {
+                
+            }
+        }
+
+//        CGPoint offset = CGPointMake(0, self.tbv_List.contentSize.height - self.tbv_List.frame.size.height);
+//        if( self.v_CommentKeyboardAccView.lc_Bottom.constant > 0 )
+//        {
+//            offset = CGPointMake(0, self.tbv_List.contentSize.height + 8);
+//        }
+//        
+////        [self.tbv_List setContentOffset:offset animated:[ani boolValue]];
+//        else
+//        {
+//            @try
+//            {
+//                NSIndexPath *indexPath = [NSIndexPath indexPathForRow:self.messages.count-1 inSection:0];
+//                [self.tbv_List scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionBottom animated:[ani boolValue]];
+//            }
+//            @catch (NSException *exception)
+//            {
+//                
+//            }
+//            //            [self.tbv_List scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionBottom animated:[ani boolValue]];
+//        }
+    }
+}
+
 - (void)setMiddleDate
 {
     NSInteger nOldDate = 0;
@@ -1906,9 +2018,9 @@ typedef enum {
 
 - (void)addTapGesture:(UIView *)view
 {
-//    UITapGestureRecognizer *chatTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(chatTap:)];
-//    [chatTap setNumberOfTapsRequired:1];
-//    [view addGestureRecognizer:chatTap];
+    UITapGestureRecognizer *chatTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(chatTap:)];
+    [chatTap setNumberOfTapsRequired:1];
+    [view addGestureRecognizer:chatTap];
 }
 
 
@@ -1924,6 +2036,7 @@ typedef enum {
 #pragma mark - Table view methods
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
 {
+    NSLog(@"reloadreloadreloadreloadreloadreloadreloadreloadreloadreloadreloadreload");
     return 1;
 }
 
@@ -1957,6 +2070,105 @@ typedef enum {
                     [self.messages removeObject:message];
                 }
             }
+        }
+
+        arM_Tmp = [NSMutableArray arrayWithArray:self.messages];
+        for( NSInteger i = 1; i < arM_Tmp.count; i++ )
+        {
+            id message = [arM_Tmp objectAtIndex:i];
+            if( [message isKindOfClass:[NSDictionary class]] )
+            {
+                if( [[message objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+                {
+                    [arM_Tmp removeObject:message];
+                }
+            }
+            else if( [message isKindOfClass:[SBDBaseMessage class]] )
+            {
+                SBDBaseMessage *baseMessage = message;
+                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                
+                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+                {
+                    [arM_Tmp removeObject:dic];
+                }
+            }
+        }
+        
+        self.messages = arM_Tmp;
+        
+        
+        NSInteger nCnt = 0;
+        arM_Tmp = [NSMutableArray arrayWithArray:self.messages];
+        for( NSInteger i = 1; i < arM_Tmp.count; i++ )
+        {
+            NSString *str_TimeTmp = @"";
+            NSString *str_PrevTimeTmp = @"";
+            
+            id message = [arM_Tmp objectAtIndex:i];
+            if( [message isKindOfClass:[NSDictionary class]] )
+            {
+                str_TimeTmp = [message objectForKey_YM:@"createDate"];
+                if( [[message objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+                {
+                    [arM_Tmp removeObject:message];
+                }
+            }
+            else if( [message isKindOfClass:[SBDBaseMessage class]] )
+            {
+                SBDBaseMessage *baseMessage = message;
+                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                
+                str_TimeTmp = [dic objectForKey_YM:@"createDate"];
+                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+                {
+                    [arM_Tmp removeObject:dic];
+                }
+            }
+            
+            message = [arM_Tmp objectAtIndex:i - 1];
+            if( [message isKindOfClass:[NSDictionary class]] )
+            {
+                str_PrevTimeTmp = [message objectForKey_YM:@"createDate"];
+                if( [[message objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+                {
+                    [arM_Tmp removeObject:message];
+                }
+            }
+            else if( [message isKindOfClass:[SBDBaseMessage class]] )
+            {
+                SBDBaseMessage *baseMessage = message;
+                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                
+                str_PrevTimeTmp = [dic objectForKey_YM:@"createDate"];
+                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+                {
+                    [arM_Tmp removeObject:dic];
+                }
+            }
+
+            if( str_TimeTmp.length >= 10 && str_PrevTimeTmp.length >= 10 )
+            {
+                NSInteger nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 10)] integerValue];
+                NSInteger nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 10)] integerValue];
+
+                if( nTime > nPrevTime )
+                {
+                    NSLog(@"nTime: %ld", nTime);
+                    NSLog(@"nPrevTime: %ld", nPrevTime);
+
+                    //1시간 이상이면
+                    [self.messages insertObject:@{@"type":@"createDate", @"createDate":str_TimeTmp} atIndex:i + nCnt];
+                    nCnt++;
+                }
+            }
+
         }
         
         return self.messages.count;
@@ -2024,6 +2236,33 @@ typedef enum {
                 [self addTapGesture:cell];
                 return cell;
             }
+            else if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+            {
+                ChatDateCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ChatDateCell"];
+                [tableView deselectRowAtIndexPath:indexPath animated:YES];
+                
+                NSString *str_Date = [dic objectForKey_YM:@"createDate"];
+                if( str_Date.length >= 12 )
+                {
+                    NSString *str_Year = [str_Date substringWithRange:NSMakeRange(0, 4)];
+                    NSString *str_Month = [str_Date substringWithRange:NSMakeRange(4, 2)];
+                    NSString *str_Day = [str_Date substringWithRange:NSMakeRange(6, 2)];
+                    NSString *str_Hour = [str_Date substringWithRange:NSMakeRange(8, 2)];
+                    NSString *str_Minute = [str_Date substringWithRange:NSMakeRange(10, 2)];
+                    
+                    NSString *str = [NSString stringWithFormat:@"%@ %ld:%02ld",
+                                [str_Hour integerValue] > 12 ? @"오후" : @"오전",
+                                ([str_Hour integerValue] > 12) ? [str_Hour integerValue] - 12 : [str_Hour integerValue] == 0 ? 12 : [str_Hour integerValue], [str_Minute integerValue]];
+
+                    NSString *str_ShowingDate = [NSString stringWithFormat:@"%@월 %@일 %@", str_Month, str_Day, str];
+                    cell.lb_Date.text = str_ShowingDate;
+                }
+                else
+                {
+                    NSLog(@"@#!@#!@#@!#");
+                }
+                return cell;
+            }
         }
         
         if( dic == nil )
@@ -2075,8 +2314,11 @@ typedef enum {
                 
                 cell.tag = indexPath.row;
                 UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                longPress.numberOfTouchesRequired = 1;
+                longPress.delegate = self;
+                longPress.cancelsTouchesInView = NO;
                 [cell addGestureRecognizer:longPress];
-                
+
                 [self addTapGesture:cell];
                 
                 [self myTextCellTemp:cell forRowAtIndexPath:indexPath];
@@ -2094,6 +2336,9 @@ typedef enum {
                 
                 cell.tag = cell.btn_Origin.tag = indexPath.row;
                 UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                longPress.numberOfTouchesRequired = 1;
+                longPress.delegate = self;
+                longPress.cancelsTouchesInView = NO;
                 [cell addGestureRecognizer:longPress];
                 
                 cell.btn_Origin.hidden = YES;
@@ -2107,6 +2352,53 @@ typedef enum {
                 cell.btn_Read.selected = NO;
                 
                 cell.v_Video.hidden = YES;
+                
+                
+                
+//                NSArray *ar_Body = [dic objectForKey:@"body"];
+//                NSDictionary *dic_Body = [ar_Body firstObject];
+                NSDictionary *dic_ImageSize = [dic objectForKey:@"imageSize"];
+
+                
+                CGFloat fImageWidth = self.view.frame.size.width;
+                CGFloat fImageHeight = self.view.frame.size.height;
+
+                fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
+                fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
+
+//                fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];
+//                fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue];
+
+                if( isnan(fImageHeight) || fImageHeight <= 0 )
+                {
+                    fImageHeight = self.view.frame.size.height - kImageMargin;
+                }
+                
+                if( isnan(fImageWidth) || fImageWidth <= 0 )
+                {
+                    fImageWidth = self.view.frame.size.width - kImageMargin;
+                }
+
+                if( fImageWidth > fImageHeight )
+                {
+                    //가로형
+                    //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+                    //            fImageHeight = fScale * fImageHeight;
+                    
+                    cell.lc_ImageWidth.constant = self.view.bounds.size.width - kImageMargin;
+                    cell.lc_ImageHeight.constant = fScale * fImageHeight;
+                }
+                else
+                {
+                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageHeight;
+//                    fImageWidth = fScale * fImageWidth;
+                    
+                    cell.lc_ImageWidth.constant = fScale * fImageWidth;
+                    cell.lc_ImageHeight.constant = self.view.bounds.size.width - kImageMargin;
+                }
+
+                
                 
                 NSData *data = [NSData dataWithData:[dic objectForKey:@"obj"]];
                 cell.iv_Contents.image = [UIImage imageWithData:data];
@@ -2175,11 +2467,48 @@ typedef enum {
                 
                 cell.tag = indexPath.row;
                 UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                longPress.numberOfTouchesRequired = 1;
+                longPress.delegate = self;
+                longPress.cancelsTouchesInView = NO;
                 [cell addGestureRecognizer:longPress];
                 
                 cell.btn_Read.selected = NO;
                 
                 cell.v_Video.hidden = NO;
+                
+                
+                NSDictionary *dic_ImageSize = [dic objectForKey:@"imageSize"];
+
+                
+                CGFloat fImageWidth = self.view.frame.size.width;
+                CGFloat fImageHeight = self.view.frame.size.height;
+                
+//                fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
+//                fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
+                
+                fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
+                fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
+                
+                if( fImageWidth > fImageHeight )
+                {
+                    //가로형
+                    //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+                    //            fImageHeight = fScale * fImageHeight;
+                    
+                    cell.lc_ImageWidth.constant = self.view.bounds.size.width - kImageMargin;
+                    cell.lc_ImageHeight.constant = fScale * fImageHeight;
+                }
+                else
+                {
+                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageHeight;
+                    fImageWidth = fScale * fImageWidth;
+                    
+                    cell.lc_ImageWidth.constant = fImageWidth;
+                    cell.lc_ImageHeight.constant = self.view.bounds.size.width - kImageMargin;
+                }
+
+                
                 
                 NSData *data = [NSData dataWithData:[dic objectForKey:@"obj"]];
                 cell.iv_Contents.image = [UIImage imageWithData:data];
@@ -2200,6 +2529,37 @@ typedef enum {
                 {
                     [cell.btn_Read setImage:BundleImage(@"chat_no_check.png") forState:UIControlStateNormal];
                 }
+                
+                return cell;
+            }
+            else if( [[dic objectForKey:@"type"] isEqualToString:@"audio"] )
+            {
+                //temp
+                MyAudioCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyAudioCell"];
+                
+//                [tableView deselectRowAtIndexPath:indexPath animated:YES];
+                
+                cell.btn_Read.selected = NO;
+                
+                double duration = [[dic objectForKey:@"duration"] doubleValue];
+                duration = ceil(duration);
+
+                NSLog(@"duration: %f", duration);
+                NSInteger nMinute = (NSInteger)duration / 60;
+                NSInteger nSecond = (NSInteger)duration % 60;
+                cell.lb_Time.hidden = YES;
+                cell.lb_BgTime.hidden = NO;
+                cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                cell.lb_BgTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+//                cell.lb_Time.text = cell.lb_BgTime.text = @"123";
+                
+                [cell.btn_PlayPause removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+                [cell.btn_Replay removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+
+//                cell.lb_Time.text = @"123";
+//                cell.lb_BgTime.text = @"456";
+
+//                [self myAudioCell:cell indexPath:indexPath withData:dic withMessageId:-1];
                 
                 return cell;
             }
@@ -2229,6 +2589,9 @@ typedef enum {
                         
                         cell.tag = indexPath.row;
                         UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                        longPress.numberOfTouchesRequired = 1;
+                        longPress.delegate = self;
+                        longPress.cancelsTouchesInView = NO;
                         [cell addGestureRecognizer:longPress];
                         
                         cell.btn_Origin.hidden = YES;
@@ -2238,6 +2601,23 @@ typedef enum {
                         cell.lb_Date.hidden = NO;
                         
                         [self myImageCell:cell forRowAtIndexPath:indexPath withVideo:NO];
+                        return cell;
+                    }
+                    else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"audio"] )
+                    {
+                        MyAudioCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyAudioCell"];
+                        
+                        //                [tableView deselectRowAtIndexPath:indexPath animated:YES];
+                        
+                        cell.tag = indexPath.row;
+                        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                        longPress.numberOfTouchesRequired = 1;
+                        longPress.delegate = self;
+                        longPress.cancelsTouchesInView = NO;
+                        [cell addGestureRecognizer:longPress];
+
+                        [self myAudioCell:cell indexPath:indexPath withData:dic withMessageId:llMessageId];
+                        
                         return cell;
                     }
                     else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"pdfQuestion"] )
@@ -2262,6 +2642,9 @@ typedef enum {
                         
                         cell.tag = indexPath.row;
                         UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                        longPress.numberOfTouchesRequired = 1;
+                        longPress.delegate = self;
+                        longPress.cancelsTouchesInView = NO;
                         [cell addGestureRecognizer:longPress];
                         
                         [self myImageCell:cell forRowAtIndexPath:indexPath withVideo:YES];
@@ -2302,11 +2685,14 @@ typedef enum {
                             
                             cell.tag = indexPath.row;
                             UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                            longPress.numberOfTouchesRequired = 1;
+                            longPress.delegate = self;
+                            longPress.cancelsTouchesInView = NO;
                             [cell addGestureRecognizer:longPress];
                             
                             [self myTextCell:cell forRowAtIndexPath:indexPath];
                             
-                            //                            [self addTapGesture:cell];
+//                            [self addTapGesture:cell];
                             
                             return cell;
                         }
@@ -2331,6 +2717,9 @@ typedef enum {
                             
                             cell.tag = indexPath.row;
                             UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                            longPress.numberOfTouchesRequired = 1;
+                            longPress.delegate = self;
+                            longPress.cancelsTouchesInView = NO;
                             [cell addGestureRecognizer:longPress];
                             
                             [self myShareExamCell:cell forRowAtIndexPath:indexPath];
@@ -2346,6 +2735,9 @@ typedef enum {
                             
                             cell.tag = indexPath.row;
                             UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                            longPress.numberOfTouchesRequired = 1;
+                            longPress.delegate = self;
+                            longPress.cancelsTouchesInView = NO;
                             [cell addGestureRecognizer:longPress];
                             
                             [self myShareExamNoMsgCell:cell forRowAtIndexPath:indexPath];
@@ -2362,6 +2754,9 @@ typedef enum {
                             
                             cell.tag = indexPath.row;
                             UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                            longPress.numberOfTouchesRequired = 1;
+                            longPress.delegate = self;
+                            longPress.cancelsTouchesInView = NO;
                             [cell addGestureRecognizer:longPress];
                             
                             [self myDirectMsgCell:cell forRowAtIndexPath:indexPath];
@@ -2381,6 +2776,9 @@ typedef enum {
                             
                             cell.tag = indexPath.row;
                             UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                            longPress.numberOfTouchesRequired = 1;
+                            longPress.delegate = self;
+                            longPress.cancelsTouchesInView = NO;
                             [cell addGestureRecognizer:longPress];
                             
                             [self myDirectCell:cell forRowAtIndexPath:indexPath];
@@ -2408,6 +2806,9 @@ typedef enum {
                         
                         cell.tag = indexPath.row;
                         UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                        longPress.numberOfTouchesRequired = 1;
+                        longPress.delegate = self;
+                        longPress.cancelsTouchesInView = NO;
                         [cell addGestureRecognizer:longPress];
                         
                         [self myDirectMsgCell:cell forRowAtIndexPath:indexPath];
@@ -2427,49 +2828,9 @@ typedef enum {
         {
             if( 1 )
             {
-                BOOL isUserIconHidden = NO;
-                
                 NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
                 if( ar_Body && ar_Body.count > 0 )
                 {
-                    //다음 메세지가 봇 메세지면 이미지 안보이게 하기
-                    if( self.dic_BotInfo )
-                    {
-                        if( self.messages.count > indexPath.row + 1 )
-                        {
-                            BOOL isAudioMsg = NO;
-                            id message = self.messages[indexPath.row + 1];
-                            NSDictionary *dic_Next = nil;
-                            if( [message isKindOfClass:[SBDBaseMessage class]] )
-                            {
-                                SBDBaseMessage *baseMessage = self.messages[indexPath.row + 1];
-                                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-                                if( [userMessage.customType isEqualToString:@"audio"] )
-                                {
-                                    isAudioMsg = YES;
-                                }
-                                
-                                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-                                dic_Next = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                            }
-                            else
-                            {
-                                isAudioMsg = YES;
-                                dic_Next = message;
-                            }
-                            
-                            NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
-                            NSInteger nNextUserId = [[dic_Next objectForKey_YM:@"userId"] integerValue];
-                            if( nUserId == nNextUserId && isAudioMsg == NO )
-                            {
-                                isUserIconHidden = YES;
-                            }
-                            else
-                            {
-                                isUserIconHidden = NO;
-                            }
-                        }
-                    }
                     
                     NSDictionary *dic_ActionMap = [dic objectForKey:@"actionMap"];
                     //                NSString *str_ShareMsg = [dic_ActionMap objectForKey_YM:@"shareMsg"];
@@ -2483,12 +2844,15 @@ typedef enum {
                         cell.rightUtilityButtons = [self rightButtons];
                         cell.delegate = self;
                         
-                        cell.iv_User.hidden = isUserIconHidden;
+//                        cell.iv_User.hidden = isUserIconHidden;
                         
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         cell.tag = indexPath.row;
                         UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                        longPress.numberOfTouchesRequired = 1;
+                        longPress.delegate = self;
+                        longPress.cancelsTouchesInView = NO;
                         [cell addGestureRecognizer:longPress];
                         
                         cell.btn_Origin.hidden = YES;
@@ -2499,7 +2863,7 @@ typedef enum {
                         
                         [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:NO];
                         
-                        cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
+//                        cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
 
                         return cell;
                     }
@@ -2509,7 +2873,7 @@ typedef enum {
                         cell.rightUtilityButtons = [self rightButtons];
                         cell.delegate = self;
 
-                        cell.iv_User.hidden = isUserIconHidden;
+//                        cell.iv_User.hidden = isUserIconHidden;
                         
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
@@ -2523,12 +2887,15 @@ typedef enum {
                         cell.rightUtilityButtons = [self rightButtons];
                         cell.delegate = self;
 
-                        cell.iv_User.hidden = isUserIconHidden;
+//                        cell.iv_User.hidden = isUserIconHidden;
 
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
                         cell.tag = indexPath.row;
                         UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                        longPress.numberOfTouchesRequired = 1;
+                        longPress.delegate = self;
+                        longPress.cancelsTouchesInView = NO;
                         [cell addGestureRecognizer:longPress];
                         
                         [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:YES];
@@ -2543,7 +2910,7 @@ typedef enum {
                         cell.rightUtilityButtons = [self rightButtons];
                         cell.delegate = self;
 
-                        cell.iv_User.hidden = isUserIconHidden;
+//                        cell.iv_User.hidden = isUserIconHidden;
 
                         [tableView deselectRowAtIndexPath:indexPath animated:YES];
                         
@@ -2595,6 +2962,8 @@ typedef enum {
 //                                    long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
 //                                    cell.createTime = llCreateTime;
                                     cell.messageId = llMessageId;
+                                    cell.fPlayDuration = [[dic objectForKey:@"playtime_seconds"] floatValue];
+                                    
 //                                    if( cell.nEId != currentEId )
 //                                    if( currentCreateTime != llCreateTime )
                                     if( llCurrentMessageId == -1 || llCurrentMessageId != llMessageId )
@@ -2607,6 +2976,11 @@ typedef enum {
                                         cell.lb_BgTime.hidden = NO;
                                         cell.btn_PlayPause.selected = NO;
                                         
+                                        CGFloat fCurrentTime = cell.fPlayDuration;
+                                        NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+                                        NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+                                        cell.lb_BgTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+
                                         if( cell.player && self.timeObserver )
                                         {
                                             @try{
@@ -2615,6 +2989,9 @@ typedef enum {
                                                 self.timeObserver = nil;
 
                                             }@catch(id anException){
+//                                                [currentPlayer pause];
+//                                                currentPlayer = nil;
+                                            }@finally {
                                                 
                                             }
                                         }
@@ -2625,6 +3002,19 @@ typedef enum {
                                         cell.lb_Time.hidden = NO;
                                         cell.lb_BgTime.hidden = YES;
                                         cell.btn_PlayPause.selected = isPlay;
+                                        
+                                        CGFloat fCurrentTime = cell.fPlayDuration;
+                                        NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+                                        NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+                                        NSString *str_Time = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                        if( [str_Time isEqualToString:@"00:00"] )
+                                        {
+                                            cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                        }
+
+                                        
+//                                        cell.lb_Time.text = [NSString stringWithFormat:@"%f", cell.fPlayDuration];
+                                        
 //                                        currentCell = cell;
                                     }
                                     
@@ -2679,18 +3069,31 @@ typedef enum {
                                     
                                     return cell;
                                 }
+                                else if( [userMessage.customType isEqualToString:@"pdf"] )
+                                {
+                                    NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
+                                    cell.rightUtilityButtons = [self rightButtons];
+                                    cell.delegate = self;
+                                    
+                                    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+                                    
+                                    [self pdfQuestionCell:cell forRowAtIndexPath:indexPath withMy:NO];
+                                    
+                                    return cell;
+                                }
                                 else if( [userMessage.customType isEqualToString:@"image"] )
                                 {
                                     OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
                                     cell.rightUtilityButtons = [self rightButtons];
                                     cell.delegate = self;
-
-                                    cell.iv_User.hidden = isUserIconHidden;
-
+                                    
                                     [tableView deselectRowAtIndexPath:indexPath animated:YES];
                                     
                                     cell.tag = indexPath.row;
                                     UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                                    longPress.numberOfTouchesRequired = 1;
+                                    longPress.delegate = self;
+                                    longPress.cancelsTouchesInView = NO;
                                     [cell addGestureRecognizer:longPress];
                                     
                                     cell.btn_Origin.hidden = YES;
@@ -2700,8 +3103,35 @@ typedef enum {
                                     cell.lb_Date.hidden = NO;
                                     
                                     [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:NO];
+
+//                                    cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
                                     
-                                    cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
+                                    return cell;
+                                }
+                                else if( [userMessage.customType isEqualToString:@"video"] )
+                                {
+                                    OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
+                                    cell.rightUtilityButtons = [self rightButtons];
+                                    cell.delegate = self;
+                                    
+                                    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+                                    
+                                    cell.tag = indexPath.row;
+                                    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                                    longPress.numberOfTouchesRequired = 1;
+                                    longPress.delegate = self;
+                                    longPress.cancelsTouchesInView = NO;
+                                    [cell addGestureRecognizer:longPress];
+                                    
+                                    cell.btn_Origin.hidden = YES;
+                                    [cell.btn_Origin setTitle:@"" forState:UIControlStateNormal];
+                                    
+                                    cell.btn_Read.hidden = NO;
+                                    cell.lb_Date.hidden = NO;
+                                    
+                                    [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:YES];
+                                    
+//                                    cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
                                     
                                     return cell;
                                 }
@@ -2712,17 +3142,20 @@ typedef enum {
                             cell.rightUtilityButtons = [self rightButtons];
                             cell.delegate = self;
 
-                            cell.iv_User.hidden = isUserIconHidden;
+//                            cell.iv_User.hidden = isUserIconHidden;
 
                             [tableView deselectRowAtIndexPath:indexPath animated:YES];
                             
                             cell.tag = indexPath.row;
                             UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                            longPress.numberOfTouchesRequired = 1;
+                            longPress.delegate = self;
+                            longPress.cancelsTouchesInView = NO;
                             [cell addGestureRecognizer:longPress];
                             
                             [self otherTextCell:cell forRowAtIndexPath:indexPath];
                             
-                            cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 10.f;
+//                            cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 10.f;
                             //                            [self addTapGesture:cell];
                             
                       
@@ -2749,6 +3182,9 @@ typedef enum {
                             
                             cell.tag = indexPath.row;
                             UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                            longPress.numberOfTouchesRequired = 1;
+                            longPress.delegate = self;
+                            longPress.cancelsTouchesInView = NO;
                             [cell addGestureRecognizer:longPress];
                             
                             [self otherShareExamCell:cell forRowAtIndexPath:indexPath];
@@ -2765,6 +3201,9 @@ typedef enum {
                             
                             cell.tag = indexPath.row;
                             UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                            longPress.numberOfTouchesRequired = 1;
+                            longPress.delegate = self;
+                            longPress.cancelsTouchesInView = NO;
                             [cell addGestureRecognizer:longPress];
                             
                             [self otherShareExamNoMsgCell:cell forRowAtIndexPath:indexPath];
@@ -2793,6 +3232,9 @@ typedef enum {
                             
                             cell.tag = indexPath.row;
                             UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                            longPress.numberOfTouchesRequired = 1;
+                            longPress.delegate = self;
+                            longPress.cancelsTouchesInView = NO;
                             [cell addGestureRecognizer:longPress];
                             
                             [self otherDirectMsgCell:cell forRowAtIndexPath:indexPath];
@@ -2810,6 +3252,9 @@ typedef enum {
                             
                             cell.tag = indexPath.row;
                             UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                            longPress.numberOfTouchesRequired = 1;
+                            longPress.delegate = self;
+                            longPress.cancelsTouchesInView = NO;
                             [cell addGestureRecognizer:longPress];
                             
                             [self otherDirectCell:cell forRowAtIndexPath:indexPath];
@@ -2829,6 +3274,9 @@ typedef enum {
                         
                         cell.tag = indexPath.row;
                         UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                        longPress.numberOfTouchesRequired = 1;
+                        longPress.delegate = self;
+                        longPress.cancelsTouchesInView = NO;
                         [cell addGestureRecognizer:longPress];
                         
                         [self otherDirectMsgCell:cell forRowAtIndexPath:indexPath];
@@ -2934,7 +3382,7 @@ typedef enum {
         else if( self.autoChatMode == kPrintAnswer || self.autoChatMode == kNextExam || self.autoChatMode == kPrintContinue )
         {
             str_AutoAnswer = [dic objectForKey:@"title"];
-            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = YES;
+//            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = YES;
             [self performSelector:@selector(onKeyboardShowInterval) withObject:nil afterDelay:0.3f];
         }
         
@@ -2952,6 +3400,9 @@ typedef enum {
                         self.timeObserver = nil;
                         
                     }@catch(id anException){
+                        [currentPlayer pause];
+                        currentPlayer = nil;
+                    }@finally {
                         
                     }
                 }
@@ -2966,10 +3417,215 @@ typedef enum {
     }
 }
 
-- (void)onAutoAudioPlayAndPause:(UIButton *)btn
+- (void)myAudioCell:(MyAudioCell *)cell indexPath:(NSIndexPath *)indexPath withData:(NSDictionary *)dic withMessageId:(long long)llMessageId
+{
+    double duration = [[dic objectForKey:@"duration"] doubleValue];
+    duration = ceil(duration);
+
+    if( [[dic objectForKey:@"temp"] isEqualToString:@"YES"] )
+    {
+        NSLog(@"temptemptemptemptemptemptemptemptemptemptemp");
+    }
+    
+    if( llMessageId <= 0 )
+    {
+        //템프일 경우
+        return;
+    }
+    
+    NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
+    if( ar_Body.count <= 0 )
+    {
+        return;
+    }
+    
+    cell.btn_Read.selected = YES;
+
+    NSDictionary *dic_Body = [ar_Body firstObject];
+
+    NSURL *url = [Util createImageUrl:[dic objectForKey:@"image_prefix"] withFooter:[dic_Body objectForKey:@"qnaBody"]];
+    
+    cell.url = url;
+    cell.nEId = [[dic_Body objectForKey:@"eId"] integerValue];
+    cell.messageId = llMessageId;
+    cell.fPlayDuration = duration;
+
+    if( llCurrentMessageId == -1 || llCurrentMessageId != llMessageId )
+    {
+        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:url];
+        cell.player = [AVPlayer playerWithPlayerItem:playerItem];
+        cell.player = [AVPlayer playerWithURL:url];
+//        cell.lb_Time.text = @"00:00";
+        cell.lb_Time.hidden = YES;
+        cell.lb_BgTime.hidden = NO;
+        cell.btn_PlayPause.selected = NO;
+        
+        CGFloat fCurrentTime = cell.fPlayDuration;
+        NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+        NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+        cell.lb_BgTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+        
+        if( cell.player && self.timeObserver )
+        {
+            @try{
+                
+                [cell.player removeTimeObserver:self.timeObserver];
+                self.timeObserver = nil;
+                
+            }@catch(id anException){
+                //                                                [currentPlayer pause];
+                //                                                currentPlayer = nil;
+            }@finally {
+                
+            }
+        }
+    }
+    else
+    {
+        NSLog(@"indexPath.row : %ld", indexPath.row);
+        cell.lb_Time.hidden = NO;
+        cell.lb_BgTime.hidden = YES;
+        cell.btn_PlayPause.selected = isPlay;
+        
+        CGFloat fCurrentTime = cell.fPlayDuration;
+        NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+        NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+        NSString *str_Time = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+        if( [str_Time isEqualToString:@"00:00"] )
+        {
+            cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+        }
+    }
+    
+    NSMutableDictionary *dicM_Info = [NSMutableDictionary dictionary];
+    [dicM_Info setObject:cell forKey:@"cell"];
+    [dicM_Info setObject:url forKey:@"url"];
+    [dicM_Info setObject:[NSNumber numberWithInteger:[[dic_Body objectForKey:@"eId"] integerValue]] forKey:@"eId"];
+    [dicM_Info setObject:[NSNumber numberWithInteger:cell.tag] forKey:@"tag"];
+    [dicM_Info setObject:[NSNumber numberWithInteger:llMessageId] forKey:@"messageId"];
+//    [dicM_Info setObject:cell.lb_Time forKey:@"timeLabel"];
+    [self.dicM_AutoAudio setObject:dicM_Info forKey:[NSString stringWithFormat:@"%ld", indexPath.row]];
+
+    cell.btn_PlayPause.obj = cell;
+    cell.tag = cell.btn_PlayPause.tag = cell.btn_Replay.tag = indexPath.row;
+    [cell.btn_PlayPause removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    [cell.btn_Replay removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    [cell.btn_PlayPause addTarget:self action:@selector(onMyAudioPlayAndPause:) forControlEvents:UIControlEventTouchUpInside];
+}
+
+- (void)onMyAudioPlayAndPause:(ExtentionButton *)btn
+{
+//    NSIndexPath* indexPath = [NSIndexPath indexPathForRow:btn.tag inSection:0];
+    
+    NSDictionary *dic_AudioInfo = [self.dicM_AutoAudio objectForKey:[NSString stringWithFormat:@"%ld", btn.tag]];
+    
+    NSInteger messageId = [[dic_AudioInfo objectForKey:@"messageId"] integerValue];
+    if( messageId <= 0 )
+    {
+        return;
+    }
+    
+    AutoChatAudioCell* cell = [dic_AudioInfo objectForKey:@"cell"];
+    
+    if( cell.nEId != currentEId )
+    {
+        //다른 플레이어를 선택했을때
+        isPlay = NO;
+    }
+    
+    if( isPlay == NO )
+    {
+        if( cell.nEId == currentEId )
+        {
+            if ((currentPlayer.rate == 0) && (currentPlayer.error == nil))
+            {
+                isPlay = YES;
+                [currentPlayer play];
+                //                [self.tbv_List reloadData];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self.tbv_List reloadData];
+                    [self.tbv_List layoutIfNeeded];
+                });
+                
+                return;
+            }
+        }
+        
+        @try
+        {
+            [currentPlayer removeTimeObserver:self.timeObserver];
+            self.timeObserver = nil;
+        }
+        @catch(id anException)
+        {
+            [currentPlayer pause];
+            currentPlayer = nil;
+        }@finally {
+            
+        }
+        
+        currentCell = [dic_AudioInfo objectForKey:@"cell"];
+        currentUrl = [dic_AudioInfo objectForKey:@"url"];
+        currentEId = [[dic_AudioInfo objectForKey:@"eId"] integerValue]; //42940
+        currentTag = [[dic_AudioInfo objectForKey:@"tag"] integerValue];
+        llCurrentMessageId = [[dic_AudioInfo objectForKey:@"messageId"] integerValue];
+//        lb_PlayerTime = [dic_AudioInfo objectForKey:@"timeLabel"];
+        lb_PlayerTime = currentCell.lb_Time;
+        
+        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:currentUrl];
+        currentPlayer = [AVPlayer playerWithPlayerItem:playerItem];
+        currentPlayer = [AVPlayer playerWithURL:cell.url];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(itemDidFinishPlaying:) name:AVPlayerItemDidPlayToEndTimeNotification object:nil];
+        
+        self.timeObserver = [currentPlayer addPeriodicTimeObserverForInterval:CMTimeMake(1, 2)
+                                                                        queue:dispatch_get_main_queue()
+                                                                   usingBlock:^(CMTime time)
+                             {
+                                 NSLog(@"onAutoAudioPlay");
+                                 
+                                 CGFloat fCurrentTime = currentCell.fPlayDuration - CMTimeGetSeconds(time);
+                                 NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+                                 NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+                                 currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                 cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                 lb_PlayerTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                             }];
+        
+        isPlay = YES;
+        
+        __weak __typeof(&*self)weakSelf = self;
+        [currentPlayer addBoundaryTimeObserverForTimes:@[[NSValue valueWithCMTime:CMTimeMake(1, 2)]]
+                                                 queue:dispatch_get_main_queue()
+                                            usingBlock:^{
+                                                
+                                                //                                                [weakSelf.tbv_List reloadData];
+                                                dispatch_async(dispatch_get_main_queue(), ^{
+                                                    [weakSelf.tbv_List reloadData];
+                                                    [weakSelf.tbv_List layoutIfNeeded];
+                                                });
+                                                
+                                            }];
+        
+        [currentPlayer play];
+    }
+    else
+    {
+        [currentPlayer pause];
+        isPlay = NO;
+    }
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.tbv_List reloadData];
+        [self.tbv_List layoutIfNeeded];
+    });
+}
+
+- (void)onAutoAudioPlayAndPause:(ExtentionButton *)btn
 {
     NSIndexPath* indexPath = [NSIndexPath indexPathForRow:btn.tag inSection:0];
+    
     AutoChatAudioCell* cell = [self.tbv_List cellForRowAtIndexPath:indexPath];
+
     if( cell.nEId != currentEId )
     {
         //다른 플레이어를 선택했을때
@@ -2994,12 +3650,34 @@ typedef enum {
             }
         }
         
-        SBDBaseMessage *baseMessage = self.messages[indexPath.row];
-        SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-        NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-        NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        @try
+        {
+            [currentPlayer removeTimeObserver:self.timeObserver];
+            self.timeObserver = nil;
+        }
+        @catch(id anException)
+        {
+            [currentPlayer pause];
+            currentPlayer = nil;
+        }@finally {
+            
+        }
+
+//        SBDBaseMessage *baseMessage = self.messages[indexPath.row];
+//        SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+//        NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+//        NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
 
 //        long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
+
+        
+        
+//        currentCell = [self.dicM_AutoAudio objectForKey:@"cell"];
+//        currentUrl = [self.dicM_AutoAudio objectForKey:@"url"];
+//        currentEId = [[self.dicM_AutoAudio objectForKey:@"eId"] integerValue]; //42940
+//        currentTag = [[self.dicM_AutoAudio objectForKey:@"tag"] integerValue];
+//        llCurrentMessageId = [[self.dicM_AutoAudio objectForKey:@"messageId"] integerValue];
+//        lb_PlayerTime = [self.dicM_AutoAudio objectForKey:@"timeLabel"];
 
         currentCell = cell;
         currentUrl = cell.url;
@@ -3020,26 +3698,18 @@ typedef enum {
         //    NSLog(@"%f", fDuration);
         
         
-        
         self.timeObserver = [currentPlayer addPeriodicTimeObserverForInterval:CMTimeMake(1, 2)
                                                     queue:dispatch_get_main_queue()
                                                usingBlock:^(CMTime time)
          {
-//             NSLog(@"11111");
-//             NSLog(@"cell.nEId : %ld", cell.nEId);
-//             NSLog(@"22222");
-//             NSLog(@"cell.nEId : %ld", currentEId);
-//             NSLog(@"currentCell : %@", currentCell);
-//             if( cell.messageId == llCurrentMessageId )
-//             {
-                 NSLog(@"onAutoAudioPlay");
-                 CGFloat fCurrentTime = CMTimeGetSeconds(time);
-                 NSInteger nMinute = (NSInteger)fCurrentTime / 60;
-                 NSInteger nSecond = (NSInteger)fCurrentTime % 60;
-                 currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+             NSLog(@"onAutoAudioPlay");
+             
+             CGFloat fCurrentTime = currentCell.fPlayDuration - CMTimeGetSeconds(time);
+             NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+             NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+             currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
              cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
              lb_PlayerTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
-//             }
          }];
         
         isPlay = YES;
@@ -3107,9 +3777,20 @@ typedef enum {
     }
 
     isPlay = YES;
-    
-    [Util rotationImage:btn withRadian:-180];
-    [Util rotationImage:btn withRadian:0];
+
+    [UIView animateWithDuration:0.15f animations:^{
+       
+        btn.transform = CGAffineTransformMakeRotation(degreesToRadian(-180));
+
+    }completion:^(BOOL finished) {
+        
+        [UIView animateWithDuration:0.15f animations:^{
+           
+            btn.transform = CGAffineTransformMakeRotation(degreesToRadian(0));
+        }];
+    }];
+//    [Util rotationImage:btn withRadian:-180];
+//    [Util rotationImage:btn withRadian:0];
 
     
     
@@ -3117,7 +3798,7 @@ typedef enum {
     
     [currentPlayer seekToTime:CMTimeMake(0, 1)];
     [currentPlayer play];
-    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
+//    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
     
 //    NSString *str_Key = [NSString stringWithFormat:@"%ld", btn.tag];
 //    NSDictionary *dic_PlayerData = [self.dicM_AutoAudio objectForKey:str_Key];
@@ -3192,6 +3873,9 @@ typedef enum {
                                 self.timeObserver = nil;
                                 
                             }@catch(id anException){
+                                [currentPlayer pause];
+                                currentPlayer = nil;
+                            }@finally {
                                 
                             }
                         }
@@ -3202,7 +3886,8 @@ typedef enum {
                                              {
                                                  NSLog(@"didEndDisplay");
 
-                                                 CGFloat fCurrentTime = CMTimeGetSeconds(time);
+//                                                 CGFloat fCurrentTime = CMTimeGetSeconds(time);
+                                                 CGFloat fCurrentTime = currentCell.fPlayDuration - CMTimeGetSeconds(time);
                                                  NSInteger nMinute = (NSInteger)fCurrentTime / 60;
                                                  NSInteger nSecond = (NSInteger)fCurrentTime % 60;
                                                  currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
@@ -3247,9 +3932,9 @@ typedef enum {
                         });
 
                         
-                        [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.3f];
-                        [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
-                        [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:5.0f];
+//                        [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.3f];
+//                        [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
+                        [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.9f];
                     }
                 }
             }
@@ -3325,6 +4010,8 @@ typedef enum {
 //    }];
     
     self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+
     [UIView animateWithDuration:0.25f animations:^{
         [self.view layoutIfNeeded];
     }];
@@ -3351,9 +4038,14 @@ typedef enum {
             dic = message;
         }
         
-        if( [[dic objectForKey_YM:@"itemType"] isEqualToString:@"cmd"] || [[dic objectForKey:@"type"] isEqualToString:@"date"] )
+        if( [[dic objectForKey_YM:@"itemType"] isEqualToString:@"cmd"] )
         {
             return 44.f;
+        }
+        
+        if( [[dic objectForKey:@"type"] isEqualToString:@"createDate"] )
+        {
+            return 37.f;
         }
         
         if( [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_JOIN"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_LEFT"] )
@@ -3365,17 +4057,17 @@ typedef enum {
         {
             if( [[dic objectForKey_YM:@"type"] isEqualToString:@"text"] )
             {
-                self.c_MyChatBasicCell.lb_Contents.text = [dic objectForKey_YM:@"contents"];
-                CGFloat fHeight = [Util getTextSize2:self.c_MyChatBasicCell.lb_Contents].height;
-                //            NSLog(@"fHeight : %f", fHeight);
-                
-                [self.c_MyChatBasicCell updateConstraintsIfNeeded];
-                [self.c_MyChatBasicCell layoutIfNeeded];
-                
-                self.c_MyChatBasicCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyChatBasicCell.bounds));
-                
-                //            NSLog(@"cell height : %f", fHeight + 30.f);
-                return fHeight + 30.f;
+//                self.c_MyChatBasicCell.lb_Contents.text = [dic objectForKey_YM:@"contents"];
+//                CGFloat fHeight = [Util getTextSize2:self.c_MyChatBasicCell.lb_Contents].height;
+//                //            NSLog(@"fHeight : %f", fHeight);
+//                
+//                [self.c_MyChatBasicCell updateConstraintsIfNeeded];
+//                [self.c_MyChatBasicCell layoutIfNeeded];
+//                
+//                self.c_MyChatBasicCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyChatBasicCell.bounds));
+//                
+//                //            NSLog(@"cell height : %f", fHeight + 30.f);
+//                return fHeight + 30.f;
                 
                 //            [self myTextCellTemp:self.c_MyChatBasicCell forRowAtIndexPath:indexPath];
                 //
@@ -3387,10 +4079,60 @@ typedef enum {
                 //            return self.c_MyChatBasicCell.bounds.size.height;
                 
                 //            return [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
+                
+                
+                
+                
+                
+//                [self myTextCell:self.c_MyChatBasicCell forRowAtIndexPath:indexPath];
+                [self myTextCellTemp:self.c_MyChatBasicCell forRowAtIndexPath:indexPath];
+                [self.c_MyChatBasicCell updateConstraintsIfNeeded];
+                [self.c_MyChatBasicCell layoutIfNeeded];
+                
+                self.c_MyChatBasicCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyChatBasicCell.bounds));
+
+                return [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
             }
             else if( [[dic objectForKey_YM:@"type"] isEqualToString:@"image"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"video"] )
             {
-                return 420.f;
+                NSDictionary *dic_ImageSize = [dic objectForKey:@"imageSize"];
+
+                CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
+                CGFloat fImageWidth = self.view.frame.size.width;
+                CGFloat fImageHeight = self.view.frame.size.height;
+                
+                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"video"] )
+                {
+                    fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
+                    fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
+                }
+                else if( [[dic objectForKey_YM:@"type"] isEqualToString:@"image"] )
+                {
+                    fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
+                    fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
+                }
+                
+                if( isnan(fImageHeight) || fImageHeight <= 0 )
+                {
+                    fImageHeight = self.view.frame.size.height - kImageMargin;
+                }
+                
+                if( isnan(fImageWidth) || fImageWidth <= 0 )
+                {
+                    fImageWidth = self.view.frame.size.width - kImageMargin;
+                }
+
+                if( fImageWidth > fImageHeight )
+                {
+                    //가로형
+                    //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+//                    fImageHeight = fScale * fImageHeight;
+                    
+                    fHeight = fScale * fImageHeight;
+                }
+                
+                return 76.f + fHeight;
             }
             else if( [[dic objectForKey_YM:@"type"] isEqualToString:@"pdfQuestion"] )
             {
@@ -3404,6 +4146,10 @@ typedef enum {
             {
                 [self normalQuestionCell:self.c_NormalQuestionCell forRowAtIndexPath:indexPath withMy:YES];
                 return self.c_NormalQuestionCell.sv_Contents.contentSize.height;
+            }
+            else if( [[dic objectForKey:@"type"] isEqualToString:@"audio"] )
+            {
+                return 38.f;
             }
         }
         
@@ -3442,12 +4188,133 @@ typedef enum {
                         
 //                        NSLog(@"text hieght : %f", rect.size.height);
 //                        NSLog(@"c_MyChatBasicCell height : %f", [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                        
+//                        return 61.f;
                         return [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
                     }
                     else if( [str_QnaType isEqualToString:@"image"] || [str_QnaType isEqualToString:@"video"] )
                     {
-                        return 420.f;
+                        CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
+                        
+                        NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
+                        if( ar_Body && ar_Body.count > 0 )
+                        {
+                            NSDictionary *dic_Body = [ar_Body firstObject];
+                            
+                            CGFloat fImageWidth = self.view.frame.size.width;
+                            CGFloat fImageHeight = self.view.frame.size.height;
+                            
+                            if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"video"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"video"] )
+                            {
+                                fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];
+                                fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue];
+                            }
+                            else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"image"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"image"] )
+                            {
+                                fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
+                                fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
+                            }
+
+                            if( isnan(fImageHeight) || fImageHeight <= 0 )
+                            {
+                                fImageHeight = self.view.frame.size.height - kImageMargin;
+                            }
+                            
+                            if( isnan(fImageWidth) || fImageWidth <= 0 )
+                            {
+                                fImageWidth = self.view.frame.size.width - kImageMargin;
+                            }
+
+                            if( fImageWidth > fImageHeight )
+                            {
+                                //가로형
+                                //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+                                CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+                                
+
+                                fHeight = fScale * fImageHeight;
+                                
+//                                fHeight = fImageHeight;
+                            }
+                        }
+                        
+                        
+                        
+                        
+                        
+                        
+                        CGFloat fAddHeightValue = 10.f;
+//                        if( indexPath.row > 0 )
+//                        {
+//                            //이전 메세지
+//                            id message = self.messages[indexPath.row - 1];
+//                            NSDictionary *dic_Prev = nil;
+//                            if( [message isKindOfClass:[SBDBaseMessage class]] )
+//                            {
+//                                SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
+//                                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+//                                if( [userMessage.customType isEqualToString:@"audio"] )
+//                                {
+//                                    //                                isAudioMsg = YES;
+//                                }
+//                                
+//                                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+//                                dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//                            }
+//                            else
+//                            {
+//                                //                            isAudioMsg = YES;
+//                                dic_Prev = message;
+//                            }
+//                            
+//                            NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
+//                            NSInteger nNextUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
+//                            
+//                            NSInteger nTime = 0;
+//                            NSInteger nPrevTime = 0;
+//                            NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
+//                            NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
+//                            if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
+//                            {
+//                                nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+//                                nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+//                            }
+//                            
+//                            if( nUserId == nNextUserId )
+//                            {
+//                                //이전 메세지가 내 메세지면
+//                                if( nTime == nPrevTime )
+//                                {
+//                                    //1분 이내의 메세지
+//                                    
+//                                }
+//                                else
+//                                {
+//                                    //1분이 지난 메세지
+//                                    fAddHeightValue = 25.f;
+//                                }
+//                            }
+//                            else
+//                            {
+//                                //이전 메세지가 내 메세지가 아니면
+//                                fAddHeightValue = 25.f;
+//                            }
+//                        }
+                        
+                        return fHeight + fAddHeightValue;
+
+                        
+                        
+                        
+                        
+                        
+                        
+//                        return 35.f + fHeight;
+                        
+//                        return 420.f;
+                    }
+                    else if( [str_QnaType isEqualToString:@"audio"] )
+                    {
+                        return 38.f;
                     }
                     else if( [str_QnaType isEqualToString:@"pdfQuestion"] )
                     {
@@ -3587,11 +4454,74 @@ typedef enum {
                             
                             if( [userMessage.customType isEqualToString:@"audio"] )
                             {
-                                return 50.f;
+                                return 38.f;
+                            }
+                            else if( [userMessage.customType isEqualToString:@"pdf"] )
+                            {
+                                [self pdfQuestionCell:self.c_NormalQuestionCell forRowAtIndexPath:indexPath withMy:NO];
+                                return self.c_NormalQuestionCell.sv_Contents.contentSize.height;
                             }
                             else if( [userMessage.customType isEqualToString:@"image"] )
                             {
-                                return 420.f;
+                                CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
+                                //bbbbbbbbbbb
+                                CGFloat fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
+                                CGFloat fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
+                                
+                                if( isnan(fImageHeight) || fImageHeight <= 0 )
+                                {
+                                    fImageHeight = self.view.frame.size.height - kImageMargin;
+                                }
+                                
+                                if( isnan(fImageWidth) || fImageWidth <= 0 )
+                                {
+                                    fImageWidth = self.view.frame.size.width - kImageMargin;
+                                }
+
+                                if( fImageWidth > fImageHeight )
+                                {
+                                    //가로형
+                                    //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+                                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+//                                    fImageHeight = fScale * fImageHeight;
+                                    
+                                    fHeight = fScale * fImageHeight;
+                                }
+
+                                return 25.f + fHeight;
+                                
+//                                return 420.f;
+                            }
+                            else if( [userMessage.customType isEqualToString:@"video"] )
+                            {
+                                CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
+                                //bbbbbbbbbbb
+                                CGFloat fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];
+                                CGFloat fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue];
+                                
+                                if( isnan(fImageHeight) || fImageHeight <= 0 )
+                                {
+                                    fImageHeight = self.view.frame.size.height - kImageMargin;
+                                }
+                                
+                                if( isnan(fImageWidth) || fImageWidth <= 0 )
+                                {
+                                    fImageWidth = self.view.frame.size.width - kImageMargin;
+                                }
+                                
+                                if( fImageWidth > fImageHeight )
+                                {
+                                    //가로형
+                                    //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+                                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+                                    //                                    fImageHeight = fScale * fImageHeight;
+                                    
+                                    fHeight = fScale * fImageHeight;
+                                }
+                                
+                                return 25.f + fHeight;
+                                
+                                //                                return 420.f;
                             }
                         }
                         
@@ -3608,7 +4538,117 @@ typedef enum {
                     }
                     else if( [str_QnaType isEqualToString:@"image"] || [str_QnaType isEqualToString:@"video"] )
                     {
-                        return 420.f;
+                        CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
+                        CGFloat fImageWidth = self.view.frame.size.width;
+                        CGFloat fImageHeight = self.view.frame.size.height;
+                        
+                        if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"video"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"video"] )
+                        {
+                            fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];
+                            fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue];
+                        }
+                        else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"image"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"image"] )
+                        {
+                            fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
+                            fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
+                        }
+                        
+                        if( isnan(fImageHeight) || fImageHeight <= 0 )
+                        {
+                            fImageHeight = self.view.frame.size.height - kImageMargin;
+                        }
+                        
+                        if( isnan(fImageWidth) || fImageWidth <= 0 )
+                        {
+                            fImageWidth = self.view.frame.size.width - kImageMargin;
+                        }
+
+                        if( fImageWidth > fImageHeight )
+                        {
+                            //가로형
+                            //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+                            CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+//                            fImageHeight = fScale * fImageHeight;
+                            
+                            fHeight = fScale * fImageHeight;
+                        }
+
+                        
+                        
+                        CGFloat fAddHeightValue = 0.f;
+                        if( indexPath.row > 0 )
+//                        if( self.messages.count > indexPath.row + 1 )
+                        {
+                            //이전 메세지
+                            id message = self.messages[indexPath.row - 1];
+                            NSDictionary *dic_Prev = nil;
+                            if( [message isKindOfClass:[SBDBaseMessage class]] )
+                            {
+                                SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
+                                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+                                if( [userMessage.customType isEqualToString:@"audio"] )
+                                {
+                                    //                                isAudioMsg = YES;
+                                }
+                                
+                                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+                                dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+                            }
+                            else
+                            {
+                                //                            isAudioMsg = YES;
+                                dic_Prev = message;
+                            }
+                            
+                            NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
+                            NSInteger nPrevUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
+                            
+                            NSInteger nTime = 0;
+                            NSInteger nPrevTime = 0;
+                            NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
+                            NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
+                            if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
+                            {
+                                nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+                                nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+                            }
+                            
+                            if( nUserId == nPrevUserId )
+                            {
+                                //이전 메세지가 내 메세지면
+                                if( nTime == nPrevTime )
+                                {
+                                    //1분 이내의 메세지
+                                    fAddHeightValue = 42.f - 15.f;
+                                }
+                                else
+                                {
+                                    //1분이 지난 메세지
+                                    fAddHeightValue = 42.f;
+                                }
+                            }
+                            else
+                            {
+                                //이전 메세지가 내 메세지가 아니면
+                                fAddHeightValue = 42.f;
+                            }
+                        }
+
+//                        if( [str_ChatType isEqualToString:@"group"] )
+//                        {
+//                            fAddHeightValue += 20.f;
+//                        }
+//                        else if( [str_ChatType isEqualToString:@"channel"] )
+//                        {
+//                            fAddHeightValue += 20.f;
+//                        }
+//                        else if( [str_ChatType isEqualToString:@"user"] )
+//                        {
+//                            
+//                        }
+
+                        return fHeight + fAddHeightValue;
+//                        return fHeight + 42.f;
                     }
                     else if( [str_QnaType isEqualToString:@"pdfQuestion"] )
                     {
@@ -3742,7 +4782,14 @@ typedef enum {
 
 - (void)tableView:(UITableView *)tableView didEndDisplayingCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath*)indexPath
 {
+    if( tableView == self.tbv_TempleteList )    return;
+    
     if( indexPath == nil )  return;
+    
+    if( indexPath.row > self.messages.count - 1 )
+    {
+        return;
+    }
     
     id message = self.messages[indexPath.row];
     
@@ -3750,7 +4797,7 @@ typedef enum {
     {
         SBDBaseMessage *baseMessage = self.messages[indexPath.row];
         SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-        NSLog(@"mesage: %@, customType: %@", userMessage.message, userMessage.customType);
+//        NSLog(@"mesage: %@, customType: %@", userMessage.message, userMessage.customType);
         if( [userMessage.customType isEqualToString:@"audio"] )
         {
             NSLog(@"audio cell didEndDisplaying");
@@ -3768,6 +4815,9 @@ typedef enum {
                             self.timeObserver = nil;
                             
                         }@catch(id anException){
+                            [currentPlayer pause];
+                            currentPlayer = nil;
+                        }@finally {
                             
                         }
                     }
@@ -3821,6 +4871,9 @@ typedef enum {
                             self.timeObserver = nil;
                             
                         }@catch(id anException){
+                            [currentPlayer pause];
+                            currentPlayer = nil;
+                        }@finally {
                             
                         }
                     }
@@ -3831,7 +4884,8 @@ typedef enum {
                      {
                          NSLog(@"didEndDisplay");
 
-                         CGFloat fCurrentTime = CMTimeGetSeconds(time);
+//                         CGFloat fCurrentTime = CMTimeGetSeconds(time);
+                         CGFloat fCurrentTime = currentCell.fPlayDuration - CMTimeGetSeconds(time);
                          NSInteger nMinute = (NSInteger)fCurrentTime / 60;
                          NSInteger nSecond = (NSInteger)fCurrentTime % 60;
                          currentCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
@@ -3876,14 +4930,14 @@ typedef enum {
                     });
 
                     
-                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.3f];
-                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
+//                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.3f];
+//                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
                     [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.9f];
                 }
                 else
                 {
-                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.3f];
-                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
+//                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.3f];
+//                    [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.6f];
                     [self performSelector:@selector(onReloadInterval) withObject:nil afterDelay:0.9f];
                 }
             }
@@ -3958,6 +5012,29 @@ typedef enum {
     NSMutableDictionary *dic_Main = [NSMutableDictionary dictionaryWithDictionary:dic];
     NSDictionary *dic_ActionMap = [dic_Main objectForKey:@"actionMap"];
     NSString *str_MsgType = [dic_ActionMap objectForKey:@"msgType"];
+    
+    if( [[dic_Main objectForKey:@"fileType"] isEqualToString:@"video"] )
+    {
+        NSArray *ar_Body = [dic_Main objectForKey:@"qnaBody"];
+        if( ar_Body.count > 0 )
+        {
+            NSDictionary *dic_Body = [ar_Body firstObject];
+            NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
+            NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:str_Contents];
+            self.vc_Movie = [[MPMoviePlayerViewController alloc]initWithContentURL:url];
+            self.vc_Movie.view.frame = self.view.bounds;
+            self.vc_Movie.moviePlayer.repeatMode = MPMovieRepeatModeOne;
+            self.vc_Movie.moviePlayer.movieSourceType = MPMovieSourceTypeStreaming;
+            self.vc_Movie.moviePlayer.controlStyle = MPMovieControlStyleFullscreen;
+            self.vc_Movie.moviePlayer.shouldAutoplay = YES;
+            self.vc_Movie.moviePlayer.repeatMode = NO;
+            [self.vc_Movie.moviePlayer prepareToPlay];
+            
+            [self presentViewController:self.vc_Movie animated:YES completion:nil];
+            
+            return;
+        }
+    }
     
     if( [str_MsgType isEqualToString:@"shareExam"] )
     {
@@ -4267,6 +5344,8 @@ typedef enum {
             else
             {
                 self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+                self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+                
                 [UIView animateWithDuration:0.25f animations:^{
                     [self.view layoutIfNeeded];
                 }];
@@ -4277,6 +5356,8 @@ typedef enum {
         else
         {
             self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+            self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+            
             [UIView animateWithDuration:0.25f animations:^{
                 [self.view layoutIfNeeded];
             }];
@@ -4293,6 +5374,8 @@ typedef enum {
         [self.view endEditing:YES];
 
         self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+        self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+
         [UIView animateWithDuration:0.25f animations:^{
             [self.view layoutIfNeeded];
         }];
@@ -4453,11 +5536,11 @@ typedef enum {
                                                                      NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
                                                                      if( nCode == 200 )
                                                                      {
-                                                                         [weakSelf.navigationController.view makeToast:@"신고 되었습니다." withPosition:kPositionCenter];
+                                                                         [ALToastView toastInView:self.view withText:@"신고 되었습니다."];
                                                                      }
                                                                      else
                                                                      {
-                                                                         [weakSelf.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
+                                                                         [ALToastView toastInView:self.view withText:[resulte objectForKey:@"error_message"]];
                                                                      }
                                                                  }
                                                              }];
@@ -4662,23 +5745,6 @@ typedef enum {
                                                     [self presentViewController:vc animated:NO completion:^{
                                                         
                                                     }];
-                                                    
-                                                    //                                                    QuestionContainerViewController *vc = [storyboard instantiateViewControllerWithIdentifier:@"QuestionContainerViewController"];
-                                                    //                                                    vc.hidesBottomBarWhenPushed = YES;
-                                                    //                                                    vc.str_Idx = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examId"] integerValue]];
-                                                    //                                                    vc.str_StartIdx = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examNo"] integerValue] - 1];
-                                                    //                                                    vc.str_SortType = @"all";
-                                                    //                                                    vc.str_ChannelId = str_ChannelId;
-                                                    //                                                    if( [[dic objectForKey:@"pdfPage"] integerValue] > 0 )
-                                                    //                                                    {
-                                                    //                                                        vc.str_PdfPage = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"pdfPage"] integerValue]];
-                                                    //                                                    }
-                                                    //                                                    if( [[dic objectForKey:@"examNo"] integerValue] > 0 )
-                                                    //                                                    {
-                                                    //                                                        vc.str_PdfNo = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examNo"] integerValue]];
-                                                    //                                                    }
-                                                    //
-                                                    //                                                    [self.navigationController pushViewController:vc animated:YES];
                                                 }
                                                 else
                                                 {
@@ -4755,15 +5821,6 @@ typedef enum {
     }
     else
     {
-        //        if( [[message objectForKey:@"temp"] isEqualToString:@"YES"] )
-        //        {
-        //            dic = [message objectForKey:@"obj"];
-        //        }
-        //        else
-        //        {
-        //            dic = message;
-        //        }
-        
         dic = message;
     }
     
@@ -4831,29 +5888,11 @@ typedef enum {
             tapGesture.delegate = self;
             [iv addGestureRecognizer:tapGesture];
             
-            
-            //            CGRect frame = iv.frame;
-            //            frame.size.height = iv.image.size.height;
-            //            iv.frame = frame;
-            
-            //            CGFloat fHeight = iv.image.size.height * (self.tbv_List.frame.size.width / iv.image.size.width);
-            //            CGRect frame = iv.frame;
-            //            if( isnan(fHeight) )
-            //            {
-            //                fHeight = 300.f;
-            //            }
-            //            else
-            //            {
-            //                frame.size.height = fHeight;
-            //            }
-            //            iv.frame = frame;
-            
             fSampleViewTotalHeight += iv.frame.size.height;
             
             [cell.sv_Contents addSubview:iv];
             cell.sv_Contents.userInteractionEnabled = YES;
         }
-        \
     }
     else
     {
@@ -4872,15 +5911,6 @@ typedef enum {
             UIPinchGestureRecognizer *pinchZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinch:)];
             pinchZoom.delegate = self;
             [iv addGestureRecognizer:pinchZoom];
-            
-            //        UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapGesture:)];
-            //        tapGesture.delegate = self;
-            //        [iv addGestureRecognizer:tapGesture];
-            
-            
-            //            CGRect frame = iv.frame;
-            //            frame.size.height = iv.image.size.height;
-            //            iv.frame = frame;
             
             CGFloat fHeight = iv.image.size.height * (self.tbv_List.frame.size.width / iv.image.size.width);
             CGRect frame = iv.frame;
@@ -5567,9 +6597,15 @@ typedef enum {
     NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
     if( ar_Body.count > 0 )
     {
+        CGFloat fImageWidth = self.view.frame.size.width;
+        CGFloat fImageHeight = self.view.frame.size.height;
+
         NSDictionary *dic_Body = [ar_Body firstObject];
         if( isVideo == NO )
         {
+            fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
+            fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
+
             cell.v_Video.hidden = YES;
             
             [cell.btn_Origin removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
@@ -5608,12 +6644,44 @@ typedef enum {
         }
         else if( isVideo )
         {
+            fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];
+            fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue];
+
             cell.v_Video.hidden = NO;
             NSString *str_Contents = [dic_Body objectForKey:@"videoCoverPath"];
             NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:str_Contents];
             [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
         }
         
+        if( isnan(fImageHeight) || fImageHeight <= 0 )
+        {
+            fImageHeight = self.view.frame.size.height - kImageMargin;
+        }
+        
+        if( isnan(fImageWidth) || fImageWidth <= 0 )
+        {
+            fImageWidth = self.view.frame.size.width - kImageMargin;
+        }
+
+        if( fImageWidth > fImageHeight )
+        {
+            //가로형
+            //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+            CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+            //            fImageHeight = fScale * fImageHeight;
+            
+            cell.lc_ImageWidth.constant = self.view.bounds.size.width - kImageMargin;
+            cell.lc_ImageHeight.constant = fScale * fImageHeight;
+        }
+        else
+        {
+            CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageHeight;
+            fImageWidth = fScale * fImageWidth;
+            
+            cell.lc_ImageWidth.constant = fImageWidth;
+            cell.lc_ImageHeight.constant = self.view.bounds.size.width - kImageMargin;
+        }
+
 //        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
         NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
         cell.lb_Date.text = @"";
@@ -5722,6 +6790,84 @@ typedef enum {
     }
     
     
+    
+    
+    
+    if( self.channel.memberCount == 2 )
+    {
+        //1:1챗이면
+        cell.lc_NameHeight.constant = 0.f;
+    }
+
+    if( indexPath.row > 0 )
+    {
+        //이전 메세지
+        id message = self.messages[indexPath.row - 1];
+        NSDictionary *dic_Prev = nil;
+        if( [message isKindOfClass:[SBDBaseMessage class]] )
+        {
+            SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
+            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+            if( [userMessage.customType isEqualToString:@"audio"] )
+            {
+                //                                isAudioMsg = YES;
+            }
+            
+            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+            dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        }
+        else
+        {
+            //                            isAudioMsg = YES;
+            dic_Prev = message;
+        }
+        
+        NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
+        NSInteger nNextUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
+        
+        NSInteger nTime = 0;
+        NSInteger nPrevTime = 0;
+        NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
+        NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
+        if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
+        {
+            nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+            nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+        }
+        
+        if( nUserId == nNextUserId )
+        {
+            //이전 메세지가 내 메세지면
+            if( nTime == nPrevTime )
+            {
+                //1분 이내의 메세지
+                cell.iv_User.hidden = YES;
+                cell.lc_Top.constant = 0.f;
+            }
+            else
+            {
+                //1분이 지난 메세지
+                cell.lc_NameHeight.constant = 15.f;
+                cell.iv_User.hidden = NO;
+                cell.lc_Top.constant = 15.f;
+            }
+        }
+        else
+        {
+            //이전 메세지가 내 메세지가 아니면
+            cell.lc_NameHeight.constant = 15.f;
+            cell.iv_User.hidden = NO;
+            cell.lc_Top.constant = 15.f;
+        }
+    }
+
+    
+    
+    
+    
+    
+    
+    
     //    [self hidenDateIfNeed:cell indexPath:indexPath];
     
     NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
@@ -5743,22 +6889,29 @@ typedef enum {
         
         if( [str_ChatType isEqualToString:@"group"] )
         {
-            cell.lb_Name.hidden = NO;
+//            cell.lb_Name.hidden = NO;
         }
         else if( [str_ChatType isEqualToString:@"channel"] )
         {
-            cell.lb_Name.hidden = NO;
+//            cell.lb_Name.hidden = NO;
         }
         else if( [str_ChatType isEqualToString:@"user"] )
         {
-            cell.lb_Name.hidden = YES;
+//            cell.lb_Name.hidden = YES;
         }
         
         cell.lb_Name.text = [dic objectForKey_YM:@"name"];
         
+        //bbbbbbbbbbb
+        CGFloat fImageWidth = self.view.frame.size.width;
+        CGFloat fImageHeight = self.view.frame.size.height;
+
         if( isVideo == NO )
         {
             cell.v_Video.hidden = YES;
+            
+            fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
+            fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
             
             [cell.btn_Origin removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
             
@@ -5796,12 +6949,46 @@ typedef enum {
         }
         else if( isVideo )
         {
+            fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];   //640
+            fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue]; //360
+
             cell.v_Video.hidden = NO;
             NSString *str_Contents = [dic_Body objectForKey:@"videoCoverPath"];
             NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:str_Contents];
             [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
         }
         
+        if( isnan(fImageHeight) || fImageHeight <= 0 )
+        {
+            fImageHeight = self.view.frame.size.height - kImageMargin;
+        }
+
+        if( isnan(fImageWidth) || fImageWidth <= 0 )
+        {
+            fImageWidth = self.view.frame.size.width - kImageMargin;
+        }
+
+        if( fImageWidth > fImageHeight )
+        {
+            //가로형
+            //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+            CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+            //            fImageHeight = fScale * fImageHeight;
+            
+
+            cell.lc_ImageWidth.constant = self.view.bounds.size.width - kImageMargin;
+            cell.lc_ImageHeight.constant = fScale * fImageHeight;
+        }
+        else
+        {
+            CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageHeight;
+//            fImageWidth = fScale * fImageWidth;
+            
+
+            cell.lc_ImageWidth.constant = fScale * fImageWidth;
+            cell.lc_ImageHeight.constant = self.view.bounds.size.width - kImageMargin;
+        }
+
 //        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
         NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
         cell.lb_Date.text = @"";
@@ -5809,6 +6996,11 @@ typedef enum {
         UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
         [btn_Date setTitle:str_Date forState:0];
 
+//        cell.btn_Origin.hidden = NO;
+//        cell.iv_Contents.backgroundColor = [UIColor blackColor];
+//        cell.btn_Origin.backgroundColor = [UIColor redColor];
+//        cell.backgroundColor = [UIColor yellowColor];
+//        cell.contentView.backgroundColor = [UIColor yellowColor];
     }
 }
 
@@ -6372,6 +7564,77 @@ typedef enum {
         dic = message;
     }
     
+    
+    
+    
+    
+    
+    
+    
+    cell.lc_Top.constant = 5.f;
+    
+    
+    if( indexPath.row > 0 )
+    {
+        //이전 메세지
+        id message = self.messages[indexPath.row - 1];
+        NSDictionary *dic_Prev = nil;
+        if( [message isKindOfClass:[SBDBaseMessage class]] )
+        {
+            SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
+            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+            dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        }
+        else
+        {
+            dic_Prev = message;
+        }
+        
+        NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
+        NSInteger nNextUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
+        
+        NSInteger nTime = 0;
+        NSInteger nPrevTime = 0;
+        NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
+        NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
+        if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
+        {
+            nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+            nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+        }
+        
+        if( nUserId == nNextUserId )
+        {
+            //이전 메세지가 내 메세지면
+            if( nTime == nPrevTime )
+            {
+                //1분 이내의 메세지
+                cell.lc_Top.constant = 0.f;
+            }
+            else
+            {
+                //1분이 지난 메세지
+//                cell.lc_Top.constant = 15.f;
+            }
+        }
+        else
+        {
+            //이전 메세지가 내 메세지가 아니면
+            cell.lc_Top.constant = 15.f;
+        }
+    }
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     [self hidenDateIfNeed:cell indexPath:indexPath];
     
     NSString *str_IsDone = [dic objectForKey_YM:@"isDone"];
@@ -6594,6 +7857,86 @@ typedef enum {
         dic = message;
     }
     
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    cell.lc_Top.constant = 5.f;
+    
+    if( indexPath.row > 0 )
+    {
+        //이전 메세지
+        id message = self.messages[indexPath.row - 1];
+        NSDictionary *dic_Prev = nil;
+        if( [message isKindOfClass:[SBDBaseMessage class]] )
+        {
+            SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
+            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+            dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        }
+        else
+        {
+            dic_Prev = message;
+        }
+        
+        NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
+        NSInteger nNextUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
+        
+        NSInteger nTime = 0;
+        NSInteger nPrevTime = 0;
+        NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
+        NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
+        if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
+        {
+            nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+            nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+        }
+        
+        if( nUserId == nNextUserId )
+        {
+            cell.lc_Top.constant = 0.f;
+
+//            //이전 메세지가 내 메세지면
+//            if( nTime == nPrevTime )
+//            {
+//                //1분 이내의 메세지
+//                cell.lc_Top.constant = 0.f;
+//            }
+//            else
+//            {
+//                //1분이 지난 메세지
+////                cell.lc_Top.constant = 15.f;
+//            }
+        }
+        else
+        {
+            //이전 메세지가 내 메세지가 아니면
+            cell.lc_Top.constant = 15.f;
+        }
+    }
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     [self hidenDateIfNeed:cell indexPath:indexPath];
     
     //    if( [[dic objectForKey:@"check"] isEqualToString:@"Y"] )
@@ -6680,6 +8023,14 @@ typedef enum {
 {
     //    NSDictionary *dic = self.arM_List[indexPath.row];
     
+//    BOOL isUserIconHidden = NO;
+    
+    if( self.channel.memberCount == 2 )
+    {
+        //1:1챗이면
+        cell.lc_NameHeight.constant = 0.f;
+    }
+    
     id message = self.messages[indexPath.row];
     
     NSDictionary *dic = nil;
@@ -6694,6 +8045,149 @@ typedef enum {
     {
         dic = message;
     }
+
+    
+    if( indexPath.row > 0 )
+    {
+        //이전 메세지
+        id message = self.messages[indexPath.row - 1];
+        NSDictionary *dic_Prev = nil;
+        if( [message isKindOfClass:[SBDBaseMessage class]] )
+        {
+            SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
+            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+            if( [userMessage.customType isEqualToString:@"audio"] )
+            {
+                //                                isAudioMsg = YES;
+            }
+            
+            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+            dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        }
+        else
+        {
+            //                            isAudioMsg = YES;
+            dic_Prev = message;
+        }
+
+        NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
+        NSInteger nNextUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
+        
+        NSInteger nTime = 0;
+        NSInteger nPrevTime = 0;
+        NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
+        NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
+        if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
+        {
+            nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+            nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+        }
+
+        if( nUserId == nNextUserId )
+        {
+            //이전 메세지가 내 메세지면
+            if( nTime == nPrevTime )
+            {
+                //1분 이내의 메세지
+                cell.iv_User.hidden = YES;
+                cell.lc_Top.constant = 0.f;
+            }
+            else
+            {
+                //1분이 지난 메세지
+                cell.lc_NameHeight.constant = 15.f;
+                cell.iv_User.hidden = NO;
+                cell.lc_Top.constant = 15.f;
+            }
+        }
+        else
+        {
+            //이전 메세지가 내 메세지가 아니면
+            cell.lc_NameHeight.constant = 15.f;
+            cell.iv_User.hidden = NO;
+            cell.lc_Top.constant = 15.f;
+        }
+    }
+    
+    
+
+    
+    
+//    if( self.messages.count > indexPath.row + 1 )
+//    {
+//        //다음 메세지
+//        //                        BOOL isAudioMsg = NO;
+//        id message = self.messages[indexPath.row + 1];
+//        NSDictionary *dic_Next = nil;
+//        if( [message isKindOfClass:[SBDBaseMessage class]] )
+//        {
+//            SBDBaseMessage *baseMessage = self.messages[indexPath.row + 1];
+//            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+//            if( [userMessage.customType isEqualToString:@"audio"] )
+//            {
+//                //                                isAudioMsg = YES;
+//            }
+//            
+//            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+//            dic_Next = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//        }
+//        else
+//        {
+//            //                            isAudioMsg = YES;
+//            dic_Next = message;
+//        }
+//        
+//        NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
+//        NSInteger nNextUserId = [[dic_Next objectForKey_YM:@"userId"] integerValue];
+//        //                        if( nUserId == nNextUserId && isAudioMsg == NO )
+//        
+//        NSInteger nTime = 0;
+//        NSInteger nNextTime = 0;
+//        NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
+//        NSString *str_NextTimeTmp = [dic_Next objectForKey:@"createDate"];
+//        if( str_TimeTmp.length >= 12 && str_NextTimeTmp.length >= 12 )
+//        {
+//            nTime = [[str_TimeTmp substringWithRange:NSMakeRange(10, 2)] integerValue];
+//            nNextTime = [[str_NextTimeTmp substringWithRange:NSMakeRange(10, 2)] integerValue];
+//        }
+//
+//        if( nUserId == nNextUserId )
+//        {
+//            if( nTime < nNextTime )
+//            {
+//                //1분이 지난 메세지
+////                cell.iv_User.hidden = NO;
+////                cell.lc_BottomHeight.constant = 15.f;
+//            }
+//            else
+//            {
+//                //1분 안의 메세지
+////                cell.iv_User.hidden = YES;
+////                cell.lc_BottomHeight.constant = 0.f;
+//            }
+//        }
+//        else
+//        {
+////            cell.iv_User.hidden = NO;
+////            cell.lc_BottomHeight.constant = 10.f;
+//        }
+//    }
+//    else if( self.messages.count == indexPath.row + 1 )
+//    {
+//        //마지막 메세지
+////        cell.iv_User.hidden = NO;
+////        cell.lc_BottomHeight.constant = 15.f;
+//
+//    }
+
+    
+    
+    
+    
+    
+    
+    
+    
     
     [self hidenDateIfNeed:cell indexPath:indexPath];
     
@@ -6707,10 +8201,10 @@ typedef enum {
     }
     else
     {
-        cell.lb_Contents.textColor = [UIColor whiteColor];
-        cell.v_ContentsBg.backgroundColor = [UIColor colorWithHexString:@"4FB826"];
-        cell.v_ContentsBg.layer.borderColor = [UIColor clearColor].CGColor;
-        cell.v_ContentsBg.layer.borderWidth = 1.f;
+//        cell.lb_Contents.textColor = [UIColor whiteColor];
+//        cell.v_ContentsBg.backgroundColor = [UIColor colorWithHexString:@"4FB826"];
+//        cell.v_ContentsBg.layer.borderColor = [UIColor clearColor].CGColor;
+//        cell.v_ContentsBg.layer.borderWidth = 1.f;
     }
     
     cell.nUserId = [[dic objectForKey_YM:@"botUserId"] integerValue];
@@ -6742,15 +8236,15 @@ typedef enum {
             
             if( [str_ChatType isEqualToString:@"group"] )
             {
-                cell.lb_Name.hidden = NO;
+//                cell.lb_Name.hidden = NO;
             }
             else if( [str_ChatType isEqualToString:@"channel"] )
             {
-                cell.lb_Name.hidden = NO;
+//                cell.lb_Name.hidden = NO;
             }
             else if( [str_ChatType isEqualToString:@"user"] )
             {
-                cell.lb_Name.hidden = YES;
+//                cell.lb_Name.hidden = YES;
             }
             
             if( [[dic_Body objectForKey_YM:@"msgType"] isEqualToString:@"solveExam"] )
@@ -6762,12 +8256,74 @@ typedef enum {
             {
                 cell.lb_Name.text = [dic objectForKey_YM:@"name"];
             }
+            
+            if( cell.lb_Name.text.length <= 0 )
+            {
+                cell.lc_NameHeight.constant = 0.f;
+            }
         }
         else if( [str_QnaType isEqualToString:@""] )
         {
             
         }
     }
+    
+//    [cell.v_ContentsBg.layer removeFromSuperlayer];
+    
+//    cell.v_ContentsBg.layer. sublayers = nil;
+    
+//    cell.v_ContentsBg.layer.mask = nil;
+//    
+//    CAShapeLayer *borderLayer = [[CAShapeLayer alloc] init];
+//    borderLayer.path = [UIBezierPath bezierPathWithRoundedRect: cell.v_ContentsBg.bounds byRoundingCorners: UIRectCornerTopLeft | UIRectCornerTopRight cornerRadii: (CGSize){20.f, 20.f}].CGPath;
+//    borderLayer.frame = cell.v_ContentsBg.bounds;
+//    borderLayer.lineWidth   = 1.0f;
+//    borderLayer.strokeColor = [UIColor lightGrayColor].CGColor;
+//    borderLayer.fillColor   = [UIColor whiteColor].CGColor;
+//    
+//    cell.v_ContentsBg.layer.mask = borderLayer;
+
+    
+    
+//    for (CALayer *layer in cell.v_ContentsBg.layer.sublayers)
+//    {
+//        [layer removeFromSuperlayer];
+//    }
+
+    
+//    cell.v_ContentsBg.layer.mask = nil;
+//
+//    UIBezierPath *PathToMask;
+//    PathToMask = [UIBezierPath bezierPathWithRoundedRect:cell.v_ContentsBg.bounds
+//                                       byRoundingCorners:(UIRectCornerTopLeft | UIRectCornerBottomLeft | UIRectCornerTopRight)
+//                                             cornerRadii:CGSizeMake(10.0, 10.0)];
+//    
+//    CAShapeLayer *maskLayer = [[CAShapeLayer alloc] init];
+//    maskLayer.frame = cell.v_ContentsBg.bounds;
+//    maskLayer.path = PathToMask.CGPath;
+//
+//    cell.v_ContentsBg.layer.mask = maskLayer;
+
+//    [rootLayer setValue:[NSNumber numberWithInt:101] forKey:@"PFtag"];
+
+    
+    
+    //    [cell.v_ContentsBg.layer addSublayer:borderLayer];
+    
+    //        cell.lb_Contents.textColor = [UIColor blackColor];
+    //        cell.v_ContentsBg.backgroundColor = [UIColor whiteColor];
+    //
+    //        CAShapeLayer * maskLayer = [CAShapeLayer layer];
+    //        maskLayer.path = [UIBezierPath bezierPathWithRoundedRect: cell.bounds byRoundingCorners: UIRectCornerTopLeft | UIRectCornerTopRight cornerRadii: (CGSize){20.f, 20.f}].CGPath;
+    //
+    //        maskLayer.borderColor = [UIColor redColor].CGColor;
+    //        maskLayer.lineWidth = 1.f;
+    //        maskLayer.strokeColor = [UIColor blueColor].CGColor;
+    //        maskLayer.lineCap = kCALineCapRound;
+    //        maskLayer.lineJoin = kCALineJoinRound;
+    
+//    cell.v_ContentsBg.layer.mask = maskLayer;
+
 }
 
 - (void)otherDirectCell:(OtherDirectChatCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
@@ -7143,6 +8699,9 @@ typedef enum {
             self.timeObserver = nil;
             
         }@catch(id anException){
+            [currentPlayer pause];
+            currentPlayer = nil;
+        }@finally {
             
         }
     }
@@ -7575,6 +9134,8 @@ typedef enum {
     [self.view endEditing:YES];
 
     self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+
     [UIView animateWithDuration:0.25f animations:^{
         [self.view layoutIfNeeded];
     }];
@@ -8248,6 +9809,9 @@ typedef enum {
                                                                                 self.timeObserver = nil;
                                                                                 
                                                                             }@catch(id anException){
+                                                                                [currentPlayer pause];
+                                                                                currentPlayer = nil;
+                                                                            }@finally {
                                                                                 
                                                                             }
                                                                         }
@@ -8393,6 +9957,8 @@ typedef enum {
                                                                 [weakSelf.navigationController.view makeToast:@"질문을 등록했습니다" withPosition:kPositionCenter];
                                                                 [weakSelf.view endEditing:YES];
                                                                 weakSelf.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+                                                                weakSelf.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+
                                                                 [UIView animateWithDuration:0.25f animations:^{
                                                                     [weakSelf.view layoutIfNeeded];
                                                                 }];
@@ -8831,6 +10397,8 @@ typedef enum {
     [self.view endEditing:YES];
     
     self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+
     [UIView animateWithDuration:0.25f animations:^{
         [self.view layoutIfNeeded];
     }];
@@ -8839,7 +10407,7 @@ typedef enum {
                              title:nil
                  cancelButtonTitle:@"취소"
             destructiveButtonTitle:nil
-                 otherButtonTitles:@[@"라이브러리", @"사진(카메라)", @"동영상(카메라)"]
+                 otherButtonTitles:@[@"라이브러리", @"사진(카메라)", @"동영상(카메라)", @"소리(음성,mp3)"]
                         completion:^(OHActionSheet* sheet, NSInteger buttonIndex)
      {
          if( buttonIndex == 0 )
@@ -8898,8 +10466,170 @@ typedef enum {
                  [self presentViewController:imagePickerController animated:YES completion:nil];
              }
          }
+         else if( buttonIndex == 3 )
+         {
+             MPMediaPickerController *pickerController = [[MPMediaPickerController alloc] initWithMediaTypes:MPMediaTypeMusic];
+             pickerController.prompt = @"Select Song";
+             pickerController.delegate = self;
+             [self presentViewController:pickerController animated:YES completion:nil];
+
+         }
      }];
 }
+
+
+-(void)mediaItemToData : (MPMediaItem * ) curItem
+{
+    NSURL *url = [curItem valueForProperty: MPMediaItemPropertyAssetURL];
+    
+    AVURLAsset *songAsset = [AVURLAsset URLAssetWithURL: url options:nil];
+    
+    AVAssetExportSession *exporter = [[AVAssetExportSession alloc] initWithAsset: songAsset
+                                                                      presetName:AVAssetExportPresetAppleM4A];
+    
+    exporter.outputFileType =   @"com.apple.m4a-audio";
+    
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString * myDocumentsDirectory = ([paths count] > 0) ? [paths objectAtIndex:0] : nil;
+    
+    [[NSDate date] timeIntervalSince1970];
+    NSTimeInterval seconds = [[NSDate date] timeIntervalSince1970];
+    NSString *intervalSeconds = [NSString stringWithFormat:@"%0.0f",seconds];
+    
+    NSString * fileName = [NSString stringWithFormat:@"%@.m4a",intervalSeconds];
+    
+    NSString *exportFile = [myDocumentsDirectory stringByAppendingPathComponent:fileName];
+    
+    NSURL *exportURL = [NSURL fileURLWithPath:exportFile];
+    exporter.outputURL = exportURL;
+    
+    // do the export
+    // (completion handler block omitted)
+    [exporter exportAsynchronouslyWithCompletionHandler:
+     ^{
+         int exportStatus = exporter.status;
+         
+         switch (exportStatus)
+         {
+             case AVAssetExportSessionStatusFailed:
+             {
+                 NSError *exportError = exporter.error;
+                 NSLog (@"AVAssetExportSessionStatusFailed: %@", exportError);
+                 break;
+             }
+             case AVAssetExportSessionStatusCompleted:
+             {
+                 NSLog (@"AVAssetExportSessionStatusCompleted");
+                 
+                 NSData *data = [NSData dataWithContentsOfFile: [myDocumentsDirectory
+                                                                 stringByAppendingPathComponent:fileName]];
+                 
+                 [self uploadData:@{@"type":@"audio", @"obj":data, @"duration":[NSNumber numberWithDouble:curItem.playbackDuration]}];
+
+                 //DLog(@"Data %@",data);
+                 data = nil;
+                 
+                 break;
+             }
+             case AVAssetExportSessionStatusUnknown:
+             {
+                 NSLog (@"AVAssetExportSessionStatusUnknown"); break;
+             }
+             case AVAssetExportSessionStatusExporting:
+             {
+                 NSLog (@"AVAssetExportSessionStatusExporting"); break;
+             }
+             case AVAssetExportSessionStatusCancelled:
+             {
+                 NSLog (@"AVAssetExportSessionStatusCancelled"); break;
+             }
+             case AVAssetExportSessionStatusWaiting:
+             {
+                 NSLog (@"AVAssetExportSessionStatusWaiting"); break;
+             }
+             default:
+             {
+                 NSLog (@"didn't get export status"); break;
+             }
+         }
+     }];
+}
+
+
+#pragma mark - MPMediaPickerControllerDelegate
+- (void)mediaPicker:(MPMediaPickerController *)mediaPicker didPickMediaItems:(MPMediaItemCollection *)mediaItemCollection
+{
+    MPMediaItem *theChosenSong = [[mediaItemCollection items]objectAtIndex:0];
+    [self mediaItemToData:theChosenSong];
+//    NSString *songTitle = [theChosenSong valueForProperty:MPMediaItemPropertyTitle];
+//    NSURL *assetURL = [theChosenSong valueForProperty:MPMediaItemPropertyAssetURL];
+//    AVURLAsset  *songAsset  = [AVURLAsset URLAssetWithURL:assetURL options:nil];
+
+    
+    
+//    // Get raw PCM data from the track
+//    NSURL *assetURL = [theChosenSong valueForProperty:MPMediaItemPropertyAssetURL];
+//    NSMutableData *data = [[NSMutableData alloc] init];
+//    
+//    const uint32_t sampleRate = 16000; // 16k sample/sec
+//    const uint16_t bitDepth = 16; // 16 bit/sample/channel
+//    const uint16_t channels = 2; // 2 channel/sample (stereo)
+//    
+//    NSDictionary *opts = [NSDictionary dictionary];
+//    AVURLAsset *asset = [[AVURLAsset alloc] initWithURL:assetURL options:opts];
+//    AVAssetReader *reader = [[AVAssetReader alloc] initWithAsset:asset error:NULL];
+//    NSDictionary *settings = [NSDictionary dictionaryWithObjectsAndKeys:
+//                              [NSNumber numberWithInt:kAudioFormatLinearPCM], AVFormatIDKey,
+//                              [NSNumber numberWithFloat:(float)sampleRate], AVSampleRateKey,
+//                              [NSNumber numberWithInt:bitDepth], AVLinearPCMBitDepthKey,
+//                              [NSNumber numberWithBool:NO], AVLinearPCMIsNonInterleaved,
+//                              [NSNumber numberWithBool:NO], AVLinearPCMIsFloatKey,
+//                              [NSNumber numberWithBool:NO], AVLinearPCMIsBigEndianKey, nil];
+//    
+//    AVAssetReaderTrackOutput *output = [[AVAssetReaderTrackOutput alloc] initWithTrack:        [[asset tracks] objectAtIndex:0] outputSettings:settings];
+//    [reader addOutput:output];
+//    [reader startReading];
+//    
+//    // read the samples from the asset and append them subsequently
+//    while ([reader status] != AVAssetReaderStatusCompleted)
+//    {
+//        CMSampleBufferRef buffer = [output copyNextSampleBuffer];
+//        if (buffer == NULL) continue;
+//        
+//        CMBlockBufferRef blockBuffer = CMSampleBufferGetDataBuffer(buffer);
+//        size_t size = CMBlockBufferGetDataLength(blockBuffer);
+//        uint8_t *outBytes = malloc(size);
+//        CMBlockBufferCopyDataBytes(blockBuffer, 0, size, outBytes);
+//        CMSampleBufferInvalidate(buffer);
+//        CFRelease(buffer);
+//        [data appendBytes:outBytes length:size];
+//        free(outBytes);
+//    }
+
+//    NSURL *url = [theChosenSong valueForProperty: MPMediaItemPropertyAssetURL];
+//    NSError *error = nil;
+//    NSData *audioData = [NSData dataWithContentsOfURL:url options:nil error:&error];
+//    if(!audioData)
+//    {
+//        NSLog(@"error while reading from %@ - %@", [url absoluteString], [error localizedDescription]);
+//    }
+//
+//    NSData *data = [NSData dataWithContentsOfURL:assetURL];
+//    
+////    [self uploadData:@{@"type":@"audio", @"obj":data, @"path":[assetURL path], @"duration":[NSNumber numberWithDouble:theChosenSong.playbackDuration]}];
+    [self dismissViewControllerAnimated:YES completion:^{
+        
+    }];
+
+}
+
+- (void)mediaPickerDidCancel:(MPMediaPickerController *)mediaPicker
+{
+    [self dismissViewControllerAnimated:YES completion:^{
+        
+    }];
+}
+
 
 #pragma mark - ImagePickerDelegate
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info
@@ -8923,7 +10653,8 @@ typedef enum {
         UIImage *resizeImage = [Util imageWithImage:thumb convertToWidth:self.view.bounds.size.width - 30];
         
         NSData *videoData = [NSData dataWithContentsOfURL:videoUrl];
-        [self uploadData:@{@"type":@"video", @"obj":videoData, @"thumb":UIImageJPEGRepresentation(resizeImage, 0.3f), @"videoUrl":[videoUrl absoluteString]}];
+        [self uploadData:@{@"type":@"video", @"obj":videoData, @"thumb":UIImageJPEGRepresentation(resizeImage, 0.3f), @"videoUrl":[videoUrl absoluteString],
+                           @"imageSize":@{@"width":[NSString stringWithFormat:@"%f", resizeImage.size.width], @"height":[NSString stringWithFormat:@"%f", resizeImage.size.height]}}];
     }
     else
     {
@@ -8931,7 +10662,8 @@ typedef enum {
         
         UIImage *resizeImage = [Util imageWithImage:outputImage convertToWidth:self.view.bounds.size.width - 30];
         
-        [self uploadData:@{@"type":@"image", @"obj":UIImageJPEGRepresentation(resizeImage, 0.3f), @"thumb":resizeImage}];
+        [self uploadData:@{@"type":@"image", @"obj":UIImageJPEGRepresentation(resizeImage, 0.3f), @"thumb":resizeImage,
+                           @"imageSize":@{@"width":[NSString stringWithFormat:@"%f", resizeImage.size.width], @"height":[NSString stringWithFormat:@"%f", resizeImage.size.height]}}];
     }
     
     [self dismissViewControllerAnimated:YES completion:nil];
@@ -8956,14 +10688,35 @@ typedef enum {
     NSInteger nSecond = [components second];
     
     NSString *str_CreateTime = [NSString stringWithFormat:@"%04ld%02ld%02ld%02d%02d%02d", nYear, nMonth, nDay, nHour, nMinute, nSecond];
-    NSDictionary *dic_Temp = @{@"questionId":[NSString stringWithFormat:@"%@", [self.dic_Info objectForKey:@"questionId"]],
-                               //                               @"contents":str_NoEncoding,
-                               @"type":[dic objectForKey:@"type"],
-                               @"createDate":str_CreateTime,
-                               @"temp":@"YES",
-                               @"isDone":@"N",
-                               @"obj":([[dic objectForKey:@"type"] isEqualToString:@"image"] || [[dic objectForKey:@"type"] isEqualToString:@"pdfQuestion"]) ? [dic objectForKey:@"obj"] : [dic objectForKey:@"thumb"],
-                               };
+
+    NSMutableDictionary *dic_Temp = [NSMutableDictionary dictionary];
+    [dic_Temp setObject:[NSString stringWithFormat:@"%@", [self.dic_Info objectForKey:@"questionId"]] forKey:@"questionId"];
+    [dic_Temp setObject:[dic objectForKey:@"type"] forKey:@"type"];
+    [dic_Temp setObject:str_CreateTime forKey:@"createDate"];
+    [dic_Temp setObject:@"YES" forKey:@"temp"];
+    [dic_Temp setObject:@"N" forKey:@"isDone"];
+    
+    if( [[dic objectForKey_YM:@"type"] isEqualToString:@"audio"] )
+    {
+        [dic_Temp setObject:[dic objectForKey:@"obj"] forKey:@"obj"];
+        [dic_Temp setObject:[dic objectForKey:@"duration"] forKey:@"duration"];
+    }
+    else
+    {
+        [dic_Temp setObject:([[dic objectForKey:@"type"] isEqualToString:@"image"] || [[dic objectForKey:@"type"] isEqualToString:@"pdfQuestion"]) ? [dic objectForKey:@"obj"] : [dic objectForKey:@"thumb"] forKey:@"obj"];
+        [dic_Temp setObject:[dic objectForKey_YM:@"imageSize"] forKey:@"imageSize"];
+        [dic_Temp setObject:@"YES" forKey:@"temp"];
+    }
+
+//    NSDictionary *dic_Temp = @{@"questionId":[NSString stringWithFormat:@"%@", [self.dic_Info objectForKey:@"questionId"]],
+//                               //                               @"contents":str_NoEncoding,
+//                               @"type":[dic objectForKey:@"type"],
+//                               @"createDate":str_CreateTime,
+//                               @"temp":@"YES",
+//                               @"isDone":@"N",
+//                               @"obj":([[dic objectForKey:@"type"] isEqualToString:@"image"] || [[dic objectForKey:@"type"] isEqualToString:@"pdfQuestion"]) ? [dic objectForKey:@"obj"] : [dic objectForKey:@"thumb"],
+//                               @"imageSize":[dic objectForKey_YM:@"imageSize"]
+//                               };
     
     NSMutableDictionary *dicM_Tmp = [NSMutableDictionary dictionaryWithDictionary:dic_Temp];
     NSString *str_VideoUrl = [dic objectForKey_YM:@"videoUrl"];
@@ -9089,6 +10842,12 @@ typedef enum {
                                                {
                                                    [dicM setObject:[NSString stringWithFormat:@"%@", [resulte objectForKey:@"tempUploadId"]] forKey:@"tempUploadId"];
                                                    [dicM setObject:[NSString stringWithFormat:@"%@", [resulte objectForKey:@"serviceUrl"]] forKey:@"serviceUrl"];
+                                                   
+                                                   if( [[dic objectForKey:@"type"] isEqualToString:@"audio"] )
+                                                   {
+                                                       [dicM setObject:[NSString stringWithFormat:@"%@", [dicM objectForKey:@"duration"]] forKey:@"duration"];
+                                                   }
+                                                   
                                                    [weakSelf upLoadContents:dicM];
                                                }
                                            }
@@ -9228,6 +10987,8 @@ typedef enum {
     [self.v_CommentKeyboardAccView removeContents];
     [self.view endEditing:YES];
     self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+    self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+
     [UIView animateWithDuration:0.25f animations:^{
         [self.view layoutIfNeeded];
     }];
@@ -9300,6 +11061,13 @@ typedef enum {
                                                     
                                                     resulte = [NSDictionary dictionaryWithDictionary:dicM_Tmp];
                                                 }
+                                                else if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"audio"] )
+                                                {
+                                                    NSMutableDictionary *dicM_Tmp = [NSMutableDictionary dictionaryWithDictionary:resulte];
+                                                    [dicM_Tmp setObject:[dic_Temp objectForKey:@"duration"] forKey:@"duration"];
+                                                    
+                                                    resulte = [NSDictionary dictionaryWithDictionary:dicM_Tmp];
+                                                }
                                                 
                                                 NSError * err;
                                                 NSData * jsonData = [NSJSONSerialization dataWithJSONObject:resulte options:0 error:&err];
@@ -9317,7 +11085,7 @@ typedef enum {
                                                         NSDictionary *dic_Tmp = (NSDictionary *)tmp;
                                                         NSString *str_TmpType = [dic_Tmp objectForKey:@"type"];
                                                         NSString *str_IsTmp = [dic_Tmp objectForKey:@"temp"];
-                                                        if( ([str_TmpType isEqualToString:@"image"] || [str_TmpType isEqualToString:@"video"]) && [str_IsTmp isEqualToString:@"YES"] )
+                                                        if( ([str_TmpType isEqualToString:@"image"] || [str_TmpType isEqualToString:@"video"] || [str_TmpType isEqualToString:@"audio"]) && [str_IsTmp isEqualToString:@"YES"] )
                                                         {
                                                             str_FindKey = str_Key;
                                                             [self.dicM_TempMyContents removeObjectForKey:str_Key];
@@ -9333,6 +11101,11 @@ typedef enum {
                                                 {
                                                     str_CustomType = @"image";
                                                     str_Msg = @"이미지를 전송 했습니다";
+                                                }
+                                                if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"audio"] )
+                                                {
+                                                    str_CustomType = @"audio";
+                                                    str_Msg = @"음성을 전송 했습니다";
                                                 }
                                                 else if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"pdfQuestion"] )
                                                 {
@@ -10326,7 +12099,7 @@ typedef enum {
             self.autoChatMode = kPrintItem;
             self.dic_PrintItemInfo = dic;
             self.arM_AutoAnswer = [NSMutableArray arrayWithArray:[dic objectForKey_YM:@"itemInfo"]];
-            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
+//            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
             [self showTempleteKeyboard];
         }
         else if( [str_Action isEqualToString:@"checkUserAnswer"] )
@@ -10377,7 +12150,7 @@ typedef enum {
             
             [self.arM_AutoAnswer addObject:@{@"title":@"다음 문제"}];
             
-            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
+//            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
             [self showTempleteKeyboard];
         }
         
@@ -10490,26 +12263,42 @@ typedef enum {
                 
                 [self.tbv_List reloadData];
                 
-                //                NSArray *visibleRows = [self.tbv_List indexPathsForVisibleRows];
-                
-                //                            [UIView setAnimationsEnabled:NO];
-                //                            [self.tbv_List beginUpdates];
-                //                [self.tbv_List reloadRowsAtIndexPaths:visibleRows
-                //                                     withRowAnimation:UITableViewRowAnimationNone];
-                
-                //                [self.tbv_List reloadRowsAtIndexPaths:visibleRows
-                //                                     withRowAnimation:UITableViewRowAnimationNone];
-                
-                
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    //                [self scrollToBottomWithForce:NO];
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                     
                     if( self.messages.count > 0 )
                     {
-                        //                    SBDUserMessage *data = (SBDUserMessage *)message;
-                        //                    NSLog(@"data.message : %@", data.message);
-                        //                    NSLog(@"data.customType : %@", data.customType);
-                        //                    NSLog(@"data.data : %@", data.data);
+                        if( self.messages.count > 1 )
+                        {
+                            id tmp = [self.messages objectAtIndex:self.messages.count - 2];
+                            if( [tmp isKindOfClass:[SBDUserMessage class]] )
+                            {
+                                SBDUserMessage *tmpData = [self.messages objectAtIndex:self.messages.count - 2];
+                                if( [tmpData.message isEqualToString:@"해설을 보여주세요"] )
+                                {
+                                    [self scrollToTheBottom:YES];
+                                    return;
+                                }
+                            }
+                            
+//                            if( self.dic_BotInfo )
+//                            {
+//                                [self.tbv_List reloadData];
+//                                [self performSelector:@selector(scrollToTheBottom2:) withObject:[NSNumber numberWithBool:YES] afterDelay:0.4f];
+//                                return;
+//                            }
+                            if( [data.customType isEqualToString:@"image"] )
+                            {
+                                [self scrollToTheBottom:YES];
+                                return;
+                            }
+                            else if( [data.customType isEqualToString:@"pdf"] )
+                            {
+                                [self.tbv_List reloadData];
+                                [self performSelector:@selector(scrollToTheBottom2:) withObject:[NSNumber numberWithBool:YES] afterDelay:0.4f];
+//                                [self scrollToTheBottom:YES];
+                                return;
+                            }
+                        }
                         
                         //다른 사람이 글을 썼을때 하단부터 오프셋이 200보다 작으면 스크롤 내려
                         if( (self.tbv_List.contentSize.height - (self.tbv_List.contentOffset.y + self.tbv_List.frame.size.height)) <
@@ -10527,25 +12316,13 @@ typedef enum {
                             else
                             {
                                 [ALToastView toastInView:self.view withText:@"새로운 메세지"];
-
-//                                [Util showToast:@"새로운 메세지"];
                             }
                         }
                         
-                        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                            
-                            [self.tbv_List reloadData];
-                            
-                            //                            NSArray *visibleRows = [self.tbv_List indexPathsForVisibleRows];
-                            
-                            //                            [UIView setAnimationsEnabled:NO];
-                            //                            [self.tbv_List beginUpdates];
-                            //                            [self.tbv_List reloadRowsAtIndexPaths:visibleRows
-                            //                                                  withRowAnimation:UITableViewRowAnimationNone];
-                            //                            [self.tbv_List endUpdates];
-                            //                            [UIView setAnimationsEnabled:YES];
-                            
-                        });
+//                        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+//                            
+//                            [self.tbv_List reloadData];
+//                        });
                     }
                 });
             });
@@ -10798,6 +12575,246 @@ typedef enum {
                                });
                            }];
 }
+
+- (IBAction)goShowTempleteKeyboard:(id)sender
+{
+    if( self.arM_AutoAnswer.count > 0 )
+    {
+        [self.v_CommentKeyboardAccView.tv_Contents resignFirstResponder];
+        self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+        self.v_CommentKeyboardAccView.keyboardStatus = kTemplete;
+        
+        self.tbv_TempleteList.hidden = NO;
+        self.v_Mic.hidden = YES;
+    }
+}
+
+- (IBAction)goMic:(id)sender
+{
+    [self.v_CommentKeyboardAccView.tv_Contents resignFirstResponder];
+    self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+    self.v_CommentKeyboardAccView.keyboardStatus = kTemplete;
+
+    self.tbv_TempleteList.hidden = YES;
+    self.v_Mic.hidden = NO;
+    
+    if( self.v_CommentKeyboardAccView.lc_Bottom.constant <= 0 )
+    {
+        if( fKeyboardHeight > 0 )
+        {
+            self.v_CommentKeyboardAccView.lc_Bottom.constant = fKeyboardHeight;
+        }
+        else
+        {
+            if( self.v_CommentKeyboardAccView.tv_Contents.autocorrectionType == UITextAutocorrectionTypeDefault ||
+               self.v_CommentKeyboardAccView.tv_Contents.autocorrectionType == UITextAutocorrectionTypeYes )
+            {
+                self.v_CommentKeyboardAccView.lc_Bottom.constant = 258.f;
+            }
+            else
+            {
+                self.v_CommentKeyboardAccView.lc_Bottom.constant = 216.f;
+            }
+        }
+    }
+    
+    [UIView animateWithDuration:0.25f animations:^{
+        [self.view layoutIfNeeded];
+    }];
+    
+    __weak typeof(self)weakSelf = self;
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        
+        [weakSelf scrollToTheBottom2:[NSNumber numberWithBool:YES]];
+    });
+}
+
+- (IBAction)goRecordTouchDown:(id)sender
+{
+    NSLog(@"touch down");
+
+    nMicTime = 0;
+    self.tm_Mic = [NSTimer scheduledTimerWithTimeInterval:1.0f target:self selector:@selector(onMicTimer:) userInfo:nil repeats:YES];
+    
+    [self setupAndPrepareToRecord];
+    [self.mic_Recorder recordForDuration:120];
+
+    isMicAni = YES;
+    self.lb_MicTimer.textColor = self.v_MicContent.backgroundColor = [UIColor colorWithHexString:@"FF1414"];
+    self.lb_MicCancelDescription.hidden = NO;
+    self.lb_MicCancelDescription.text = @"";
+    self.btn_Mic.selected = YES;
+    [self.btn_Mic setImage:BundleImage(@"mic1-red-bold.png") forState:UIControlStateNormal];
+
+    [self micAniStart];
+}
+
+- (IBAction)goRecordTouchCancel:(id)sender
+{
+//    [self.tm_Mic invalidate];
+//    self.tm_Mic = nil;
+//    
+//    NSLog(@"cancel");
+//    isMicAni = NO;
+//    [self micReset];
+    
+    NSLog(@"cancel");
+    
+    self.lb_MicCancelDescription.text = @"취소하려면 버튼 밖으로 손가락을 이동하세요.";
+    [self.btn_Mic setImage:BundleImage(@"mic1-red-bold.png") forState:UIControlStateNormal];
+}
+
+- (IBAction)goRecoredTouchDragInSide:(id)sender
+{
+    NSLog(@"drag inside");
+    self.lb_MicCancelDescription.text = @"";
+}
+
+- (IBAction)goRecordTouchUpInSide:(id)sender
+{
+    NSLog(@"up");
+    
+    [self.tm_Mic invalidate];
+    self.tm_Mic = nil;
+
+    [self.mic_Recorder stop];
+
+    if (!IMPEDE_PLAYBACK)
+    {
+        [AudioSessionManager setAudioSessionCategory:AVAudioSessionCategoryPlayback];
+    }
+    
+//    self.mic_Player = [[AVAudioPlayer alloc] initWithContentsOfURL:self.mic_RecordedAudioURL error:&audioError];
+//    self.mic_Player.duration
+//    self.mic_Player.delegate = self;
+//    [self.mic_Player play];
+
+
+    isMicAni = NO;
+
+    NSError *audioError;
+    AVAudioPlayer *mic_Player = [[AVAudioPlayer alloc] initWithContentsOfURL:self.mic_RecordedAudioURL error:&audioError];
+    
+    [self micReset];
+    
+    NSString *str_Path = [self.mic_RecordedAudioURL path];
+    NSData *data = [NSData dataWithContentsOfFile:str_Path];
+
+    [self uploadData:@{@"type":@"audio", @"obj":data, @"path":str_Path, @"duration":[NSNumber numberWithDouble:mic_Player.duration]}];
+}
+
+- (IBAction)goRecordTouchUpOutSide:(id)sender
+{
+    NSLog(@"cancel");
+    
+    [self.tm_Mic invalidate];
+    self.tm_Mic = nil;
+
+    self.lb_MicCancelDescription.text = @"";
+
+    isMicAni = NO;
+    [self micReset];
+
+}
+
+- (void)setupAndPrepareToRecord
+{
+    NSLog(@"setupAndPrepareToRecord");
+    
+    if (!IMPEDE_PLAYBACK)
+    {
+        [AudioSessionManager setAudioSessionCategory:AVAudioSessionCategoryRecord];
+    }
+    
+    NSDate *date = [[NSDate alloc] initWithTimeIntervalSinceNow:1];
+    self.mic_RecordedAudioFileName = [NSString stringWithFormat:@"%@", date];
+    
+    // sets the path for audio file
+    NSArray *pathComponents = [NSArray arrayWithObjects:
+                               [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) lastObject],
+                               [NSString stringWithFormat:@"%@.m4a", self.mic_RecordedAudioFileName],
+//                               [NSString stringWithFormat:@"%@.mp3", self.mic_RecordedAudioFileName],
+                               nil];
+    self.mic_RecordedAudioURL = [NSURL fileURLWithPathComponents:pathComponents];
+    
+    // settings for the recorder
+    NSMutableDictionary *recordSetting = [[NSMutableDictionary alloc] init];
+    [recordSetting setValue:[NSNumber numberWithInt:kAudioFormatMPEG4AAC] forKey:AVFormatIDKey];
+    [recordSetting setValue:[NSNumber numberWithFloat:44100.0] forKey:AVSampleRateKey];
+    [recordSetting setValue:[NSNumber numberWithInt:2] forKey:AVNumberOfChannelsKey];
+
+//    NSDictionary *recordSetting =  [NSDictionary dictionaryWithObjectsAndKeys:
+//                                    [NSNumber numberWithInt:AVAudioQualityMin],AVEncoderAudioQualityKey,
+//                                    [NSNumber numberWithInt:16], AVEncoderBitRateKey,
+//                                    [NSNumber numberWithInt: 2], AVNumberOfChannelsKey,
+//                                    [NSNumber numberWithFloat:44100.0], AVSampleRateKey,
+//                                    [NSNumber numberWithInt:kAudioFormatMPEGLayer3], AVFormatIDKey,
+//                                    nil];
+
+    // initiate recorder
+    NSError *error;
+    self.mic_Recorder = [[AVAudioRecorder alloc] initWithURL:self.mic_RecordedAudioURL settings:recordSetting error:&error];
+    self.mic_Recorder.delegate = self;
+    [self.mic_Recorder prepareToRecord];
+}
+
+- (void)micAniStart
+{
+    if( isMicAni )
+    {
+        [UIView animateWithDuration:0.7f
+                         animations:^{
+                             
+                             if( self.iv_MicAni.alpha > 0.4 )
+                             {
+                                 self.iv_MicAni.alpha = NO;
+                             }
+                             else
+                             {
+                                 self.iv_MicAni.alpha = 0.4f;
+                             }
+                             
+                         } completion:^(BOOL finished) {
+                             
+                             [self micAniStart];
+                         }];
+    }
+    else
+    {
+        [self.iv_MicAni.layer removeAllAnimations];
+        [self micReset];
+    }
+}
+
+- (void)micReset
+{
+    nMicTime = 0;
+    [self.iv_MicAni.layer removeAllAnimations];
+    self.iv_MicAni.alpha = NO;
+    self.lb_MicCancelDescription.hidden = YES;
+    self.lb_MicTimer.textColor = [UIColor colorWithHexString:@"828282"];
+    self.v_MicContent.backgroundColor = [UIColor colorWithHexString:@"E6E6E6"];
+    self.lb_MicDescription.text = @"눌러서 녹음하기";
+    self.lb_MicTimer.text = @"0:00";
+    self.btn_Mic.selected = NO;
+    [self.btn_Mic setImage:BundleImage(@"mic0-red-bold.png") forState:UIControlStateNormal];
+}
+
+- (void)onMicTimer:(NSTimer *)timer
+{
+    nMicTime++;
+    NSInteger nMinute = nMicTime / 60;
+    NSInteger nSecond = nMicTime % 60;
+    self.lb_MicTimer.text = [NSString stringWithFormat:@"%ld:%02ld", nMinute, nSecond];
+}
+
+//음악 재생이 멈춘 후 콜
+//- (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag
+//{
+//    
+//}
+
 
 @end
 

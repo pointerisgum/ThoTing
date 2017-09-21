@@ -240,7 +240,8 @@ NSString *const SubscriptionTopic = @"/topics/global";
 - (void)subscribeToTopic {
     // If the app has a registration token and is connected to GCM, proceed to subscribe to the
     // topic
-    if (_registrationToken && _connectedToGCM) {
+    if (_registrationToken && _connectedToGCM)
+    {
         [[GCMPubSub sharedInstance] subscribeWithToken:_registrationToken
                                                  topic:SubscriptionTopic
                                                options:nil
@@ -273,7 +274,7 @@ NSString *const SubscriptionTopic = @"/topics/global";
     
     isForground = YES;
     [[NSNotificationCenter defaultCenter] postNotificationName:@"EnterForegroundNoti" object:nil userInfo:nil];
-    [[NSNotificationCenter defaultCenter] postNotificationName:@"ChatFeedReloadNoti" object:nil];
+//    [[NSNotificationCenter defaultCenter] postNotificationName:@"ChatFeedReloadNoti" object:nil];
 }
 
 - (void)applicationWillTerminate:(UIApplication *)application {
@@ -611,9 +612,9 @@ NSString *const SubscriptionTopic = @"/topics/global";
         }
     }];
     
-    [[NSNotificationCenter defaultCenter] postNotificationName:@"EnterForeground"
-                                                        object:nil
-                                                      userInfo:nil];
+//    [[NSNotificationCenter defaultCenter] postNotificationName:@"EnterForeground"
+//                                                        object:nil
+//                                                      userInfo:nil];
 
 }
 // [END connect_gcm_service]
