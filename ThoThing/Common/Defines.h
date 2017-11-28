@@ -32,6 +32,8 @@
 #import "SVProgressHUD.h"
 #import "MBProgressHUD.h"
 #import "ALToastView.h"
+#import "UIAlertController+Blocks.h"
+#import "DZImageEditingController.h"
 
 #define SYSTEM_VERSION                              ([[UIDevice currentDevice] systemVersion])
 #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v)  ([SYSTEM_VERSION compare:v options:NSNumericSearch] != NSOrderedAscending)
@@ -68,10 +70,14 @@ static CGFloat kChatMargin = 110.f;
 #define NSEUCKREncoding (-2147481280)
 
 //개발
-#define kBaseUrl                @"http://dev2.thoting.com"        //개발섭
+//#define kBaseUrl                @"http://dev2.thoting.com"        //개발섭
+#define kBaseUrl                @"http://chatapi.thoting.com"        //개발섭
 #define kWebBaseUrl             @"http://ui2.thoting.com"
-#define kSendBirdAppId          @"42D36EAA-F2E3-4D3E-B250-D11A91BA18DA"
-#define kSendBirdApiToken       @"3b10e442ee85ea4c6cef0b8f123630e9f659bf9f"
+#define kSendBirdAppId          @"6D1C06EE-6F6E-48A1-AE53-59011685442D"
+#define kSendBirdApiToken       @"f93c5f8f0faac94241b80b298e0c0eb3489b9c4f"
+
+//#define kSendBirdAppId          @"42D36EAA-F2E3-4D3E-B250-D11A91BA18DA"
+//#define kSendBirdApiToken       @"3b10e442ee85ea4c6cef0b8f123630e9f659bf9f"
 
 //실섭
 //#define kBaseUrl                @"http://dev.thoting.com"        //실섭
@@ -87,6 +93,7 @@ static CGFloat kChatMargin = 110.f;
 #define kEtcBoard       [UIStoryboard storyboardWithName:@"Etc" bundle:nil]
 #define kChannelBoard   [UIStoryboard storyboardWithName:@"Channel" bundle:nil]
 #define kQuestionBoard   [UIStoryboard storyboardWithName:@"Question" bundle:nil]
+#define kMyBoard       [UIStoryboard storyboardWithName:@"My" bundle:nil]
 
 
 #define kLocal                  @"http://112.216.0.179:8284"    //Local
@@ -95,10 +102,14 @@ static CGFloat kChatMargin = 110.f;
 #define kAppStoreURL            @"https://itunes.apple.com/kr/app/seuwiteo-switter/id973499825?mt=8"
 #define kMarketURL              @""
 
+//토팅 섬네일
+#define kThotingThumbUrl        @"http://data.thoting.com:8282/c_edujm/images/user/000/000/thotingUserImg.png"
+
 #define kMainColor  [UIColor colorWithHexString:@"4285f4"]
 #define kMainRedColor  [UIColor colorWithHexString:@"FF5959"]
 #define kMainOrangeColor  [UIColor colorWithHexString:@"#F99900"]
 #define kMainYellowColor [UIColor colorWithHexString:@"#EDB900"]
+#define kRoundColor [UIColor colorWithRed:245.f/255.f green:245.f/255.f blue:245.f/255.f alpha:1]
 
 #define kRegistrationKey @"onRegistrationCompleted"
 #define kMessageKey @"onMessageReceived"

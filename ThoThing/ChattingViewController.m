@@ -348,7 +348,8 @@
             
             isReplyMode = NO;
             self.v_CommentKeyboardAccView.tv_Contents.placeholder = kChatPlaceHolder;
-
+            
+            
 //            [self.v_CommentKeyboardAccView setNeedsUpdateConstraints];
 //            
 //            [UIView animateWithDuration:0.25f animations:^{
@@ -2418,7 +2419,7 @@
                                         [dicM objectForKey:@"type"], @"type",
                                         nil];
     
-    [[WebAPI sharedData] imageUpload:@"v1/attach/file/uploader"
+    [[WebAPI sharedData] imageUpload:@"v1/chat/file/uploader"
                                param:dicM_Params
                           withImages:[NSDictionary dictionaryWithObject:[dicM objectForKey:@"obj"] forKey:@"file"]
                            withBlock:^(id resulte, NSError *error) {

@@ -379,7 +379,8 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             }
             else
             {
-                str_MineType = @"image/jpg";
+//                str_MineType = @"image/jpg";
+                str_MineType = [self contentTypeForImageData:imageData];
                 str_FileName = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld%@.jpg", (long)nYear, (long)nMonth, (long)nDay, (long)nHour, (long)nMinute, (long)nSecond, str_MillSec];
             }
             
@@ -441,6 +442,23 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
     [operation start];
 }
 
+- (NSString *)contentTypeForImageData:(NSData *)data {
+    uint8_t c;
+    [data getBytes:&c length:1];
+    
+    switch (c) {
+        case 0xFF:
+            return @"image/jpeg";
+        case 0x89:
+            return @"image/png";
+        case 0x47:
+            return @"image/gif";
+        case 0x49:
+        case 0x4D:
+            return @"image/tiff";
+    }
+    return nil;
+}
 
 - (void)fileUpload:(NSString *)path param:(NSMutableDictionary *)dataParams withFileUrl:(NSURL *)url withBlock:(void(^)(id resulte, NSError *error))completion
 {
@@ -851,7 +869,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
         //중복된 팝업을 방지하기 위한 코드
         static BOOL isNowShowPopup = NO;
         
-        if( nRetry < kRetryCount )
+        //재시도 없애기
+        if( 0 )
+            //            if( nRetry < kRetryCount )
         {
             NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
             [self callAsyncWebAPIBlock:path param:params indicatorShow:isIndicatorShow withBlock:^(id resulte, NSError *error) {
@@ -944,7 +964,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             //중복된 팝업을 방지하기 위한 코드
             static BOOL isNowShowPopup = NO;
             
-            if( nRetry < kRetryCount )
+            //재시도 없애기
+            if( 0 )
+                //            if( nRetry < kRetryCount )
             {
                 NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
                 [self callAsyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {
@@ -1032,7 +1054,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             //중복된 팝업을 방지하기 위한 코드
             static BOOL isNowShowPopup = NO;
             
-            if( nRetry < kRetryCount )
+            //재시도 없애기
+            if( 0 )
+                //            if( nRetry < kRetryCount )
             {
                 NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
                 [self callAsyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {
@@ -1147,7 +1171,8 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             {
                 UIWindow *window = [[UIApplication sharedApplication] keyWindow];
                 [window makeToast:@"NetworkError"];
-                
+                NSLog(@"network error path: %@", path);
+                NSLog(@"network error params: %@", params);
                 if( !isNowShowPopup )
                 {
                     isNowShowPopup = YES;
@@ -1169,7 +1194,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
                 return;
             }
             
-            if( nRetry < kRetryCount )
+            //재시도 없애기
+            if( 0 )
+//            if( nRetry < kRetryCount )
             {
                 NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
                 [self callAsyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {
@@ -1229,7 +1256,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
                 
                 UIWindow *window = [[UIApplication sharedApplication] keyWindow];
                 [window makeToast:@"NetworkError"];
-                
+                NSLog(@"network error path: %@", path);
+                NSLog(@"network error params: %@", params);
+
                 if( !isNowShowPopup )
                 {
                     isNowShowPopup = YES;
@@ -1320,7 +1349,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             {
                 UIWindow *window = [[UIApplication sharedApplication] keyWindow];
                 [window makeToast:@"NetworkError"];
-                
+                NSLog(@"network error path: %@", path);
+                NSLog(@"network error params: %@", params);
+
                 if( !isNowShowPopup )
                 {
                     isNowShowPopup = YES;
@@ -1343,7 +1374,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             }
 
 
-            if( nRetry < kRetryCount )
+            //재시도 없애기
+            if( 0 )
+                //            if( nRetry < kRetryCount )
             {
                 NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
                 [self callAsyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {
@@ -1396,7 +1429,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
                 
                 UIWindow *window = [[UIApplication sharedApplication] keyWindow];
                 [window makeToast:@"NetworkError"];
-                
+                NSLog(@"network error path: %@", path);
+                NSLog(@"network error params: %@", params);
+
                 if( !isNowShowPopup )
                 {
                     isNowShowPopup = YES;
@@ -1447,7 +1482,7 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
     {
 //        [MBProgressHUD show];
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
-        
+        NSLog(@"params: %@", params);
         [sendBirdclient postPath:path parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
             
             nRetry = 0;
@@ -1482,41 +1517,47 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
 //                }];
 //            }
 //            else if( !isNowShowPopup )
-            if( 1 )
-            {
-                NSDictionary *userInfo = [error userInfo];
-                NSString *errorString = [[userInfo objectForKey:NSUnderlyingErrorKey] localizedDescription];
-                if( [errorString rangeOfString:@"offline"].location != NSNotFound && [Util getNetworkSatatus] == nil )
-                {
-                    //오프라인 상태
-                    completion(nil, error);
-                    return ;
-                }
-                
-                UIWindow *window = [[UIApplication sharedApplication] keyWindow];
-                [window makeToast:@"NetworkError"];
-                
-                if( !isNowShowPopup )
-                {
-                    isNowShowPopup = YES;
-                    
-//                    UIAlertView *alert = CREATE_ALERT(nil, [operation.request.URL absoluteString], @"확인", nil);
-//                    [alert showWithCompletion:^(UIAlertView *alertView, NSInteger buttonIndex) {
-//                        if( buttonIndex == 0 )
-//                        {
-//                            isNowShowPopup = NO;
-//                        }
-//                    }];
-                    
-                    isNowShowPopup = NO;
-                }
-                
-                nRetry = 0;
-                
-                completion(nil, error);
-            }
             
-            nRetry++;
+            
+            
+            
+
+            //오프라인으로 실행됐던거 지우는 로직 주석처리함 (20170921)
+//            if( 1 )
+//            {
+//                NSDictionary *userInfo = [error userInfo];
+//                NSString *errorString = [[userInfo objectForKey:NSUnderlyingErrorKey] localizedDescription];
+//                if( [errorString rangeOfString:@"offline"].location != NSNotFound && [Util getNetworkSatatus] == nil )
+//                {
+//                    //오프라인 상태
+//                    completion(nil, error);
+//                    return ;
+//                }
+//                
+//                UIWindow *window = [[UIApplication sharedApplication] keyWindow];
+//                [window makeToast:@"NetworkError"];
+//                
+//                if( !isNowShowPopup )
+//                {
+//                    isNowShowPopup = YES;
+//                    
+////                    UIAlertView *alert = CREATE_ALERT(nil, [operation.request.URL absoluteString], @"확인", nil);
+////                    [alert showWithCompletion:^(UIAlertView *alertView, NSInteger buttonIndex) {
+////                        if( buttonIndex == 0 )
+////                        {
+////                            isNowShowPopup = NO;
+////                        }
+////                    }];
+//                    
+//                    isNowShowPopup = NO;
+//                }
+//                
+//                nRetry = 0;
+//                
+//                completion(nil, error);
+//            }
+//            
+//            nRetry++;
         }];
         
         NSMutableString *strM_CallUrl = [NSMutableString stringWithFormat:@"%@%@?", kBaseUrl, params];
@@ -1540,9 +1581,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
 //        [MBProgressHUD show];
         [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
         
-        NSString *str_PostPath = [NSString stringWithFormat:@"/api/%@", path];
+//        NSString *str_PostPath = [NSString stringWithFormat:@"/api/%@", path];
         
-        [sendBirdclient getPath:str_PostPath parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
+        [sendBirdclient getPath:path parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
             
             nRetry = 0;
 
@@ -1568,7 +1609,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             //중복된 팝업을 방지하기 위한 코드
             static BOOL isNowShowPopup = NO;
             
-            if( nRetry < kRetryCount )
+            //재시도 없애기
+            if( 0 )
+                //            if( nRetry < kRetryCount )
             {
                 NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
                 [self callAsyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {
@@ -1612,7 +1655,7 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             nRetry++;
         }];
         
-        NSMutableString *strM_CallUrl = [NSMutableString stringWithFormat:@"https://api.sendbird.com%@?", str_PostPath];
+        NSMutableString *strM_CallUrl = [NSMutableString stringWithFormat:@"https://api.sendbird.com%@?", path];
         NSArray *ar_AllKeys = [params allKeys];
         for( int i = 0; i < [ar_AllKeys count]; i++ )
         {
@@ -1673,7 +1716,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             //중복된 팝업을 방지하기 위한 코드
             static BOOL isNowShowPopup = NO;
             
-            if( nRetry < kRetryCount )
+            //재시도 없애기
+            if( 0 )
+                //            if( nRetry < kRetryCount )
             {
                 NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
                 [self callAsyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {
@@ -1761,7 +1806,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             //중복된 팝업을 방지하기 위한 코드
             static BOOL isNowShowPopup = NO;
             
-            if( nRetry < kRetryCount )
+            //재시도 없애기
+            if( 0 )
+                //            if( nRetry < kRetryCount )
             {
                 NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
                 [self callAsyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {
@@ -1856,7 +1903,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             //중복된 팝업을 방지하기 위한 코드
             static BOOL isNowShowPopup = NO;
             
-            if( nRetry < kRetryCount )
+            //재시도 없애기
+            if( 0 )
+                //            if( nRetry < kRetryCount )
             {
                 NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
                 [self callSyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {
@@ -1920,7 +1969,9 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             //중복된 팝업을 방지하기 위한 코드
             static BOOL isNowShowPopup = NO;
             
-            if( nRetry < kRetryCount )
+            //재시도 없애기
+            if( 0 )
+                //            if( nRetry < kRetryCount )
             {
                 NSLog(@"@@@@@@@@@@@RETRY@@@@@@@@@@");
                 [self callSyncWebAPIBlock:path param:params withMethod:aMethod withBlock:^(id resulte, NSError *error) {

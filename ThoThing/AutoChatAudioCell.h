@@ -13,7 +13,7 @@
 #import "ExtentionButton.h"
 
 @interface AutoChatAudioCell : SWTableViewCell
-@property (nonatomic, assign) NSInteger nEId;
+@property (nonatomic, assign) long long nEId;
 @property (nonatomic, assign) long long createTime;
 @property (nonatomic, assign) long long messageId;
 @property (nonatomic, assign) CGFloat fPlayDuration;

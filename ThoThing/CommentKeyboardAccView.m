@@ -24,9 +24,9 @@
     
     self.tv_Contents.contentInset = UIEdgeInsetsMake(0, 0, 0, 0);
     
-    self.v_InputLayer.layer.cornerRadius = 6.f;
-    self.v_InputLayer.layer.borderColor = [UIColor colorWithRed:220.f/255.f green:220.f/255.f blue:220.f/255.f alpha:1].CGColor;
-    self.v_InputLayer.layer.borderWidth = 1.f;
+//    self.v_InputLayer.layer.cornerRadius = 6.f;
+//    self.v_InputLayer.layer.borderColor = [UIColor colorWithRed:220.f/255.f green:220.f/255.f blue:220.f/255.f alpha:1].CGColor;
+//    self.v_InputLayer.layer.borderWidth = 1.f;
     
     self.btn_Done.layer.cornerRadius = 6.f;
     self.btn_Done.clipsToBounds = YES;
@@ -55,7 +55,7 @@
 #pragma mark - UITextViewDelegate
 - (BOOL)textView:(UITextView *)textView shouldChangeTextInRange:(NSRange)range replacementText:(NSString *)text
 {
-    [self performSelector:@selector(onChangeInterval) withObject:nil afterDelay:0.1f];
+    [self performSelector:@selector(onChangeInterval) withObject:nil afterDelay:0.01f];
     NSUInteger length = [[textView text] length] - range.length + text.length;
     if( length <= 0 )
     {
@@ -137,15 +137,31 @@
     else
     {
         self.lc_AddWidth.constant = 0.f;
+        
+//        [self.tv_Contents setNeedsLayout];
+//        [self.tv_Contents layoutIfNeeded];
+//        [self setNeedsLayout];
+//        [self layoutIfNeeded];
+//
+//        [self layoutSubviews];
+//        [self.tv_Contents layoutSubviews];
+        
+//        [self setNeedsDisplay];
+        [self.tv_Contents setNeedsDisplay];
+
     }
     
-    [self.tv_Contents setNeedsLayout];
-    [self.tv_Contents setNeedsUpdateConstraints];
+//    [self.tv_Contents setNeedsLayout];
+//    [self.tv_Contents setNeedsUpdateConstraints];
     [self.tv_Contents updateConstraints];
     
-    [self setNeedsLayout];
-    [self setNeedsUpdateConstraints];
+
     [self updateConstraints];
+    
+    if( self.completionTextChangeBlock )
+    {
+        self.completionTextChangeBlock(self.tv_Contents.text);
+    }
 }
 
 - (void)removeContents

@@ -156,4 +156,10 @@
 
 + (void)showToast:(NSString *)aMsg;
 
++ (NSString *)getDetailDate:(NSString *)aDay;
+
++ (void)addOpenChannelUrl:(NSString *)aUrl withRId:(NSString *)aRId;
+
++ (NSString *)contentTypeForImageData:(NSData *)data;   //마인타입 가져오기
+
 @end

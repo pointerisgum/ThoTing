@@ -9,7 +9,7 @@
 #import <UIKit/UIKit.h>
 #import <TTTAttributedLabel.h>
 #import "SWTableViewCell.h"
-
+  
 @interface OtherChatBasicCell : SWTableViewCell
 @property (nonatomic, assign) NSInteger nUserId;
 @property (nonatomic, weak) IBOutlet UIImageView *iv_User;

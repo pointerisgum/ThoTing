@@ -451,7 +451,7 @@ static void AFNetworkReachabilityReleaseCallback(const void *info) {
         url = [NSURL URLWithString:path relativeToURL:self.baseURL];
     }
     
-    if( [path hasPrefix:@"v3/group_channels"] )
+    if( [path hasPrefix:@"v3/group_channels"] || [path hasPrefix:@"v3/users"] )
     {
         //샌드버드 플랫폼 api일때
         [self setDefaultHeader:@"Api-Token" value:kSendBirdApiToken];

@@ -14,7 +14,7 @@
 #import <Fabric/Fabric.h>
 #import <Crashlytics/Crashlytics.h>
 #import "MainChannelViewController.h"
-#import "ChatFeedMainViewController.h"
+#import "MyMainViewController.h"
 
 @interface AppDelegate ()
 {
@@ -40,6 +40,7 @@ NSString *const SubscriptionTopic = @"/topics/global";
 
 - (BOOL)application:(UIApplication *)application handleOpenURL:(NSURL *)url
 {
+    NSLog(@"!!!!!!!!!!!!!!!!!!!!!");
 //    if( url )
 //    {
 //        [self.mainNavi dismissViewControllerAnimated:NO completion:^{
@@ -76,6 +77,48 @@ NSString *const SubscriptionTopic = @"/topics/global";
 //
 //    
 //}
+- (void)removeCache
+{
+    [self removeAllStoredCredentials];
+    
+    SDImageCache *imageCache = [SDImageCache sharedImageCache];
+    [imageCache clearMemory];
+    [imageCache clearDisk];
+}
+
+- (void)removeAllStoredCredentials
+{
+    // Delete any cached URLrequests!
+    NSURLCache *sharedCache = [NSURLCache sharedURLCache];
+    [sharedCache removeAllCachedResponses];
+    
+    // Also delete all stored cookies!
+    NSHTTPCookieStorage *cookieStorage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+    NSArray *cookies = [cookieStorage cookies];
+    id cookie;
+    for (cookie in cookies) {
+        [cookieStorage deleteCookie:cookie];
+    }
+    
+    NSDictionary *credentialsDict = [[NSURLCredentialStorage sharedCredentialStorage] allCredentials];
+    if ([credentialsDict count] > 0) {
+        // the credentialsDict has NSURLProtectionSpace objs as keys and dicts of userName => NSURLCredential
+        NSEnumerator *protectionSpaceEnumerator = [credentialsDict keyEnumerator];
+        id urlProtectionSpace;
+        // iterate over all NSURLProtectionSpaces
+        while (urlProtectionSpace = [protectionSpaceEnumerator nextObject]) {
+            NSEnumerator *userNameEnumerator = [[credentialsDict objectForKey:urlProtectionSpace] keyEnumerator];
+            id userName;
+            // iterate over all usernames for this protectionspace, which are the keys for the actual NSURLCredentials
+            while (userName = [userNameEnumerator nextObject]) {
+                NSURLCredential *cred = [[credentialsDict objectForKey:urlProtectionSpace] objectForKey:userName];
+                //NSLog(@"credentials to be removed: %@", cred);
+                [[NSURLCredentialStorage sharedCredentialStorage] removeCredential:cred forProtectionSpace:urlProtectionSpace];
+            }
+        }
+    }
+}
+
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch
 
@@ -83,7 +126,8 @@ NSString *const SubscriptionTopic = @"/topics/global";
     
     
     [Common removeAllPdfFile];
-
+//    [self removeCache];
+    
     isForground = YES;
     
     [Fabric with:@[[Crashlytics class]]];
@@ -128,12 +172,15 @@ NSString *const SubscriptionTopic = @"/topics/global";
     NSAssert(!configureError, @"Error configuring Google services: %@", configureError);
     _gcmSenderID = [[[GGLContext sharedInstance] configuration] gcmSenderID];
     // Register for remote notifications
-    if (floor(NSFoundationVersionNumber) <= NSFoundationVersionNumber_iOS_7_1) {
+    if (floor(NSFoundationVersionNumber) <= NSFoundationVersionNumber_iOS_7_1)
+    {
         // iOS 7.1 or earlier
         UIRemoteNotificationType allNotificationTypes =
         (UIRemoteNotificationTypeSound | UIRemoteNotificationTypeAlert | UIRemoteNotificationTypeBadge);
         [application registerForRemoteNotificationTypes:allNotificationTypes];
-    } else {
+    }
+    else
+    {
         // iOS 8 or later
         // [END_EXCLUDE]
         UIUserNotificationType allNotificationTypes =
@@ -216,6 +263,13 @@ NSString *const SubscriptionTopic = @"/topics/global";
         [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithBool:NO] forKey:@"IsLogin"];
         [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithBool:NO] forKey:@"IsUserInfo"];
         [[NSUserDefaults standardUserDefaults] setObject:@"NO" forKey:@"FirstBoot"];
+        
+        [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithBool:YES] forKey:@"PushSount"];
+        [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithBool:YES] forKey:@"PushVibrator"];
+        [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithBool:YES] forKey:@"PushBot"];
+        [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithBool:YES] forKey:@"PushPreview"];
+        [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithBool:YES] forKey:@"PushContact"];
+
         [[NSUserDefaults standardUserDefaults] synchronize];
     }
 
@@ -235,6 +289,76 @@ NSString *const SubscriptionTopic = @"/topics/global";
     }
 
     return YES;
+}
+
+- (BOOL) application:(UIApplication *)application openURL:(NSURL *)url sourceApplication:(NSString *)sourceApplication annotation:(id)annotation
+{
+    NSLog(@"application openURL:(%@) sourceApplication:(%@) annotation:(%@)", url, sourceApplication, annotation);
+    
+    BOOL isLogin = [[[NSUserDefaults standardUserDefaults] objectForKey:@"IsLogin"] boolValue];
+    
+    if( isLogin == NO ) return YES;
+    
+    //thoting://profile/138
+    NSString *str_Path = url.absoluteString;
+    if( [str_Path rangeOfString:@"profile/"].location != NSNotFound )
+    {
+        //프로필
+        NSArray *ar_Tmp = [str_Path componentsSeparatedByString:@"profile/"];
+        if( ar_Tmp.count == 2 )
+        {
+            NSString *str_UserId = [NSString stringWithFormat:@"%@", [ar_Tmp objectAtIndex:1]];
+            if( [str_UserId integerValue] > 0 )
+            {
+                NSString *str_MyUserId = [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"];
+
+                UIStoryboard *storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
+                MyMainViewController *vc = [storyboard instantiateViewControllerWithIdentifier:@"MyMainViewController"];
+                UINavigationController *navi = [[UINavigationController alloc] initWithRootViewController:vc];
+                
+                vc.str_UserIdx = str_UserId;
+                vc.isModalMode = YES;
+                
+                if( [str_UserId isEqualToString:str_MyUserId] )
+                {
+                    vc.isAnotherUser = NO;
+                }
+                else
+                {
+                    vc.isAnotherUser = YES;
+                }
+                
+                [self performSelector:@selector(onShowProfileInterval:) withObject:navi afterDelay:0.5f];
+
+//                id root = self.window.rootViewController;
+//                if( [root isKindOfClass:[UINavigationController class]] )
+//                {
+//                    UINavigationController *naviTmp = (UINavigationController *)root;
+//                    UIViewController *vc_Main = [naviTmp.viewControllers firstObject];
+//                    [vc_Main presentViewController:naviTmp animated:YES completion:^{
+//
+//                    }];
+//                }
+//                else
+//                {
+//                    [self.window.rootViewController presentViewController:navi animated:YES completion:^{
+//
+//                    }];
+//                }
+//                UINavigationController *navi = (UINavigationController *)self.window.rootViewController;
+//                [navi pushViewController:vc animated:YES];
+            }
+        }
+    }
+
+    return YES;
+}
+
+- (void)onShowProfileInterval:(UINavigationController *)navi
+{
+    [self.window.rootViewController presentViewController:navi animated:YES completion:^{
+        
+    }];
 }
 
 - (void)subscribeToTopic {
@@ -279,6 +403,8 @@ NSString *const SubscriptionTopic = @"/topics/global";
 
 - (void)applicationWillTerminate:(UIApplication *)application {
     // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
+    
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"UpdateRoomStatus" object:nil];
     
     [Common removeAllPdfFile];
 
@@ -352,7 +478,7 @@ NSString *const SubscriptionTopic = @"/topics/global";
     
 
     __block UIStoryboard *storyboard = self.window.rootViewController.storyboard;
-    self.vc_Main = [storyboard instantiateViewControllerWithIdentifier:@"MainViewController"];
+    self.vc_Main = [storyboard instantiateViewControllerWithIdentifier:@"ChatMainNavi"];
 
     
     //메인화면 보여준 후 로그인을 태운다
@@ -373,6 +499,7 @@ NSString *const SubscriptionTopic = @"/topics/global";
                                             if( nCode == 200 )
                                             {
                                                 NSDictionary *dic = [resulte objectForKey:@"result"];
+                                                [[NSUserDefaults standardUserDefaults] setObject:[resulte objectForKey:@"userImg_prefix"] forKey:@"userImg_prefix"];
                                                 [[NSUserDefaults standardUserDefaults] setObject:[resulte objectForKey:@"apiToken"] forKey:@"apiToken"];
                                                 [[NSUserDefaults standardUserDefaults] setObject:[resulte objectForKey:@"secretKey"] forKey:@"secretKey"];
                                                 [[NSUserDefaults standardUserDefaults] setObject:[dic objectForKey:@"userId"] forKey:@"userId"];
@@ -387,9 +514,12 @@ NSString *const SubscriptionTopic = @"/topics/global";
                                                 
                                                 NSData *followChannelData = [NSKeyedArchiver archivedDataWithRootObject:[resulte objectForKey:@"followChannelInfo"]];
                                                 [[NSUserDefaults standardUserDefaults] setObject:followChannelData forKey:@"followChannelInfo"];
-                                                [[NSUserDefaults standardUserDefaults] setObject:[dic objectForKey:@"userPic"] forKey:@"userPic"];
+//                                                [[NSUserDefaults standardUserDefaults] setObject:[dic objectForKey:@"userPic"] forKey:@"userPic"];
                                                 [[NSUserDefaults standardUserDefaults] synchronize];
                                                 
+//                                                SBDUser *user = [SBDMain getCurrentUser];
+//                                                NSLog(@"%@", user.profileUrl);
+//
                                                 [Common registToken];
                                                 [Common logUser];
                                                 
@@ -423,16 +553,16 @@ NSString *const SubscriptionTopic = @"/topics/global";
                                                                     }completion:nil];
 
 
-                                                    NSArray *myViewControllers = self.vc_Main.viewControllers;
-                                                    for (UINavigationController *navViewController in myViewControllers)
-                                                    {
-                                                        UIViewController *ctrl = navViewController.topViewController;
-                                                        if( [ctrl isKindOfClass:[ChatFeedMainViewController class]] )
-                                                        {
-                                                            ChatFeedMainViewController *vc_Tmp = (ChatFeedMainViewController *)ctrl;
-                                                            [vc_Tmp updateSendBirdDelegate];    //홈화면에서 메인화면으로 전환 후 샌드버드 델리게이트 업데이트
-                                                        }
-                                                    }
+//                                                    NSArray *myViewControllers = self.vc_Main.viewControllers;
+//                                                    for (UINavigationController *navViewController in myViewControllers)
+//                                                    {
+//                                                        UIViewController *ctrl = navViewController.topViewController;
+//                                                        if( [ctrl isKindOfClass:[ChatFeedMainViewController class]] )
+//                                                        {
+//                                                            ChatFeedMainViewController *vc_Tmp = (ChatFeedMainViewController *)ctrl;
+//                                                            [vc_Tmp updateSendBirdDelegate];    //홈화면에서 메인화면으로 전환 후 샌드버드 델리게이트 업데이트
+//                                                        }
+//                                                    }
 
 //                                                    self.window.rootViewController = self.vc_Main;
                                                 }
@@ -479,10 +609,18 @@ NSString *const SubscriptionTopic = @"/topics/global";
                                                             }
                                                         }];
                                                         
-                                                        [SBDMain updateCurrentUserInfoWithNickname:str_UserName
-                                                                                        profileUrl:[[NSUserDefaults standardUserDefaults] objectForKey:@"userPic"]
+                                                        SBDUser *user = [SBDMain getCurrentUser];
+                                                        NSLog(@"%@", user.profileUrl);
+
+                                                        [[NSUserDefaults standardUserDefaults] setObject:user.profileUrl forKey:@"userPic"];
+                                                        [[NSUserDefaults standardUserDefaults] synchronize];
+                                                        
+
+                                                        [SBDMain updateCurrentUserInfoWithNickname:user.nickname
+                                                                                        profileUrl:user.profileUrl
                                                                                  completionHandler:^(SBDError * _Nullable error) {
-                                                                                     
+
+                                                                                      [[NSNotificationCenter defaultCenter] postNotificationName:@"OnDashBoardReloadNoti" object:nil];
                                                                                  }];
                                                     }
                                                 }];
@@ -624,6 +762,8 @@ NSString *const SubscriptionTopic = @"/topics/global";
 {
     isForground = NO;
     
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"UpdateRoomStatus" object:nil];
+
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"CurrentQuestionIdx"];
     [[NSUserDefaults standardUserDefaults] synchronize];
 
@@ -754,53 +894,53 @@ NSString *const SubscriptionTopic = @"/topics/global";
     
     
     
-    //푸시타고 왔을때 해당 방으로 이동 또는 해당 방으로 이동 후 해당 문제로 이동하기 (아직 다 구현되진 않음)
-    NSDictionary *dic_SBD = userInfo[@"sendbird"];
-    if( 0 )
-    {
-        NSDictionary *dic_Channel = dic_SBD[@"channel"];
-        NSString *str_ChannelUrl = dic_Channel[@"channel_url"];
-        NSString *str_CustomType = dic_SBD[@"custom_type"];
-        if( [str_CustomType isEqualToString:@"shareExam"] || [str_CustomType isEqualToString:@"shareQuestion"] )
-        {
-            //문제 공유일 경우
-            NSString *str_Data = dic_SBD[@"data"];
-            NSData *data = [str_Data dataUsingEncoding:NSUTF8StringEncoding];
-            NSDictionary *dic_Data = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-            
-            self.vc_Main.selectedIndex = 1;
-            
-            NSDictionary *dic_Param = @{@"url":str_ChannelUrl, @"data":dic_Data};
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"MessagePushNoti" object:dic_Param];
-        }
-    }
-    else
-    {
-        NSString *str_PushType = userInfo[@"gcm.notification.commandType"];
-        NSString *str_ChannelUrl = userInfo[@"gcm.notification.channelUrl"];
-        NSString *str_Data = userInfo[@"gcm.notification.data"];
-
-        if( [str_PushType isEqualToString:@"newText"] && str_Data == nil )
-        {
-            //글에 대한 푸시일때
-            self.vc_Main.selectedIndex = 1;
-            
-            NSDictionary *dic_Param = @{@"url":str_ChannelUrl};
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"MessagePushNoti" object:dic_Param];
-        }
-        else if( [str_PushType isEqualToString:@"shareExam"] || [str_PushType isEqualToString:@"shareQuestion"] )
-        {
-            //문제 공유일 경우
-            NSString *str_Data = userInfo[@"gcm.notification.data"];
-            NSData *data = [str_Data dataUsingEncoding:NSUTF8StringEncoding];
-            NSDictionary *dic_Data = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-            
-            self.vc_Main.selectedIndex = 1;
-            
-            NSDictionary *dic_Param = @{@"url":str_ChannelUrl, @"data":dic_Data};
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"MessagePushNoti" object:dic_Param];
-        }
-    }
+//    //푸시타고 왔을때 해당 방으로 이동 또는 해당 방으로 이동 후 해당 문제로 이동하기 (아직 다 구현되진 않음)
+//    NSDictionary *dic_SBD = userInfo[@"sendbird"];
+//    if( 0 )
+//    {
+//        NSDictionary *dic_Channel = dic_SBD[@"channel"];
+//        NSString *str_ChannelUrl = dic_Channel[@"channel_url"];
+//        NSString *str_CustomType = dic_SBD[@"custom_type"];
+//        if( [str_CustomType isEqualToString:@"shareExam"] || [str_CustomType isEqualToString:@"shareQuestion"] )
+//        {
+//            //문제 공유일 경우
+//            NSString *str_Data = dic_SBD[@"data"];
+//            NSData *data = [str_Data dataUsingEncoding:NSUTF8StringEncoding];
+//            NSDictionary *dic_Data = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//
+//            self.vc_Main.selectedIndex = 1;
+//
+//            NSDictionary *dic_Param = @{@"url":str_ChannelUrl, @"data":dic_Data};
+//            [[NSNotificationCenter defaultCenter] postNotificationName:@"MessagePushNoti" object:dic_Param];
+//        }
+//    }
+//    else
+//    {
+//        NSString *str_PushType = userInfo[@"gcm.notification.commandType"];
+//        NSString *str_ChannelUrl = userInfo[@"gcm.notification.channelUrl"];
+//        NSString *str_Data = userInfo[@"gcm.notification.data"];
+//
+//        if( [str_PushType isEqualToString:@"newText"] && str_Data == nil )
+//        {
+//            //글에 대한 푸시일때
+//            self.vc_Main.selectedIndex = 1;
+//
+//            NSDictionary *dic_Param = @{@"url":str_ChannelUrl};
+//            [[NSNotificationCenter defaultCenter] postNotificationName:@"MessagePushNoti" object:dic_Param];
+//        }
+//        else if( [str_PushType isEqualToString:@"shareExam"] || [str_PushType isEqualToString:@"shareQuestion"] )
+//        {
+//            //문제 공유일 경우
+//            NSString *str_Data = userInfo[@"gcm.notification.data"];
+//            NSData *data = [str_Data dataUsingEncoding:NSUTF8StringEncoding];
+//            NSDictionary *dic_Data = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//
+//            self.vc_Main.selectedIndex = 1;
+//
+//            NSDictionary *dic_Param = @{@"url":str_ChannelUrl, @"data":dic_Data};
+//            [[NSNotificationCenter defaultCenter] postNotificationName:@"MessagePushNoti" object:dic_Param];
+//        }
+//    }
     
     
     return;

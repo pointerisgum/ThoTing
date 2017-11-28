@@ -15,9 +15,11 @@ typedef enum {
 } KeyboardStatus;
 
 typedef void (^CompletionBlock)(id completeResult);
+typedef void (^CompletionTextChangeBlock)(id completeResult);
 
 @interface CommentKeyboardAccView : UIView
 @property (nonatomic, copy) CompletionBlock completionBlock;
+@property (nonatomic, copy) CompletionTextChangeBlock completionTextChangeBlock;
 @property (nonatomic, assign) KeyboardStatus keyboardStatus;
 @property (nonatomic, assign) CGFloat fKeyboardHeight;
 @property (nonatomic, weak) IBOutlet UIButton *btn_Add;
@@ -32,5 +34,6 @@ typedef void (^CompletionBlock)(id completeResult);
 @property (nonatomic, weak) IBOutlet UIButton *btn_KeyboardChange;
 @property (nonatomic, weak) IBOutlet UIButton *btn_TempleteKeyboard;
 - (void)setCompletionBlock:(CompletionBlock)completionBlock;
+- (void)setCompletionTextChangeBlock:(CompletionTextChangeBlock)completionTextChangeBlock;
 - (void)removeContents;
 @end

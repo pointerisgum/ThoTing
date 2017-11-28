@@ -406,7 +406,7 @@ static NSInteger snUploadCnt = 0;
                                         [dicM objectForKey:@"type"], @"type",
                                         nil];
     
-    [[WebAPI sharedData] imageUpload:@"v1/attach/file/uploader"
+    [[WebAPI sharedData] imageUpload:@"v1/chat/file/uploader"
                                param:dicM_Params
                           withImages:[NSDictionary dictionaryWithObject:[dicM objectForKey:@"obj"] forKey:@"file"]
                            withBlock:^(id resulte, NSError *error) {

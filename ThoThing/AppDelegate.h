@@ -9,11 +9,12 @@
 #import <UIKit/UIKit.h>
 #import <Google/CloudMessaging.h>
 #import "MainViewController.h"
+#import "ChatFeedMainViewController.h"
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate, GGLInstanceIDDelegate, GCMReceiverDelegate>
 
 @property (strong, nonatomic) UIWindow *window;
-@property (nonatomic, strong) MainViewController *vc_Main;
+@property (nonatomic, strong) UINavigationController *vc_Main;
 @property (nonatomic, assign) BOOL isChannelMode;
 @property(nonatomic, readonly, strong) NSString *registrationKey;
 @property(nonatomic, readonly, strong) NSString *messageKey;

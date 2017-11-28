@@ -4,6 +4,11 @@
 <dict>
 	<key>SchemeUserState</key>
 	<dict>
+		<key>APAddressBook.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
 		<key>GSKStretchyHeaderView.xcscheme</key>
 		<dict>
 			<key>isShown</key>
@@ -36,37 +41,6 @@
 		</dict>
 	</dict>
 	<key>SuppressBuildableAutocreation</key>
-	<dict>
-		<key>021E963909D0B022CC3E1185959375C3</key>
-		<dict>
-			<key>primary</key>
-			<true/>
-		</dict>
-		<key>2B14CEA5979647ACD63B8A184C3975D9</key>
-		<dict>
-			<key>primary</key>
-			<true/>
-		</dict>
-		<key>4B7903A2A7C783E4AD9DF9309DA61888</key>
-		<dict>
-			<key>primary</key>
-			<true/>
-		</dict>
-		<key>52B47666FBA55D42B40D63AACFC4C782</key>
-		<dict>
-			<key>primary</key>
-			<true/>
-		</dict>
-		<key>753D4A1DD1561EF0C8372FF182785B6E</key>
-		<dict>
-			<key>primary</key>
-			<true/>
-		</dict>
-		<key>B72C7EA739B6A24F233286089A1DE97C</key>
-		<dict>
-			<key>primary</key>
-			<true/>
-		</dict>
-	</dict>
+	<dict/>
 </dict>
 </plist>

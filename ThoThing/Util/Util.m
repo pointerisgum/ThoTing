@@ -1114,6 +1114,38 @@ static UIView *v_Indi = nil;
     return @"";
 }
 
++ (NSString *)getDetailDate:(NSString *)aDay
+{
+    if( aDay.length < 12 )
+    {
+        return aDay;
+    }
+    
+    NSDate *date = [NSDate date];
+    NSCalendar* calendar = [NSCalendar currentCalendar];
+    NSDateComponents* components = [calendar components:NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay|NSCalendarUnitHour|NSCalendarUnitMinute|NSCalendarUnitSecond fromDate:date];
+    NSInteger nYear = [components year];
+    NSInteger nMonth = [components month];
+    NSInteger nDay = [components day];
+    NSInteger nHour = [components hour];
+    NSInteger nMinute = [components minute];
+    NSInteger nSecond = [components second];
+    NSString *str_Current = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld", nYear, nMonth, nDay, nHour, nMinute, nSecond];
+    
+    NSString *str_Date = [NSString stringWithFormat:@"%@", aDay];
+    NSString *str_Year = [str_Date substringWithRange:NSMakeRange(0, 4)];
+    NSString *str_Month = [str_Date substringWithRange:NSMakeRange(4, 2)];
+    NSString *str_Day = [str_Date substringWithRange:NSMakeRange(6, 2)];
+    
+    NSString *str_Hour = [str_Date substringWithRange:NSMakeRange(8, 2)];
+    NSString *str_Minute = [str_Date substringWithRange:NSMakeRange(10, 2)];
+    str_Date = [NSString stringWithFormat:@"%@ %ld:%02ld",
+                [str_Hour integerValue] > 12 ? @"오후" : @"오전",
+                ([str_Hour integerValue] > 12) ? [str_Hour integerValue] - 12 : [str_Hour integerValue] == 0 ? 12 : [str_Hour integerValue], [str_Minute integerValue]];
+    
+    return str_Date;
+}
+
 + (NSString *)getMainThotingChatDate:(NSString *)aDay
 {
     NSDate *date = [NSDate date];
@@ -1178,6 +1210,30 @@ static UIView *v_Indi = nil;
                                     }];
 }
 
++ (void)addOpenChannelUrl:(NSString *)aUrl withRId:(NSString *)aRId
+{
+    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+                                        [Util getUUID], @"uuid",
+                                        aUrl, @"channelUrl",
+                                        aRId, @"rId",
+                                        @"opengroup", @"channelType",
+                                        nil];
+    
+    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/update/chat/room/channel/url"
+                                        param:dicM_Params
+                                   withMethod:@"GET"
+                                    withBlock:^(id resulte, NSError *error) {
+                                        
+                                        [MBProgressHUD hide];
+                                        
+                                        if( resulte )
+                                        {
+                                            
+                                        }
+                                    }];
+}
+
 + (nullable NSArray<SBDBaseMessage *> *)loadMessagesInChannel:(NSString * _Nonnull)channelUrl
 {
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
@@ -1235,6 +1291,26 @@ static UIView *v_Indi = nil;
 + (void)showToast:(NSString *)aMsg
 {
     [ALToastView toastInView:[UIApplication sharedApplication].keyWindow withText:aMsg];
+}
+
++ (NSString *)contentTypeForImageData:(NSData *)data
+{
+    uint8_t c;
+    [data getBytes:&c length:1];
+    
+    switch (c) {
+        case 0xFF:
+            return @"jpeg";
+        case 0x89:
+            return @"png";
+        case 0x47:
+            return @"gif";
+        case 0x49:
+        case 0x4D:
+            return @"tiff";
+    }
+    
+    return nil;
 }
 
 @end

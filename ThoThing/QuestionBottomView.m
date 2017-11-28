@@ -800,14 +800,12 @@
 
 - (void)onDResetInterval
 {
-//    [SendBird disconnect];
     [self joinDRoom];
     [self updateDList];
 }
 
 - (void)onQResetInterval
 {
-//    [SendBird disconnect];
     [self joinQRoom];
     [self updateQList];
 }
@@ -840,6 +838,8 @@
 
 - (void)joinDRoom
 {
+    return;
+    
     NSString *str_ChannelUrl = [NSString stringWithFormat:@"thotingQuestion_explain_%@", self.str_QId];
     NSString *str_ChannelName = [NSString stringWithFormat:@"%@문제지 %@번 질문과답", self.str_ExamId, self.str_QId];
     //    NSString *str_ChannelName = [NSString stringWithFormat:@"%@문제지 %@번 문제풀이", self.str_ExamId, self.str_QuestionId];
@@ -1124,6 +1124,7 @@
 
 - (void)updateDList
 {
+    return;
     NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
                                         [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
                                         [Util getUUID], @"uuid",
@@ -1197,6 +1198,8 @@
 
 - (void)updateQList
 {
+    return;
+
     NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
                                         [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
                                         [Util getUUID], @"uuid",
@@ -3344,7 +3347,7 @@
                                         [dic objectForKey:@"type"], @"type",
                                         nil];
     
-    [[WebAPI sharedData] imageUpload:@"v1/attach/file/uploader"
+    [[WebAPI sharedData] imageUpload:@"v1/chat/file/uploader"
                                param:dicM_Params
                           withImages:[NSDictionary dictionaryWithObject:[dic objectForKey:@"obj"] forKey:@"file"]
                            withBlock:^(id resulte, NSError *error) {

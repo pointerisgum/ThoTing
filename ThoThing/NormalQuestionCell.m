@@ -14,7 +14,7 @@
     [super awakeFromNib];
     // Initialization code
     
-    self.sv_Contents.backgroundColor = [UIColor colorWithRed:245.f/255.f green:245.f/255.f blue:245.f/255.f alpha:1];
+//    self.sv_Contents.backgroundColor = [UIColor colorWithRed:245.f/255.f green:245.f/255.f blue:245.f/255.f alpha:1];
     self.sv_Contents.scrollEnabled = NO;
     self.iv_User.contentMode = UIViewContentModeScaleAspectFill;
     self.iv_User.clipsToBounds = YES;

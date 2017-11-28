@@ -364,15 +364,15 @@ static inline CGSize CTFramesetterSuggestFrameSizeForAttributedStringWithConstra
     NSMutableDictionary *mutableInactiveLinkAttributes = [NSMutableDictionary dictionary];
     [mutableInactiveLinkAttributes setObject:[NSNumber numberWithBool:NO] forKey:(NSString *)kCTUnderlineStyleAttributeName];
 
-    if ([NSMutableParagraphStyle class]) {
-        [mutableLinkAttributes setObject:[UIColor whiteColor] forKey:(NSString *)kCTForegroundColorAttributeName];  //링크시 표현될 색상
-        [mutableActiveLinkAttributes setObject:[UIColor whiteColor] forKey:(NSString *)kCTForegroundColorAttributeName];
-        [mutableInactiveLinkAttributes setObject:[UIColor whiteColor] forKey:(NSString *)kCTForegroundColorAttributeName];
-    } else {
-        [mutableLinkAttributes setObject:(__bridge id)[[UIColor whiteColor] CGColor] forKey:(NSString *)kCTForegroundColorAttributeName];   //링크시 표현될 색상
-        [mutableActiveLinkAttributes setObject:(__bridge id)[[UIColor whiteColor] CGColor] forKey:(NSString *)kCTForegroundColorAttributeName];
-        [mutableInactiveLinkAttributes setObject:(__bridge id)[[UIColor whiteColor] CGColor] forKey:(NSString *)kCTForegroundColorAttributeName];
-    }
+//    if ([NSMutableParagraphStyle class]) {
+//        [mutableLinkAttributes setObject:[UIColor whiteColor] forKey:(NSString *)kCTForegroundColorAttributeName];  //링크시 표현될 색상
+//        [mutableActiveLinkAttributes setObject:[UIColor whiteColor] forKey:(NSString *)kCTForegroundColorAttributeName];
+//        [mutableInactiveLinkAttributes setObject:[UIColor whiteColor] forKey:(NSString *)kCTForegroundColorAttributeName];
+//    } else {
+//        [mutableLinkAttributes setObject:(__bridge id)[[UIColor whiteColor] CGColor] forKey:(NSString *)kCTForegroundColorAttributeName];   //링크시 표현될 색상
+//        [mutableActiveLinkAttributes setObject:(__bridge id)[[UIColor whiteColor] CGColor] forKey:(NSString *)kCTForegroundColorAttributeName];
+//        [mutableInactiveLinkAttributes setObject:(__bridge id)[[UIColor whiteColor] CGColor] forKey:(NSString *)kCTForegroundColorAttributeName];
+//    }
 
     self.linkAttributes = [NSDictionary dictionaryWithDictionary:mutableLinkAttributes];
     self.activeLinkAttributes = [NSDictionary dictionaryWithDictionary:mutableActiveLinkAttributes];

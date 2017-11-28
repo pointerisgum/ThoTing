@@ -890,25 +890,25 @@
 
 - (IBAction)goHome:(id)sender
 {
-    AppDelegate *appDelegate = (AppDelegate *)[[UIApplication sharedApplication] delegate];
-    appDelegate.isChannelMode = NO;
-    
-    NSArray *myViewControllers = appDelegate.vc_Main.viewControllers;
-    for (UINavigationController *navViewController in myViewControllers)
-    {
-        UIViewController *ctrl = navViewController.topViewController;
-        if( [ctrl isKindOfClass:[ChatFeedMainViewController class]] )
-        {
-            ChatFeedMainViewController *vc_Tmp = (ChatFeedMainViewController *)ctrl;
-            [vc_Tmp updateSendBirdDelegate];    //홈화면에서 메인화면으로 전환 후 샌드버드 델리게이트 업데이트
-        }
-    }
-
-    [self dismissViewControllerAnimated:YES completion:^{
-        
-    }];
 //    AppDelegate *appDelegate = (AppDelegate *)[[UIApplication sharedApplication] delegate];
-//    [appDelegate showMainView];
+//    appDelegate.isChannelMode = NO;
+//
+//    NSArray *myViewControllers = appDelegate.vc_Main.viewControllers;
+//    for (UINavigationController *navViewController in myViewControllers)
+//    {
+//        UIViewController *ctrl = navViewController.topViewController;
+//        if( [ctrl isKindOfClass:[ChatFeedMainViewController class]] )
+//        {
+//            ChatFeedMainViewController *vc_Tmp = (ChatFeedMainViewController *)ctrl;
+//            [vc_Tmp updateSendBirdDelegate];    //홈화면에서 메인화면으로 전환 후 샌드버드 델리게이트 업데이트
+//        }
+//    }
+//
+//    [self dismissViewControllerAnimated:YES completion:^{
+//
+//    }];
+////    AppDelegate *appDelegate = (AppDelegate *)[[UIApplication sharedApplication] delegate];
+////    [appDelegate showMainView];
 }
 
 - (IBAction)goAddFeed:(id)sender

@@ -25,6 +25,7 @@
     NSInteger nSelectedIdx;
     CGFloat fBottomHeight;
 }
+@property (nonatomic, strong) NSMutableArray *arM_SelectItem;
 @property (nonatomic, strong) NSMutableArray *arM_TopList;
 @property (nonatomic, strong) NSMutableDictionary *dicM_List;
 @property (nonatomic, strong) NSMutableDictionary *dicM_TbvList;
@@ -42,6 +43,7 @@
 @property (nonatomic, weak) IBOutlet UIView *v_Bottom;
 @property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_ContentsWidth;
 @property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_CotentsBottom;
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_BackWidth;
 @end
 
 @implementation SearchBarViewController
@@ -51,6 +53,18 @@
     // Do any additional setup after loading the view.
     
     kMenuWidth = (self.view.bounds.size.width / 6) + 4;
+    
+    if( self.isBotMakeMode )
+    {
+        if( self.ar_DidSelectList )
+        {
+            self.arM_SelectItem = [NSMutableArray arrayWithArray:self.ar_DidSelectList];
+        }
+        else
+        {
+            self.arM_SelectItem = [NSMutableArray array];
+        }
+    }
     
     self.dicM_List = [NSMutableDictionary dictionary];
     self.dicM_TbvList = [NSMutableDictionary dictionary];
@@ -62,6 +76,11 @@
     {
         self.searchBar.text = self.str_SearchWord;
         self.lc_CancelWidth.constant = 60.f;
+    }
+    else if( self.isBotMakeMode )
+    {
+        self.lc_CancelWidth.constant = 0.f;
+        self.lc_BackWidth.constant = 60.f;
     }
     else
     {
@@ -126,7 +145,15 @@
 
     if( self.lc_CancelWidth.constant < 60.f )
     {
-        self.lc_CancelWidth.constant = 60.0f;
+        if( self.isBotMakeMode )
+        {
+            self.lc_CancelWidth.constant = 0.f;
+        }
+        else
+        {
+            self.lc_CancelWidth.constant = 60.0f;
+        }
+        
         [self.view setNeedsUpdateConstraints];
         
         [UIView animateWithDuration:0.1f animations:^{
@@ -659,18 +686,48 @@
         
         UIWindow *window = [[UIApplication sharedApplication] keyWindow];
         UIButton *btn_Info = [UIButton buttonWithType:UIButtonTypeCustom];
-        btn_Info.frame = CGRectMake(window.bounds.size.width - 55, 0, 40, 100);
+        if( self.isBotMakeMode )
+        {
+            btn_Info.frame = CGRectMake(window.bounds.size.width - 55, 0, 40, 50);
+        }
+        else
+        {
+            btn_Info.frame = CGRectMake(window.bounds.size.width - 55, 0, 40, 100);
+        }
         [btn_Info setImage:BundleImage(@"info.png") forState:UIControlStateNormal];
         btn_Info.tag = indexPath.section;
         [btn_Info addTarget:self action:@selector(onItemInfo:) forControlEvents:UIControlEventTouchUpInside];
 
-        
         [cell.contentView addSubview:iv_Cover];
         [cell.contentView addSubview:lb_Subject];
         [cell.contentView addSubview:lb_Title];
         [cell.contentView addSubview:lb_Tag];
         [cell.contentView addSubview:lb_Ower];
         [cell.contentView addSubview:btn_Info];
+
+        if( self.isBotMakeMode )
+        {
+            UIButton *btn_Check = [UIButton buttonWithType:UIButtonTypeCustom];
+            btn_Check.selected = NO;
+            btn_Check.frame = CGRectMake(window.bounds.size.width - 55, 50, 40, 50);
+            
+            [btn_Check setImage:BundleImage(@"kik_cell_select_off.png") forState:UIControlStateNormal];
+            [btn_Check setImage:BundleImage(@"kik_cell_select_on.png") forState:UIControlStateSelected];
+            btn_Check.tag = indexPath.section;
+            [btn_Check addTarget:self action:@selector(onCheck:) forControlEvents:UIControlEventTouchUpInside];
+            
+            for( NSInteger i = 0; i < self.arM_SelectItem.count; i++ )
+            {
+                NSDictionary *dic_Tmp = self.arM_SelectItem[i];
+                if( [dic_Tmp isEqual:dic] )
+                {
+                    btn_Check.selected = YES;
+                    break;
+                }
+            }
+            
+            [cell.contentView addSubview:btn_Check];
+        }
     }
     else
     {
@@ -755,6 +812,26 @@
     UIView *v_Section = [[UIView alloc] initWithFrame:CGRectMake(0, 0, tableView.frame.size.width, 10)];
     v_Section.backgroundColor = [UIColor colorWithRed:240.f/255.f green:240.f/255.f blue:240.f/255.f alpha:1];
     return v_Section;
+}
+
+- (void)onCheck:(UIButton *)btn
+{
+    NSArray *ar_List = [self.dicM_List objectForKey:[NSString stringWithFormat:@"%ld", nSelectedIdx]];
+    NSDictionary *dic = ar_List[btn.tag];
+
+    for( NSInteger i = 0; i < self.arM_SelectItem.count; i++ )
+    {
+        NSDictionary *dic_Tmp = self.arM_SelectItem[i];
+        if( [dic_Tmp isEqual:dic] )
+        {
+            [self.arM_SelectItem removeObject:dic];
+            [self reloadList];
+            return;
+        }
+    }
+    
+    [self.arM_SelectItem addObject:dic];
+    [self reloadList];
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView
@@ -902,6 +979,16 @@
         
     }];
     
+}
+
+- (IBAction)goBack:(id)sender
+{
+    if( self.completionBlock )
+    {
+        self.completionBlock(self.arM_SelectItem);
+    }
+    
+    [self.navigationController popViewControllerAnimated:YES];
 }
 
 @end

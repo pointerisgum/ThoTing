@@ -114,6 +114,7 @@
                                             if( nCode == 200 )
                                             {
                                                 NSDictionary *dic = [resulte objectForKey:@"result"];
+                                                [[NSUserDefaults standardUserDefaults] setObject:[resulte objectForKey:@"userImg_prefix"] forKey:@"userImg_prefix"];
                                                 [[NSUserDefaults standardUserDefaults] setObject:[resulte objectForKey:@"apiToken"] forKey:@"apiToken"];
                                                 [[NSUserDefaults standardUserDefaults] setObject:[resulte objectForKey:@"secretKey"] forKey:@"secretKey"];
                                                 [[NSUserDefaults standardUserDefaults] setObject:self.tf_Id.text forKey:@"email"];
@@ -137,7 +138,7 @@
                                                 
                                                 NSData *followChannelData = [NSKeyedArchiver archivedDataWithRootObject:[resulte objectForKey:@"followChannelInfo"]];
                                                 [[NSUserDefaults standardUserDefaults] setObject:followChannelData forKey:@"followChannelInfo"];
-                                                [[NSUserDefaults standardUserDefaults] setObject:[dic objectForKey:@"userPic"] forKey:@"userPic"];
+//                                                [[NSUserDefaults standardUserDefaults] setObject:[dic objectForKey:@"userPic"] forKey:@"userPic"];
                                                 [[NSUserDefaults standardUserDefaults] synchronize];
                                                 
                                                 
@@ -184,10 +185,16 @@
                                                             
                                                         }];
 
-                                                        [SBDMain updateCurrentUserInfoWithNickname:str_UserName
-                                                                                        profileUrl:[[NSUserDefaults standardUserDefaults] objectForKey:@"userPic"]
+                                                        SBDUser *user = [SBDMain getCurrentUser];
+                                                        NSLog(@"%@", user.profileUrl);
+                                                        
+                                                        [[NSUserDefaults standardUserDefaults] setObject:user.profileUrl forKey:@"userPic"];
+                                                        [[NSUserDefaults standardUserDefaults] synchronize];
+
+                                                        [SBDMain updateCurrentUserInfoWithNickname:user.nickname
+                                                                                        profileUrl:user.profileUrl
                                                                                  completionHandler:^(SBDError * _Nullable error) {
-                                                                                     
+
                                                                                  }];
                                                     }
                                                 }];

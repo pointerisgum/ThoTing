@@ -21,4 +21,8 @@
 @property (nonatomic, weak) IBOutlet UIView *v_BadgeGuide;
 @property (nonatomic, weak) IBOutlet UILabel *lb_GroupCount;
 @property (nonatomic, weak) IBOutlet UILabel *lb_TotalUser;
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_ThumbWidth;
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_ThumbHeight;
+@property (nonatomic, weak) IBOutlet UIImageView *iv_User1;
+@property (nonatomic, weak) IBOutlet UIImageView *iv_User2;
 @end

@@ -268,7 +268,7 @@
     if( [str_Type isEqualToString:@"text"] || [str_Type isEqualToString:@"pdf"] )
     {
         NSString *str_Body = [dic objectForKey:@"questionText"];
-        if( [str_Body isKindOfClass:[NSNull class]] == NO )
+        if( [str_Body isEqual:[NSNull class]] == NO )
         {
             str_Body = [str_Body stringByReplacingOccurrencesOfString:@"\n" withString:@""];
             cell.lb_Title.text = str_Body;

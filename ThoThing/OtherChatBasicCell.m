@@ -42,6 +42,9 @@
 {
     [super layoutSubviews];
     
+    [self.lb_Contents updateConstraintsIfNeeded];
+    [self.lb_Contents layoutIfNeeded];
+    
     [self.contentView updateConstraintsIfNeeded];
     [self.contentView layoutIfNeeded];
     
@@ -49,6 +52,7 @@
 //    self.lb_Contents.preferredMaxLayoutWidth = self.frame.size.width - 180;
     
     self.lb_Contents.preferredMaxLayoutWidth = self.frame.size.width - kChatMargin;
+    [self.lb_Contents setNeedsUpdateConstraints];
 }
 
 @end

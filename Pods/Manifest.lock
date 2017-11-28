@@ -1,4 +1,7 @@
 PODS:
+  - APAddressBook (0.3.1):
+    - APAddressBook/Core (= 0.3.1)
+  - APAddressBook/Core (0.3.1)
   - GGLInstanceID (1.2.1)
   - Google/CloudMessaging (2.0.4):
     - GGLInstanceID (~> 1.0)
@@ -31,6 +34,7 @@ PODS:
   - youtube-ios-player-helper (0.1.6)
 
 DEPENDENCIES:
+  - APAddressBook
   - Google/CloudMessaging
   - GSKStretchyHeaderView
   - MXParallaxHeader
@@ -40,6 +44,7 @@ DEPENDENCIES:
   - youtube-ios-player-helper (~> 0.1.1)
 
 SPEC CHECKSUMS:
+  APAddressBook: f7e50fce276ae975c202b83b0ee98f4efde5a104
   GGLInstanceID: 4a317044f744281b82cd03015f379899f277cad3
   Google: d536877ec602555b755cc28ce6fed104825c693c
   GoogleCloudMessaging: f37ea14dd0f41d4d889c10b5559dd35bbfd9ac26
@@ -55,6 +60,6 @@ SPEC CHECKSUMS:
   TTTAttributedLabel: 8cffe8e127e4e82ff3af1e5386d4cd0ad000b656
   youtube-ios-player-helper: 21ab92db027c7ff86cb17a3843a3f6eafc8158d2
 
-PODFILE CHECKSUM: 71e34e4829079963b942bef316dc8658f7231c31
+PODFILE CHECKSUM: 35a2b007ece69a71fcec297cd7e45a433eb2987a
 
 COCOAPODS: 1.2.1

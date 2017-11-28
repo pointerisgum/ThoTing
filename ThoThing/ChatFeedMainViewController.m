@@ -15,6 +15,12 @@
 #import "OnlineCell.h"
 #import "ReciveSendViewController.h"
 #import "OnlineBotCell.h"
+#import "KikMyViewController.h"
+#import "KikMenuViewController.h"
+#import "KikGroupMakeViewController.h"
+#import "KikGroupsViewController.h"
+#import "KikBotMainViewController.h"
+#import "KikMainSearchViewController.h"
 
 @interface ChatFeedMainViewController () <SBDChannelDelegate, SWTableViewCellDelegate>
 {
@@ -24,6 +30,7 @@
 @property (nonatomic, strong) NSTimer *tm_OffLine;
 @property (nonatomic, strong) NSString *str_CurrentChannel;
 @property (nonatomic, strong) NSMutableArray *arM_List;
+@property (nonatomic, strong) NSMutableArray *arM_DicList;
 @property (nonatomic, strong) NSMutableArray *arM_Online;
 //@property (nonatomic, strong) NSMutableDictionary *dicM_Count;
 @property (nonatomic, strong) ODRefreshControl *refreshControl;
@@ -34,6 +41,7 @@
 @property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_OnlineHeight;
 @property (nonatomic, weak) IBOutlet UICollectionView *cv_Online;
 @property (nonatomic, weak) IBOutlet UIButton *btn_Close;
+@property (nonatomic, weak) IBOutlet UIButton *btn_Menu;
 @end
 
 @implementation ChatFeedMainViewController
@@ -78,6 +86,13 @@
     [super viewDidLoad];
     // Do any additional setup after loading the view.
     
+    NSData *data = [[NSUserDefaults standardUserDefaults] objectForKey:@"DashBoardList"];
+    self.arM_DicList = [NSMutableArray arrayWithArray:[NSKeyedUnarchiver unarchiveObjectWithData:data]];
+    if( self.arM_DicList && self.arM_DicList.count > 0 )
+    {
+        [self.tbv_List reloadData];
+    }
+
     if( self.isChannelMode )
     {
         self.btn_Close.hidden = NO;
@@ -89,6 +104,11 @@
     
     self.iv_Icon.layer.cornerRadius = self.iv_Icon.frame.size.width / 2;
     
+//    NSString *str_UserPic = [[NSUserDefaults standardUserDefaults] objectForKey:@"userPic"];
+    SBDUser *user = [SBDMain getCurrentUser];
+    [self.iv_Icon sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"no_image.png")];
+    [self setIcon:user.profileUrl];
+
     NSString *str_NormalQKey = [NSString stringWithFormat:@"NormalQuestion_%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
     NSData *tempData = [[NSUserDefaults standardUserDefaults] objectForKey:str_NormalQKey];
     if( tempData == nil )
@@ -109,15 +129,17 @@
         [[NSUserDefaults standardUserDefaults] synchronize];
     }
 
-//    self.openChannelListQuery = [SBDOpenChannel createOpenChannelListQuery];
-//    [self.openChannelListQuery loadNextPageWithCompletionHandler:^(NSArray<SBDOpenChannel *> * _Nullable channels, SBDError * _Nullable error) {
-//        
-//        
+//    SBDOpenChannelListQuery *q = [SBDOpenChannel createOpenChannelListQuery];
+//    q.limit = 100;
+//
+//    [q loadNextPageWithCompletionHandler:^(NSArray<SBDOpenChannel *> * _Nullable channels, SBDError * _Nullable error) {
+//
+//
 //    }];
     
     
 //    [self startSendBird];
-    [self performSelector:@selector(onChannelJoinInterval) withObject:nil afterDelay:1.0f];
+//    [self performSelector:@selector(onChannelJoinInterval) withObject:nil afterDelay:1.0f];
 
 //    //10초에 한번씩 오프라인 작업이 있는지 타이머를 돌려서 처리 체크
 //    self.tm_OffLine = [NSTimer scheduledTimerWithTimeInterval:60.f target:self selector:@selector(onOffLineTask) userInfo:nil repeats:YES];
@@ -137,11 +159,12 @@
     self.refreshControl.tintColor = kMainYellowColor;
     [self.refreshControl addTarget:self action:@selector(onRefresh:) forControlEvents:UIControlEventValueChanged];
     [self.tbv_List addSubview:self.refreshControl];
-    
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onReload) name:@"ChatFeedReloadNoti" object:nil];
+
+//    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onReload) name:@"ChatFeedReloadNoti" object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onDashBoardUpdate:) name:@"DashBoardUpdate" object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onRemoveDashboardItem:) name:@"RemoveDashboardItem" object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onMessagePushNoti:) name:@"MessagePushNoti" object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onReload) name:@"NOTI_RELOAD_DASHBOARD" object:nil];
 //    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onTest33) name:@"Test33" object:nil];
 
 //    NSString *str_Key = [NSString stringWithFormat:@"DashBoardCount_%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
@@ -172,7 +195,11 @@
                                                 name:UIApplicationDidBecomeActiveNotification
                                               object:nil];
 
-    
+    [[NSNotificationCenter defaultCenter]addObserver:self
+                                            selector:@selector(onDashBoardReloadNoti)
+                                                name:@"OnDashBoardReloadNoti"
+                                              object:nil];
+
     NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
                                         [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
                                         [Util getUUID], @"uuid",
@@ -195,7 +222,7 @@
                                                 {
                                                     [[NSUserDefaults standardUserDefaults] setObject:@"Y" forKey:@"isTeacher"];
                                                     
-                                                    [self updateTopIcon];
+//                                                    [self updateTopIcon];
                                                 }
                                                 else
                                                 {
@@ -218,7 +245,19 @@
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
+
+    SBDUser *user = [SBDMain getCurrentUser];
+    [self.iv_Icon sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"no_image.png")];
+
+    [self updateBadgeCount];
+
+    str_ImagePrefix = [[NSUserDefaults standardUserDefaults] objectForKey:@"userImg_prefix"];
+    if( str_ImagePrefix == nil || str_ImagePrefix.length <= 0 )
+    {
+        str_ImagePrefix = @"http://data.thoting.com:8282/c_edujm/images/user/";
+    }
     
+
     self.hidesBottomBarWhenPushed = NO;
     
     [SBDMain addChannelDelegate:self identifier:@"chatfeedmain"];
@@ -240,18 +279,18 @@
     
     //    [self.tbv_List reloadData];
     
-    [self updateTopIcon];
-    [self updateOnlineUser];
+//    [self updateTopIcon];
+//    [self updateOnlineUser];
     
     static BOOL isOnce = YES;
     if( isOnce )
     {
         isOnce = NO;
-        [self updateList];
+//        [self updateList];
     }
     else
     {
-        [self updateList];
+//        [self updateList];
 //        SBDGroupChannelListQuery *query = [SBDGroupChannel createMyGroupChannelListQuery];
 //        query.limit = 100;
 //        query.order = SBDGroupChannelListOrderLatestLastMessage;
@@ -307,6 +346,33 @@
     
     str_Path = [NSString stringWithFormat:@"%@/api/v1/get/my/channel/qna/chat/room/list", kBaseUrl];
     [[WebAPI sharedData] cancelMethod:@"GET" withPath:str_Path];
+}
+
+- (void)updateBadgeCount
+{
+    NSString *str_MyUserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+    NSString *str_Path = [NSString stringWithFormat:@"v3/users/%@/unread_count", str_MyUserId];
+    [[WebAPI sharedData] callAsyncSendBirdAPIBlock:str_Path
+                                             param:nil
+                                        withMethod:@"GET"
+                                         withBlock:^(id resulte, NSError *error) {
+                                             
+                                             if( resulte )
+                                             {
+                                                 NSInteger nTotalUnReadCount = [[resulte objectForKey:@"unread_count"] integerValue];
+                                                 UITabBarItem *item = [self.tabBarController.tabBar.items objectAtIndex:kTabBarBadgeIdx];
+                                                 if( nTotalUnReadCount > 0 )
+                                                 {
+                                                     item.badgeValue = [NSString stringWithFormat:@"%ld", nTotalUnReadCount];
+                                                     [UIApplication sharedApplication].applicationIconBadgeNumber = nTotalUnReadCount;
+                                                 }
+                                                 else
+                                                 {
+                                                     item.badgeValue = nil;
+                                                     [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
+                                                 }
+                                             }
+                                         }];
 }
 
 - (void)updateSendBirdDelegate
@@ -441,6 +507,7 @@
                                                 }
                                                 
                                                 [weakSelf.cv_Online reloadData];
+                                                [weakSelf.tbv_List reloadData];
                                             }
                                         }
                                     }];
@@ -737,9 +804,17 @@
     [self joinMainChannel];
 }
 
+- (void)onDashBoardReloadNoti
+{
+    SBDUser *user = [SBDMain getCurrentUser];
+    [self.iv_Icon sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"no_image.png")];
+
+    [self updateList];
+}
+
 - (void)onReload
 {
-//    [self updateListWithIndicator:NO];
+    [self updateList];
 }
 
 - (void)viewDidAppear:(BOOL)animated
@@ -764,12 +839,13 @@
                                         str_ChannelUrl, @"channel_url",
                                         str_ChannelName, @"name",
                                         nil];
-
+    NSLog(@"1111111111111111111111111");
     [[WebAPI sharedData] callAsyncSendBirdAPIBlock:@"channel/create"
                                              param:dicM_Params
                                         withMethod:@"POST"
                                          withBlock:^(id resulte, NSError *error) {
 
+                                             NSLog(@"2222222222222222222222222");
                                              if( resulte )
                                              {
                                                  if( [[resulte objectForKey:@"error"] integerValue] == 1 )
@@ -810,13 +886,19 @@
 
 - (void)updateList
 {
+    __weak __typeof__(self) weakSelf = self;
+    
     self.groupChannelListQuery = [SBDGroupChannel createMyGroupChannelListQuery];
-    self.groupChannelListQuery.limit = 100;
+    self.groupChannelListQuery.limit = 20;
+//    self.groupChannelListQuery.order = SBDGroupChannelListOrderChronological;   //시간순
     self.groupChannelListQuery.order = SBDGroupChannelListOrderLatestLastMessage;
     self.groupChannelListQuery.includeEmptyChannel = NO;   //아무 대화가 없는 채널 보일지 말지 (YES는 보이는거)
 //    self.groupChannelListQuery.customTypeFilter = self.str_ChannelId;
+    
     NSLog(@"%@", self.str_ChannelId);
+    NSLog(@"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
     [self.groupChannelListQuery loadNextPageWithCompletionHandler:^(NSArray<SBDGroupChannel *> * _Nullable channels, SBDError * _Nullable error) {
+        
         if (error != nil)
         {
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -824,6 +906,11 @@
             });
             
             return;
+        }
+
+        if(channels.count > 0 )
+        {
+            NSLog(@"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         }
 
         NSMutableArray *arM_Tmp = [NSMutableArray array];
@@ -857,32 +944,15 @@
             self.arM_List = [NSMutableArray arrayWithArray:channels];
         }
         
-        NSInteger nTotalUnReadCount = 0;
-        for( NSInteger i = 0; i < self.arM_List.count; i++ )
-        {
-            SBDGroupChannel *groupChannel = self.arM_List[i];
-            nTotalUnReadCount += groupChannel.unreadMessageCount;
-        }
+        [self saveDashBoardData];
         
-        NSLog(@"nTotalUnReadCount : %ld", nTotalUnReadCount);
         
-        UITabBarItem *item = [self.tabBarController.tabBar.items objectAtIndex:kTabBarBadgeIdx];
-        if( nTotalUnReadCount > 0 )
-        {
-            item.badgeValue = [NSString stringWithFormat:@"%ld", nTotalUnReadCount];
-            [UIApplication sharedApplication].applicationIconBadgeNumber = nTotalUnReadCount;
-        }
-        else
-        {
-            item.badgeValue = nil;
-            [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
-        }
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self.tbv_List reloadData];
+            [weakSelf.tbv_List reloadData];
             
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(300 * NSEC_PER_MSEC)), dispatch_get_main_queue(), ^{
-                [self.refreshControl endRefreshing];
+                [weakSelf.refreshControl endRefreshing];
             });
         });
     }];
@@ -917,6 +987,48 @@
 //            });
 //        });
 //    }];
+}
+
+- (void)loadChannels
+{
+    __weak __typeof__(self) weakSelf = self;
+
+    if ([self.groupChannelListQuery hasNext] == NO)
+    {
+        return;
+    }
+
+    [self.groupChannelListQuery loadNextPageWithCompletionHandler:^(NSArray<SBDGroupChannel *> * _Nullable channels, SBDError * _Nullable error) {
+        
+        if (error != nil)
+        {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [weakSelf.refreshControl endRefreshing];
+            });
+            
+            return;
+        }
+        
+        if(channels.count > 0 )
+        {
+            NSLog(@"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        }
+        
+        
+        
+        [weakSelf.arM_List addObjectsFromArray:channels];
+//        for (SBDGroupChannel *channel in channels)
+//        {
+//            [weakSelf.arM_List addObject:channel];
+//        }
+
+//        [self saveDashBoardData];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+//            [weakSelf.refreshControl endRefreshing];
+            [weakSelf.tbv_List reloadData];
+        });
+    }];
 }
 
 - (void)didReceiveMemoryWarning {
@@ -1087,25 +1199,25 @@
     [self.tbv_List reloadData];
     [self.tbv_List setNeedsLayout];
     
-    NSInteger nTotalBadgeCnt = 0;
-    for( NSInteger i = 0; i < self.arM_List.count; i++ )
-    {
-        NSDictionary *dic = self.arM_List[i];
-        NSInteger nBadgeCnt = [[dic objectForKey:@"newQnaCount"] integerValue];
-        nTotalBadgeCnt += nBadgeCnt;
-    }
-    
-    UITabBarItem *item = [self.tabBarController.tabBar.items objectAtIndex:kTabBarBadgeIdx];
-    if( nTotalBadgeCnt > 0 )
-    {
-        item.badgeValue = [NSString stringWithFormat:@"%ld", nTotalBadgeCnt];
-        [UIApplication sharedApplication].applicationIconBadgeNumber = nTotalBadgeCnt;
-    }
-    else
-    {
-        item.badgeValue = nil;
-        [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
-    }
+//    NSInteger nTotalBadgeCnt = 0;
+//    for( NSInteger i = 0; i < self.arM_List.count; i++ )
+//    {
+//        NSDictionary *dic = self.arM_List[i];
+//        NSInteger nBadgeCnt = [[dic objectForKey:@"newQnaCount"] integerValue];
+//        nTotalBadgeCnt += nBadgeCnt;
+//    }
+//
+//    UITabBarItem *item = [self.tabBarController.tabBar.items objectAtIndex:kTabBarBadgeIdx];
+//    if( nTotalBadgeCnt > 0 )
+//    {
+//        item.badgeValue = [NSString stringWithFormat:@"%ld", nTotalBadgeCnt];
+//        [UIApplication sharedApplication].applicationIconBadgeNumber = nTotalBadgeCnt;
+//    }
+//    else
+//    {
+//        item.badgeValue = nil;
+//        [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
+//    }
 }
 
 
@@ -1195,50 +1307,60 @@
                 
                 [groupChannel markAsRead];
 
-                [cell hideUtilityButtonsAnimated:YES];
-                
-                [self.arM_List removeObjectAtIndex:cell.tag];
-                [self.tbv_List reloadData];
-                
+//                [cell hideUtilityButtonsAnimated:YES];
+//
+//                [self.arM_List removeObjectAtIndex:cell.tag];
+//                [self.arM_DicList removeObjectAtIndex:cell.tag];
+//                [self.tbv_List reloadData];
+//
+//                NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self.arM_DicList];
+//                [[NSUserDefaults standardUserDefaults] setObject:data forKey:@"DashBoardList"];
+//                [[NSUserDefaults standardUserDefaults] synchronize];
+
                 [self leaveChat:groupChannel];
 
                 [groupChannel leaveChannelWithCompletionHandler:^(SBDError * _Nullable error) {
                     
+                    [self.arM_List removeObject:groupChannel];
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [self.tbv_List reloadData];
+                    });
                 }];
 
-                SBDBaseChannel *baseChannel = (SBDBaseChannel *)groupChannel;
-                NSDictionary *dic_Tmp = [NSJSONSerialization JSONObjectWithData:[groupChannel.data dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
-                NSDictionary *dic = [dic_Tmp objectForKey:@"qnaRoomInfos"];
-                NSString *str_RId = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"rId"]];
                 
-                NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                                    [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
-                                                    [Util getUUID], @"uuid",
-                                                    @"menu", @"pageInfo",
-                                                    @"hide", @"setMode",
-                                                    str_RId, @"rId",
-                                                    nil];
-                
-                [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/hide/my/qna/chat/room"
-                                                    param:dicM_Params
-                                               withMethod:@"POST"
-                                                withBlock:^(id resulte, NSError *error) {
-                                                    
-                                                    [MBProgressHUD hide];
-                                                    
-                                                    if( resulte )
-                                                    {
-                                                        NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
-                                                        if( nCode == 200 )
-                                                        {
-
-                                                        }
-                                                        else
-                                                        {
-
-                                                        }
-                                                    }
-                                                }];
+//                SBDBaseChannel *baseChannel = (SBDBaseChannel *)groupChannel;
+//                NSDictionary *dic_Tmp = [NSJSONSerialization JSONObjectWithData:[groupChannel.data dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+//                NSDictionary *dic = [dic_Tmp objectForKey:@"qnaRoomInfos"];
+//                NSString *str_RId = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"rId"]];
+//
+//                NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+//                                                    [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+//                                                    [Util getUUID], @"uuid",
+//                                                    @"menu", @"pageInfo",
+//                                                    @"hide", @"setMode",
+//                                                    str_RId, @"rId",
+//                                                    nil];
+//
+//                [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/hide/my/qna/chat/room"
+//                                                    param:dicM_Params
+//                                               withMethod:@"POST"
+//                                                withBlock:^(id resulte, NSError *error) {
+//
+//                                                    [MBProgressHUD hide];
+//
+//                                                    if( resulte )
+//                                                    {
+//                                                        NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+//                                                        if( nCode == 200 )
+//                                                        {
+//
+//                                                        }
+//                                                        else
+//                                                        {
+//
+//                                                        }
+//                                                    }
+//                                                }];
             }
         }];
     }
@@ -1285,47 +1407,29 @@
 
 - (void)leaveChat:(SBDBaseChannel *)channel
 {
-    NSString *str_UserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
-    NSString *str_UserName = [[NSUserDefaults standardUserDefaults] objectForKey:@"userName"];
-    NSString *str_Msg = [NSString stringWithFormat:@"%@님이 나갔습니다.", str_UserName];
-
-    //나감
+    SBDUser *user = [SBDMain getCurrentUser];
+    NSString *str_Msg = [NSString stringWithFormat:@"%@님이 나갔습니다", user.nickname];
     NSMutableDictionary *dicM_Param = [NSMutableDictionary dictionary];
     [dicM_Param setObject:@"ADMM" forKey:@"message_type"];
+    [dicM_Param setObject:user.userId forKey:@"user_id"];
     [dicM_Param setObject:str_Msg forKey:@"message"];
-    [dicM_Param setObject:@"cmd" forKey:@"custom_type"];
+    [dicM_Param setObject:@"USER_LEFT" forKey:@"custom_type"];
+    [dicM_Param setObject:@"true" forKey:@"is_silent"];
     
-    NSMutableDictionary *dicM_Data = [NSMutableDictionary dictionary];
-    [dicM_Data setObject:@"USER_LEFT" forKey:@"type"];
+    NSMutableDictionary *dicM_MessageData = [NSMutableDictionary dictionary];
+    [dicM_MessageData setObject:str_Msg forKey:@"message"];
     
-    NSMutableDictionary *dicM_Inviter = [NSMutableDictionary dictionary];
-    [dicM_Inviter setObject:str_UserId forKey:@"user_id"];
-    [dicM_Inviter setObject:str_UserName forKey:@"nickname"];
-    [dicM_Data setObject:dicM_Inviter forKey:@"sender"];
-    
-    
-//    NSMutableArray *arM_Users = [NSMutableArray array];
-//    NSArray *ar_Users = [NSArray arrayWithArray:data];
-//    for( NSInteger i = 0; i < ar_Users.count; i++ )
-//    {
-//        NSDictionary *dic_User = ar_Users[i];
-//        NSString *str_UserId = [NSString stringWithFormat:@"%@", [dic_User objectForKey:@"userId"]];
-//        [arM_Users addObject:@{@"user_id":str_UserId, @"nickname":[dic_User objectForKey:@"userName"]}];
-//    }
-    [dicM_Data setObject:[NSArray array] forKey:@"users"];
-    
-    [dicM_Data setObject:str_Msg forKey:@"message"];
+    NSMutableDictionary *dicM_Sender = [NSMutableDictionary dictionary];
+    [dicM_Sender setObject:user.nickname forKey:@"nickname"];
+    [dicM_Sender setObject:user.userId forKey:@"user_id"];
+    [dicM_MessageData setObject:dicM_Sender forKey:@"sender"];
     
     NSError *error;
-    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_Data
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_MessageData
                                                        options:NSJSONWritingPrettyPrinted
                                                          error:&error];
     NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-    
     [dicM_Param setObject:jsonString forKey:@"data"];
-    
-    //        [dicM_Param setObject:@"true" forKey:@"is_silent"];
-    [dicM_Param setObject:@"true" forKey:@"is_silent"];
     
     NSString *str_Path = [NSString stringWithFormat:@"v3/group_channels/%@/messages", channel.channelUrl];
     [[WebAPI sharedData] callAsyncSendBirdAPIBlock:str_Path
@@ -1338,6 +1442,32 @@
                                                  
                                              }
                                          }];
+    
+    NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:[channel.data dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+                                        [Util getUUID], @"uuid",
+                                        [NSString stringWithFormat:@"%@", [dic objectForKey:@"rId"]], @"rId",
+                                        nil];
+    
+    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/chat/room/leave"
+                                        param:dicM_Params
+                                   withMethod:@"POST"
+                                    withBlock:^(id resulte, NSError *error) {
+                                        
+                                        [MBProgressHUD hide];
+                                        
+                                        if( resulte )
+                                        {
+                                            NSLog(@"resulte : %@", resulte);
+                                            
+                                            NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+                                            if( nCode == 200 )
+                                            {
+
+                                            }
+                                        }
+                                    }];
 }
 
 
@@ -1388,63 +1518,385 @@
     cell.delegate = self;
 
     cell.iv_User.backgroundColor = [UIColor clearColor];
-
+//    cell.iv_User1.backgroundColor = [UIColor clearColor];
+//    cell.iv_User2.backgroundColor = [UIColor clearColor];
+    
     SBDGroupChannel *groupChannel = self.arM_List[indexPath.row];
     SBDBaseChannel *baseChannel = (SBDBaseChannel *)groupChannel;
-    NSDictionary *dic_Tmp = [NSJSONSerialization JSONObjectWithData:[groupChannel.data dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
-    NSDictionary *dic = [dic_Tmp objectForKey:@"qnaRoomInfos"];
+    SBDUserMessage *lastMessage = (SBDUserMessage *)groupChannel.lastMessage;
+    NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:[groupChannel.data dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+//    NSDictionary *dic = [dic_Tmp objectForKey:@"qnaRoomInfos"];
+
+//    NSDictionary *dic_Main = self.arM_DicList[indexPath.row];
+//    NSDictionary *dic = [dic_Main objectForKey:@"info"];
+//    NSString *str_RoomName = [dic_Main objectForKey:@"name"];
+//    NSInteger nMemberCount = [[dic_Main objectForKey:@"memberCount"] integerValue];
+//    NSArray *ar_Members = [NSArray arrayWithArray:[dic_Main objectForKey:@"members"]];
+//    NSInteger nUnreadMessageCount = [[dic_Main objectForKey:@"unreadMessageCount"] integerValue];
+//    NSString *str_CustomType = [dic_Main objectForKey:@"customType"];
+//    NSString *str_LastMessage = [dic_Main objectForKey:@"message"];
+//    NSString *str_LastMessageCreateAt = [NSString stringWithFormat:@"%@", [dic_Main objectForKey:@"lastMessageCreatedAt"]];
+//    long long llLastMessageCreatedAt = [str_LastMessageCreateAt longLongValue];
+//    NSString *str_ChannelCreateAt = [NSString stringWithFormat:@"%@", [dic_Main objectForKey:@"channelCreatedAt"]];
+//    long long llChannelCreatedAt = [str_ChannelCreateAt longLongValue];
+
 
     cell.iv_User.image = BundleImage(@"");
+    cell.iv_User1.image = BundleImage(@"");
+    cell.iv_User2.image = BundleImage(@"");
     cell.lb_Title.text = @"";
     cell.lb_GroupCount.text = @"";
     
+    cell.iv_User.hidden = NO;
+    cell.iv_User1.hidden = YES;
+    cell.iv_User2.hidden = YES;
+
     if( groupChannel.memberCount <= 2 )
     {
-        id userThumbnail = [dic objectForKey:@"userThumbnail"];
-        if( [userThumbnail isKindOfClass:[NSArray class]] == NO )
+        //1:1chat
+        if( groupChannel.memberCount == 1 )
         {
-            return cell;
+            SBDUser *user = groupChannel.members[0];
+            cell.lb_Title.text = user.nickname;
+            [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"")];
         }
-        
-        NSArray *ar = userThumbnail;
-        
-        for( NSInteger i = 0; i < ar.count; i++ )
+        else
         {
-            NSDictionary *dic_Tmp = [ar objectAtIndex:i];
-            if( [[dic_Tmp objectForKey:@"userId"] integerValue] != [[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"] integerValue] )
+            for( NSInteger i = 0; i < groupChannel.memberCount; i++ )
             {
-                //1:1 채팅일때 상대방 유저 사진
-                NSString *str_ImageUrl = [dic_Tmp objectForKey:@"imgUrl"];
-                if( [str_ImageUrl hasPrefix:@"http"] == NO )
+                SBDUser *user = groupChannel.members[i];
+                NSString *str_MyUserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+                if( [str_MyUserId isEqualToString:user.userId] == NO )
                 {
-                    if( str_ImagePrefix == nil || str_ImagePrefix.length <= 0 )
-                    {
-                        str_ImageUrl = [NSString stringWithFormat:@"%@%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userImg_prefix"], str_ImageUrl];
-                    }
-                    else
-                    {
-                        str_ImageUrl = [NSString stringWithFormat:@"%@%@", str_ImagePrefix, str_ImageUrl];
-                    }
+                    cell.lb_Title.text = user.nickname;
+                    [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"")];
+                    
+                    break;
                 }
-                [cell.iv_User setImageWithURL:[NSURL URLWithString:str_ImageUrl] usingCache:NO];
-                
-                //1:1 채팅일때 상대방 닉네임
-                cell.lb_Title.text = [dic_Tmp objectForKey_YM:@"userName"];
             }
         }
     }
     else
     {
-        //그룹 채팅일때 채팅방 전체 유저 수
-        cell.lb_GroupCount.text = [NSString stringWithFormat:@"%ld", groupChannel.memberCount];
+        //group chat
+        NSLog(@"groupChannel.customType: %@", groupChannel.customType);
+        if( [groupChannel.customType isEqualToString:@"channel"] )
+        {
+            //섬네일이 있는 그룹방
+            [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:groupChannel.coverUrl] placeholderImage:BundleImage(@"")];
+        }
+        else if( [groupChannel.customType isEqualToString:@"opengroup"] )
+        {
+            //이건 #채널 (항상 이미지와 타이틀이 있음)
+            [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:groupChannel.coverUrl] placeholderImage:BundleImage(@"")];
+        }
+        else if( [groupChannel.customType isEqualToString:@"group"] )
+        {
+            if( groupChannel.coverUrl.length > 0 )
+            {
+                [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:groupChannel.coverUrl] placeholderImage:BundleImage(@"")];
+            }
+            else
+            {
+                //이름과 섬네일이 없는 그룹방
+                cell.iv_User.hidden = YES;
+                cell.iv_User1.hidden = NO;
+                cell.iv_User2.hidden = NO;
+                
+                NSMutableArray *arM = [NSMutableArray arrayWithArray:groupChannel.members];
+                for( NSInteger i = 0; i < arM.count; i++ )
+                {
+                    //그룹 챗일 경우 내 이미지는 제거한다
+                    SBDUser *user = arM[i];
+                    NSString *str_MyId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+                    if( [str_MyId isEqualToString:user.userId] )
+                    {
+                        [arM removeObjectAtIndex:i];
+                        break;
+                    }
+                }
+                
+                for( NSInteger i = 0; i < 2; i++ )
+                {
+                    SBDUser *user = arM[i];
+                    if( i == 0 )
+                    {
+                        [cell.iv_User1 sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"")];
+                    }
+                    else if( i == 1 )
+                    {
+                        [cell.iv_User2 sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"")];
+                    }
+                }
+            }
+        }
+        else
+        {
+            for( NSInteger i = 0; i < groupChannel.memberCount; i++ )
+            {
+                SBDUser *user = groupChannel.members[i];
+                NSString *str_MyUserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+                if( [str_MyUserId isEqualToString:user.userId] == NO )
+                {
+                    cell.lb_Title.text = user.nickname;
+                    [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"")];
+                    
+                    break;
+                }
+            }
+        }
         
-        //그룹 채팅일때 방 만들때 방 제목 입력한거
-        cell.lb_Title.text = baseChannel.name;
-        
-        //그룹 채팅일때 원 배경색
-        cell.iv_User.backgroundColor = [UIColor colorWithHexString:[dic objectForKey_YM:@"codeHex"]];
-        cell.iv_User.image = BundleImage(@"");
+        cell.lb_Title.text = groupChannel.name;
     }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+//    BOOL isChatBot = [[NSString stringWithFormat:@"%@", [dic objectForKey:@"roomType"]] isEqualToString:@"chatBot"];
+////    if( 0 )
+////    {
+////        cell.lc_ThumbWidth.constant = 59.f;
+////        cell.lc_ThumbHeight.constant = 59.f;
+////        cell.iv_User.layer.cornerRadius = 20.f;
+////    }
+////    else
+////    {
+////        cell.lc_ThumbWidth.constant = 60.f;
+////        cell.lc_ThumbHeight.constant = 60.f;
+////        cell.iv_User.layer.cornerRadius = cell.lc_ThumbWidth.constant / 2;
+////    }
+//
+//
+//    if( groupChannel.memberCount <= 2 || isChatBot )
+//    {
+//        id userThumbnail = [dic objectForKey:@"userThumbnail"];
+//        if( [userThumbnail isKindOfClass:[NSArray class]] == NO )
+//        {
+//            if( isChatBot )
+//            {
+//                NSString *str_BotId = [NSString stringWithFormat:@"%@", [dic objectForKey:@"botUserId"]];
+//                for( NSInteger i = 0; i < groupChannel.memberCount; i++ )
+//                {
+//                    SBDUser *user = groupChannel.members[i];
+//                    if( [str_BotId isEqualToString:user.userId] )
+//                    {
+//                        [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"")];
+//                        break;
+//                    }
+//
+////                    NSDictionary *dic_User = groupChannel.members[i];
+////                    NSString *str_UserId = [NSString stringWithFormat:@"%@", [dic_User objectForKey:@"userId"]];
+////                    NSString *str_ProfileUrl = [NSString stringWithFormat:@"%@", [dic_User objectForKey:@"profileUrl"]];
+////                    if( [str_BotId isEqualToString:str_UserId] )
+////                    {
+////                        [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:str_ProfileUrl] placeholderImage:BundleImage(@"")];
+////                        break;
+////                    }
+//                }
+//
+//                cell.lb_Title.text = groupChannel.name;
+//            }
+//            else
+//            {
+//                NSString *str_ImageUrl = [dic objectForKey_YM:@"roomCoverUrl"];
+//                if( str_ImageUrl && str_ImageUrl.length > 0 )
+//                {
+//                    if( str_ImagePrefix == nil || str_ImagePrefix.length <= 0 )
+//                    {
+//                        str_ImageUrl = [NSString stringWithFormat:@"%@%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userImg_prefix"], str_ImageUrl];
+//                    }
+//                    else
+//                    {
+//                        str_ImageUrl = [NSString stringWithFormat:@"%@%@", str_ImagePrefix, str_ImageUrl];
+//                    }
+//                    [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:str_ImageUrl] placeholderImage:BundleImage(@"")];
+//                    //                [cell.iv_User setImageWithURL:[NSURL URLWithString:str_ImageUrl] usingCache:NO];
+//                }
+//                else
+//                {
+//                    NSString *str_BotId = [NSString stringWithFormat:@"%@", [dic objectForKey:@"botUserId"]];
+//                    for( NSInteger i = 0; i < groupChannel.memberCount; i++ )
+//                    {
+//                        SBDUser *user = groupChannel.members[i];
+//                        if( [str_BotId isEqualToString:user.userId] )
+//                        {
+//                            [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"")];
+//                            break;
+//                        }
+//
+////                        NSDictionary *dic_User = groupChannel.members[i];
+////                        NSString *str_UserId = [NSString stringWithFormat:@"%@", [dic_User objectForKey:@"userId"]];
+////                        NSString *str_ProfileUrl = [NSString stringWithFormat:@"%@", [dic_User objectForKey:@"profileUrl"]];
+////                        if( [str_BotId isEqualToString:str_UserId] )
+////                        {
+////                            [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:str_ProfileUrl] placeholderImage:BundleImage(@"")];
+////                            //                        [cell.iv_User setImageWithURL:[NSURL URLWithString:user.profileUrl] usingCache:NO];
+////                            break;
+////                        }
+//                    }
+//                }
+//
+//                cell.lb_Title.text = groupChannel.name;
+//            }
+//        }
+//        else
+//        {
+//            NSArray *ar = userThumbnail;
+//
+//            for( NSInteger i = 0; i < ar.count; i++ )
+//            {
+//                NSDictionary *dic_Tmp = [ar objectAtIndex:i];
+//                if( [[dic_Tmp objectForKey:@"userId"] integerValue] != [[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"] integerValue] )
+//                {
+//                    //1:1 채팅일때 상대방 유저 사진
+//                    NSString *str_ImageUrl = [dic_Tmp objectForKey:@"imgUrl"];
+//                    if( [str_ImageUrl hasPrefix:@"http"] == NO )
+//                    {
+//                        if( str_ImagePrefix == nil || str_ImagePrefix.length <= 0 )
+//                        {
+//                            str_ImageUrl = [NSString stringWithFormat:@"%@%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userImg_prefix"], str_ImageUrl];
+//                        }
+//                        else
+//                        {
+//                            str_ImageUrl = [NSString stringWithFormat:@"%@%@", str_ImagePrefix, str_ImageUrl];
+//                        }
+//                    }
+////                    [cell.iv_User setImageWithURL:[NSURL URLWithString:str_ImageUrl] usingCache:NO];
+//                    [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:str_ImageUrl] placeholderImage:BundleImage(@"")];
+//
+//                    //1:1 채팅일때 상대방 닉네임
+//                    cell.lb_Title.text = [dic_Tmp objectForKey_YM:@"userName"];
+//                }
+//            }
+//        }
+//    }
+//    else
+//    {
+//        //그룹 채팅일때 방 만들때 방 제목 입력한거
+//        cell.lb_Title.text = groupChannel.name;
+//
+//        NSString *str_CoverUrl = [dic objectForKey:@"roomCoverUrl"];
+//        NSLog(@"str_CoverUrl : %@", str_CoverUrl);
+//        if( str_CoverUrl )
+//        {
+//            NSURL *imageUrl = [NSURL URLWithString:[NSString stringWithFormat:@"%@%@", str_ImagePrefix, str_CoverUrl]];
+//            [cell.iv_User sd_setImageWithURL:imageUrl placeholderImage:BundleImage(@"")];
+//        }
+//        else
+//        {
+//            //그룹 채팅일때 채팅방 전체 유저 수
+//            cell.lb_GroupCount.text = [NSString stringWithFormat:@"%ld", groupChannel.memberCount];
+//
+//            //그룹 채팅일때 원 배경색
+//            cell.iv_User.backgroundColor = [UIColor colorWithHexString:[dic objectForKey_YM:@"codeHex"]];
+//            cell.iv_User.image = BundleImage(@"");
+//        }
+//    }
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+//    cell.iv_User1.hidden = YES;
+//    cell.iv_User2.hidden = YES;
+    
+////    //여기
+//    //유저 섬네일 표현 때문에 새로 추가한 로직 (위에꺼 무시 17.10.31)
+//    if( groupChannel.memberCount <= 2 )
+//    {
+//        //1:1 챗방
+//        cell.iv_User.hidden = NO;
+//        cell.iv_User1.hidden = YES;
+//        cell.iv_User2.hidden = YES;
+//        for( NSInteger i = 0; i < groupChannel.memberCount; i++ )
+//        {
+//            SBDUser *user = groupChannel.members[i];
+//
+//            NSString *str_MyId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+//            if( [str_MyId isEqualToString:user.userId] == NO )
+//            {
+//                [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"")];
+//                break;
+//            }
+//        }
+//    }
+//    else
+//    {
+//        //1:대 챗방
+//        cell.iv_User.hidden = YES;
+//        cell.iv_User1.hidden = NO;
+//        cell.iv_User2.hidden = NO;
+//
+//        NSMutableArray *arM = [NSMutableArray arrayWithArray:groupChannel.members];
+//        for( NSInteger i = 0; i < arM.count; i++ )
+//        {
+//            //그룹 챗일 경우 내 이미지는 제거한다
+//            SBDUser *user = arM[i];
+//            NSString *str_MyId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+//            if( [str_MyId isEqualToString:user.userId] )
+//            {
+//                [arM removeObjectAtIndex:i];
+//                break;
+//            }
+//        }
+//
+//        for( NSInteger i = 0; i < 2; i++ )
+//        {
+//            //그룹챗일 경우 몇명이건 상관없이 내 이미지를 제외한 무조건 다른 유저 2명만 보여준다
+//            SBDUser *user = arM[i];
+//            NSLog(@"user.profileUrl : %@", user.profileUrl);
+//
+//            if( i == 0 )
+//            {
+//                [cell.iv_User1 sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"")];
+//            }
+//            else if( i == 1 )
+//            {
+//                [cell.iv_User2 sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"")];
+//            }
+//        }
+//    }
+    
+    
+    
+    
+    
+    
+    
     
     
     //뱃지 카운트
@@ -1462,8 +1914,29 @@
     cell.btn_Type.hidden = YES;
     
     //마지막 메세지 (이미지, 동영상, 텍스트에 대한 구분이 필요함)
-    SBDUserMessage *lastMessage = (SBDUserMessage *)groupChannel.lastMessage;
-    if( [lastMessage.customType isEqualToString:@"image"] )
+//    SBDUserMessage *lastMessage = (SBDUserMessage *)groupChannel.lastMessage;
+    NSLog(@"lastMessage.customType: %@", lastMessage.customType);
+    if( [groupChannel.customType isKindOfClass:[NSString class]] == NO )
+    {
+        //예외처리
+        [cell.btn_Type setTitle:@"" forState:UIControlStateNormal];
+        cell.btn_Type.hidden = YES;
+        cell.lb_Disc2.text = @"";
+        
+        return cell;
+    }
+    
+    NSString *str_CustomType = lastMessage.customType;
+//    if( [groupChannel.customType isEqualToString:@"chatBot"] )
+//    {
+//        str_CustomType = lastMessage.customType;
+//    }
+//    else
+//    {
+////        str_CustomType = groupChannel.customType;
+//        str_CustomType = lastMessage.customType;
+//    }
+    if( [str_CustomType isEqualToString:@"image"] || [str_CustomType isEqualToString:@"pdfImage"] )
     {
         [cell.btn_Type setImage:BundleImage(@"camera_icon_small.png") forState:UIControlStateNormal];
         [cell.btn_Type setTitle:@"사진" forState:UIControlStateNormal];
@@ -1471,7 +1944,7 @@
         
         cell.lb_Disc2.text = @"";
     }
-    else if( [lastMessage.customType isEqualToString:@"video"] )
+    else if( [str_CustomType isEqualToString:@"video"] )
     {
         [cell.btn_Type setImage:BundleImage(@"video_icon_samll.png") forState:UIControlStateNormal];
         [cell.btn_Type setTitle:@"동영상" forState:UIControlStateNormal];
@@ -1479,7 +1952,7 @@
 
         cell.lb_Disc2.text = @"";
     }
-    else if( [lastMessage.customType isEqualToString:@"pdf"] )
+    else if( [str_CustomType isEqualToString:@"pdf"] )
     {
         [cell.btn_Type setImage:BundleImage(@"camera_icon_small.png") forState:UIControlStateNormal];
         [cell.btn_Type setTitle:@"PDF 문제" forState:UIControlStateNormal];
@@ -1487,7 +1960,7 @@
         
         cell.lb_Disc2.text = @"";
     }
-    else if( [lastMessage.customType isEqualToString:@"audio"] )
+    else if( [str_CustomType isEqualToString:@"audio"] )
     {
         [cell.btn_Type setImage:BundleImage(@"audio_icon_samll.png") forState:UIControlStateNormal];
         [cell.btn_Type setTitle:@"음성" forState:UIControlStateNormal];
@@ -1495,7 +1968,7 @@
         
         cell.lb_Disc2.text = @"";
     }
-    else if( [lastMessage.customType isEqualToString:@"shareExam"] || [lastMessage.customType isEqualToString:@"shareQuestion"] )
+    else if( [str_CustomType isEqualToString:@"shareExam"] || [str_CustomType isEqualToString:@"shareQuestion"] )
     {
         cell.lb_Disc1.text = [dic objectForKey_YM:@"subjectName"];
         cell.lb_Disc1.backgroundColor = [UIColor colorWithHexString:[dic objectForKey_YM:@"codeHex"]];
@@ -1519,10 +1992,16 @@
             cell.lb_Disc2.text = strM;
         }
     }
-    else if( [lastMessage.customType isEqualToString:@"pdfQuestion"] || [lastMessage.customType isEqualToString:@"normalQuestion"] )
+    else if( [str_CustomType isEqualToString:@"pdfQuestion"] || [str_CustomType isEqualToString:@"normalQuestion"] )
     {
         cell.lb_Disc1.text = @"";
         cell.lb_Disc2.text = @"""질문이 등록 되었습니다""";
+    }
+    else if( [lastMessage.customType isEqualToString:@"videoLink"] )
+    {
+        [cell.btn_Type setImage:BundleImage(@"video_icon_samll.png") forState:UIControlStateNormal];
+        [cell.btn_Type setTitle:@"동영상링크" forState:UIControlStateNormal];
+        cell.btn_Type.hidden = NO;
     }
 //    else if( [lastMessage.customType isEqualToString:@"shareQuestion"] )
 //    {
@@ -1545,7 +2024,7 @@
     if( lastMessage.createdAt <= 0 )
     {
         //마지막 메세지가 없을때
-        lastMessageDate = [NSDate dateWithTimeIntervalSince1970:(double)groupChannel.createdAt];
+        lastMessageDate = [NSDate dateWithTimeIntervalSince1970:(double)lastMessage.createdAt];
 
     }
     else
@@ -1589,6 +2068,10 @@
 //        cell.lb_Date.text = str_Time;
 //        NSLog(@"%@", str_Time);
 //    }
+
+    if (self.arM_List.count > 0 && indexPath.row + 1 == self.arM_List.count) {
+        [self loadChannels];
+    }
 
     return cell;
     
@@ -1871,60 +2354,19 @@
 {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     
+    if( self.arM_List == nil || self.arM_List.count <= 0 )  return;
+    
     SBDGroupChannel *groupChannel = self.arM_List[indexPath.row];
     [groupChannel markAsRead];
-    SBDBaseChannel *baseChannel = (SBDBaseChannel *)groupChannel;
-    NSDictionary *dic_Tmp = [NSJSONSerialization JSONObjectWithData:[groupChannel.data dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
-    NSDictionary *dic = [dic_Tmp objectForKey:@"qnaRoomInfos"];
+    [groupChannel updateChannelWithName:groupChannel.name coverUrl:groupChannel.coverUrl data:groupChannel.data completionHandler:^(SBDGroupChannel * _Nullable channel, SBDError * _Nullable error) {
+        
+        NSLog(@"channel.unreadMessageCount : %ld", channel.unreadMessageCount);
+        [self.arM_List replaceObjectAtIndex:indexPath.row withObject:channel];
+        [self saveDashBoardData];
+        [self.tbv_List reloadData];
+    }];
 
-   
-    UIStoryboard *storyBoard = [UIStoryboard storyboardWithName:@"Feed" bundle:nil];
-    ChatFeedViewController *vc = [storyBoard instantiateViewControllerWithIdentifier:@"ChatFeedViewController"];
-    //    vc.hidesBottomBarWhenPushed = YES;
-    vc.str_RId = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"rId"]];
-    vc.str_RoomName = [dic objectForKey_YM:@"roomName"];
-    //    vc.str_ChatType = [NSString stringWithFormat:@"%@", [dic objectForKey:@"roomType"]];
-    vc.roomColor = [UIColor colorWithHexString:[dic objectForKey:@"codeHex"]];
-    vc.dic_Info = dic;
-    vc.channelImageUrl = [NSURL URLWithString:baseChannel.coverUrl];
-    vc.channel = groupChannel;
-    vc.str_ChannelIdTmp = self.str_ChannelId;
-//    vc.str_ChannelUrl = baseChannel.channelUrl;
-    
-    
-    if( groupChannel.memberCount <= 2 )
-    {
-        id userThumbnail = [dic objectForKey:@"userThumbnail"];
-        if( [userThumbnail isKindOfClass:[NSArray class]]  )
-        {
-            NSArray *ar = userThumbnail;
-            
-            for( NSInteger i = 0; i < ar.count; i++ )
-            {
-                NSDictionary *dic_Tmp = [ar objectAtIndex:i];
-                if( [[dic_Tmp objectForKey:@"userId"] integerValue] != [[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"] integerValue] )
-                {
-                    //1:1 채팅일때 상대방 유저 사진
-                    NSString *str_TargetName = [dic_Tmp objectForKey_YM:@"userName"];
-                    if( [[dic objectForKey:@"roomType"] isEqualToString:@"chatBot"] )
-                    {
-                        vc.dic_BotInfo = @{@"userId":[NSString stringWithFormat:@"%@", [dic_Tmp objectForKey:@"userId"]]};
-                        break;
-                    }
-                    else if( [str_TargetName isEqualToString:@"#영어듣기"] || [str_TargetName isEqualToString:@"#PDF"] || [str_TargetName isEqualToString:@"#스피킹매트릭스"] ||
-                            [str_TargetName isEqualToString:@"#미술"] || [str_TargetName isEqualToString:@"#test"] )
-                    {
-                        //봇방
-                        vc.dic_BotInfo = @{@"userId":[NSString stringWithFormat:@"%@", [dic_Tmp objectForKey:@"userId"]]};
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    [self.navigationController pushViewController:vc animated:YES];
-    
+    [self moveChatRoom:groupChannel];
     
     
     
@@ -2004,6 +2446,117 @@
 //    [self.navigationController pushViewController:vc animated:YES];
 }
 
+- (void)moveChatRoom:(SBDGroupChannel *)groupChannel
+{
+    SBDBaseChannel *baseChannel = (SBDBaseChannel *)groupChannel;
+    NSDictionary *dic_Tmp = [NSJSONSerialization JSONObjectWithData:[groupChannel.data dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+    NSDictionary *dic = [dic_Tmp objectForKey:@"qnaRoomInfos"];
+    
+    
+    UIStoryboard *storyBoard = [UIStoryboard storyboardWithName:@"Feed" bundle:nil];
+    ChatFeedViewController *vc = [storyBoard instantiateViewControllerWithIdentifier:@"ChatFeedViewController"];
+    //    vc.hidesBottomBarWhenPushed = YES;
+    vc.str_RId = [NSString stringWithFormat:@"%@", [dic_Tmp objectForKey_YM:@"rId"]];
+    vc.str_RoomName = [dic objectForKey_YM:@"roomName"];
+    //    vc.str_ChatType = [NSString stringWithFormat:@"%@", [dic objectForKey:@"roomType"]];
+    vc.roomColor = [UIColor colorWithHexString:[dic objectForKey:@"codeHex"]];
+    vc.dic_Info = dic;
+    vc.channelImageUrl = [NSURL URLWithString:baseChannel.coverUrl];
+    vc.channel = groupChannel;
+    vc.str_ChannelIdTmp = self.str_ChannelId;
+    //    vc.str_ChannelUrl = baseChannel.channelUrl;
+    
+    
+    
+    
+    if( [groupChannel.customType isEqualToString:@"chatBot"] )
+    {
+        for( NSInteger i = 0; i < groupChannel.memberCount; i++ )
+        {
+            SBDUser *user = groupChannel.members[i];
+            NSString *str_MyUserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+            if( [str_MyUserId isEqualToString:user.userId] == NO )
+            {
+                vc.dic_BotInfo = @{@"userId":user.userId};
+            }
+        }
+    }
+
+    
+    
+//    NSString *str_BotIdTmp = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"botUserId"]];
+//    BOOL isChatBot = [[NSString stringWithFormat:@"%@", [dic objectForKey:@"roomType"]] isEqualToString:@"chatBot"];
+//    if( groupChannel.memberCount <= 2 || isChatBot )
+//    {
+//        if( isChatBot )
+//        {
+//            NSArray *ar_Members = groupChannel.members;
+//            NSString *str_BotId = [NSString stringWithFormat:@"%@", [dic objectForKey:@"botUserId"]];
+//            for( NSInteger i = 0; i < ar_Members.count; i++ )
+//            {
+//                SBDUser *user = ar_Members[i];
+//                NSString *str_UserId = [NSString stringWithFormat:@"%@", user.userId];
+////                NSDictionary *dic_User = ar_Members[i];
+////                NSString *str_UserId = [NSString stringWithFormat:@"%@", [dic_User objectForKey:@"userId"]];
+////                NSString *str_ProfileUrl = [NSString stringWithFormat:@"%@", [dic_User objectForKey:@"profileUrl"]];
+//                if( [str_BotId isEqualToString:str_UserId] )
+//                {
+//                    vc.dic_BotInfo = @{@"userId":str_BotId};
+//                    break;
+//                }
+//            }
+//        }
+//        else
+//        {
+//            id userThumbnail = [dic objectForKey:@"userThumbnail"];
+//            if( [userThumbnail isKindOfClass:[NSArray class]] && groupChannel.memberCount == 2 )
+//            {
+//                NSArray *ar = userThumbnail;
+//
+//                for( NSInteger i = 0; i < ar.count; i++ )
+//                {
+//                    NSDictionary *dic_SubTmp = [ar objectAtIndex:i];
+//                    if( [[dic_SubTmp objectForKey:@"userId"] integerValue] != [[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"] integerValue] )
+//                    {
+//                        //1:1 채팅일때 상대방 유저 사진
+//                        NSString *str_TargetName = [dic_SubTmp objectForKey_YM:@"userName"];
+//                        if( [[dic objectForKey:@"roomType"] isEqualToString:@"chatBot"] )
+//                        {
+//                            vc.dic_BotInfo = @{@"userId":[NSString stringWithFormat:@"%@", [dic_SubTmp objectForKey:@"userId"]]};
+//                            break;
+//                        }
+//                        else if( [str_TargetName isEqualToString:@"#영어듣기"] || [str_TargetName isEqualToString:@"#PDF"] || [str_TargetName isEqualToString:@"#스피킹매트릭스"] ||
+//                                [str_TargetName isEqualToString:@"#미술"] || [str_TargetName isEqualToString:@"#test"] )
+//                        {
+//                            //봇방
+//                            vc.dic_BotInfo = @{@"userId":[NSString stringWithFormat:@"%@", [dic_SubTmp objectForKey:@"userId"]]};
+//                            break;
+//                        }
+//                    }
+//                }
+//            }
+//            else if( isChatBot )
+//            {
+//                NSString *str_BotId = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"botUserId"]];
+//                if( str_BotId.length > 0 )
+//                {
+//                    vc.dic_BotInfo = @{@"userId":[NSString stringWithFormat:@"%@", [dic objectForKey:@"botUserId"]]};
+//                }
+//                else
+//                {
+//                    vc.dic_BotInfo = @{@"userId":[NSString stringWithFormat:@"%@", [dic objectForKey:@"userId"]]};
+//                }
+//            }
+//        }
+//    }
+//    else if( str_BotIdTmp.length > 0 )
+//    {
+//        vc.dic_BotInfo = @{@"userId":str_BotIdTmp};
+//    }
+    
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
 - (NSString *)getDday:(NSString *)aDay
 {
     aDay = [aDay stringByReplacingOccurrencesOfString:@"-" withString:@""];
@@ -2071,6 +2624,66 @@
     
     
     return @"";
+}
+
+- (void)saveDashBoardData
+{
+    self.arM_DicList = [NSMutableArray arrayWithCapacity:self.arM_List.count];
+    NSInteger nTotalUnReadCount = 0;
+    for( NSInteger i = 0; i < self.arM_List.count; i++ )
+    {
+        SBDGroupChannel *groupChannel = self.arM_List[i];
+        NSDictionary *dic_Tmp = [NSJSONSerialization JSONObjectWithData:[groupChannel.data dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+        NSDictionary *dic = [dic_Tmp objectForKey:@"qnaRoomInfos"];
+        if( dic )
+        {
+            SBDUserMessage *lastMessage = (SBDUserMessage *)groupChannel.lastMessage;
+            NSMutableDictionary *dicM = [NSMutableDictionary dictionary];
+            [dicM setObject:groupChannel.name forKey:@"name"];
+            [dicM setObject:[NSString stringWithFormat:@"%ld", groupChannel.memberCount] forKey:@"memberCount"];
+            
+            NSArray *ar_User = [NSArray arrayWithArray:groupChannel.members];
+            NSMutableArray *arM_User = [NSMutableArray arrayWithCapacity:ar_User.count];
+            for( NSInteger j = 0; j < ar_User.count; j++ )
+            {
+                NSMutableDictionary *dicM_User = [NSMutableDictionary dictionary];
+                SBDUser *user = ar_User[j];
+                [dicM_User setObject:user.userId forKey:@"userId"];
+                [dicM_User setObject:user.profileUrl forKey:@"profileUrl"];
+                [arM_User addObject:dicM_User];
+            }
+            
+            [dicM setObject:arM_User forKey:@"members"];
+            [dicM setObject:[NSString stringWithFormat:@"%ld", groupChannel.unreadMessageCount] forKey:@"unreadMessageCount"];
+            [dicM setObject:lastMessage.customType forKey:@"customType"];
+            [dicM setObject:lastMessage.message forKey:@"message"];
+            [dicM setObject:[NSString stringWithFormat:@"%lld", lastMessage.createdAt] forKey:@"lastMessageCreatedAt"];
+            [dicM setObject:[NSString stringWithFormat:@"%lld", lastMessage.messageId] forKey:@"messageId"];
+            [dicM setObject:[NSString stringWithFormat:@"%ld", groupChannel.createdAt] forKey:@"channelCreatedAt"];
+            [dicM setObject:dic forKey:@"info"];
+            [self.arM_DicList addObject:dicM];
+        }
+        
+        nTotalUnReadCount += groupChannel.unreadMessageCount;
+    }
+    
+    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self.arM_DicList];
+    [[NSUserDefaults standardUserDefaults] setObject:data forKey:@"DashBoardList"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    
+    NSLog(@"nTotalUnReadCount : %ld", nTotalUnReadCount);
+    
+//    UITabBarItem *item = [self.tabBarController.tabBar.items objectAtIndex:kTabBarBadgeIdx];
+//    if( nTotalUnReadCount > 0 )
+//    {
+//        item.badgeValue = [NSString stringWithFormat:@"%ld", nTotalUnReadCount];
+//        [UIApplication sharedApplication].applicationIconBadgeNumber = nTotalUnReadCount;
+//    }
+//    else
+//    {
+//        item.badgeValue = nil;
+//        [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
+//    }
 }
 
 #pragma mark - CollectionView
@@ -2203,7 +2816,8 @@
         [self makeNewRoom:dic withUserId:str_UserId withImageUrl:str_ImageUrl];
     }
     
-
+    [self updateOnlineUser];
+    
     //유저 이름 가져오기
 //    NSString *str_UserName = @"";
 //    NSString *str_UserThumb = @"";
@@ -2528,38 +3142,123 @@
         NSLog(@"%@", data.message);
         NSLog(@"%@", data.customType);
 
+        NSInteger nFindIdx = -1;
         SBDGroupChannel *messageReceivedChannel = (SBDGroupChannel *)sender;
+//        for( NSInteger i = 0; i < self.arM_List.count; i++ )
+//        {
+//            SBDGroupChannel *groupChannel = self.arM_List[i];
+//            if( [groupChannel isEqual:messageReceivedChannel] )
+//            {
+//                nFindIdx = i;
+//                [self.arM_List removeObject:messageReceivedChannel];
+//                break;
+//            }
+//        }
+//        [self.arM_List insertObject:messageReceivedChannel atIndex:nFindIdx];
+        
         if ([self.arM_List indexOfObject:messageReceivedChannel] != NSNotFound)
         {
             [self.arM_List removeObject:messageReceivedChannel];
         }
         [self.arM_List insertObject:messageReceivedChannel atIndex:0];
         
+        [self saveDashBoardData];
+        
+        
+        
+        
+//        SBDGroupChannel *groupChannel = [self.arM_List firstObject];
+//
+//        NSDictionary *dic_Tmp = [NSJSONSerialization JSONObjectWithData:[groupChannel.data dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+//        NSDictionary *dic = [dic_Tmp objectForKey:@"qnaRoomInfos"];
+//        if( dic )
+//        {
+//            NSInteger nFindIdx = -1;
+//            SBDUserMessage *lastMessage = (SBDUserMessage *)groupChannel.lastMessage;
+//            long long llMessageId = lastMessage.messageId;
+//
+//            for( NSInteger i = 0; i < self.arM_DicList.count; i++ )
+//            {
+//                NSDictionary *dic = [self.arM_DicList objectAtIndex:i];
+//                long long messageId = [[dic objectForKey:@"messageId"] longLongValue];
+//                if( messageId == llMessageId )
+//                {
+//                    nFindIdx = i;
+//                    break;
+//                }
+//            }
+//
+//
+//            NSMutableDictionary *dicM = [NSMutableDictionary dictionary];
+//            [dicM setObject:groupChannel.name forKey:@"name"];
+//            [dicM setObject:[NSString stringWithFormat:@"%ld", groupChannel.memberCount] forKey:@"memberCount"];
+//
+//            NSArray *ar_User = [NSArray arrayWithArray:groupChannel.members];
+//            NSMutableArray *arM_User = [NSMutableArray arrayWithCapacity:ar_User.count];
+//            for( NSInteger j = 0; j < ar_User.count; j++ )
+//            {
+//                NSMutableDictionary *dicM_User = [NSMutableDictionary dictionary];
+//                SBDUser *user = ar_User[j];
+//                [dicM_User setObject:user.userId forKey:@"userId"];
+//                [dicM_User setObject:user.profileUrl forKey:@"profileUrl"];
+//                [arM_User addObject:dicM_User];
+//            }
+//
+//            [dicM setObject:arM_User forKey:@"members"];
+//            [dicM setObject:[NSString stringWithFormat:@"%ld", groupChannel.unreadMessageCount] forKey:@"unreadMessageCount"];
+//            [dicM setObject:lastMessage.customType forKey:@"customType"];
+//            [dicM setObject:lastMessage.message forKey:@"message"];
+//            [dicM setObject:[NSString stringWithFormat:@"%lld", lastMessage.createdAt] forKey:@"lastMessageCreatedAt"];
+//            [dicM setObject:[NSString stringWithFormat:@"%ld", groupChannel.createdAt] forKey:@"channelCreatedAt"];
+//            [dicM setObject:dic forKey:@"info"];
+//
+//            if( nFindIdx < 0 )
+//            {
+//                [self.arM_DicList insertObject:dicM atIndex:0];
+//            }
+//            else
+//            {
+//                [self.arM_DicList replaceObjectAtIndex:nFindIdx withObject:dicM];
+//            }
+//        }
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         dispatch_async(dispatch_get_main_queue(), ^{
             
-            NSInteger nTotalUnReadCount = 0;
-            for( NSInteger i = 0; i < self.arM_List.count; i++ )
-            {
-                SBDGroupChannel *groupChannel = self.arM_List[i];
-                nTotalUnReadCount += groupChannel.unreadMessageCount;
-            }
+            [self updateBadgeCount];
             
-            NSLog(@"nTotalUnReadCount : %ld", nTotalUnReadCount);
-            
-            UITabBarItem *item = [self.tabBarController.tabBar.items objectAtIndex:kTabBarBadgeIdx];
-            if( nTotalUnReadCount > 0 )
-            {
-                item.badgeValue = [NSString stringWithFormat:@"%ld", nTotalUnReadCount];
-                [UIApplication sharedApplication].applicationIconBadgeNumber = nTotalUnReadCount;
-            }
-            else
-            {
-                item.badgeValue = nil;
-                [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
-            }
-            
-            
-            [self.tbv_List reloadData];
+//            NSInteger nTotalUnReadCount = 0;
+//            for( NSInteger i = 0; i < self.arM_List.count; i++ )
+//            {
+//                SBDGroupChannel *groupChannel = self.arM_List[i];
+//                nTotalUnReadCount += groupChannel.unreadMessageCount;
+//            }
+//
+//            NSLog(@"nTotalUnReadCount : %ld", nTotalUnReadCount);
+//
+//            UITabBarItem *item = [self.tabBarController.tabBar.items objectAtIndex:kTabBarBadgeIdx];
+//            if( nTotalUnReadCount > 0 )
+//            {
+//                item.badgeValue = [NSString stringWithFormat:@"%ld", nTotalUnReadCount];
+//                [UIApplication sharedApplication].applicationIconBadgeNumber = nTotalUnReadCount;
+//            }
+//            else
+//            {
+//                item.badgeValue = nil;
+//                [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
+//            }
+//
+//
+//            [self.tbv_List reloadData];
         });
     }
 }
@@ -2663,6 +3362,7 @@
 
 - (void)channel:(SBDOpenChannel * _Nonnull)sender userWasBanned:(SBDUser * _Nonnull)user {
     // When a user is banned on the open channel
+    NSLog(@"");
 }
 
 - (void)channel:(SBDOpenChannel * _Nonnull)sender userWasUnbanned:(SBDUser * _Nonnull)user {
@@ -2683,6 +3383,7 @@
     if ([sender isKindOfClass:[SBDGroupChannel class]])
     {
         SBDGroupChannel *messageReceivedChannel = (SBDGroupChannel *)sender;
+        
         if ([self.arM_List indexOfObject:messageReceivedChannel] != NSNotFound)
         {
             [self.arM_List removeObject:messageReceivedChannel];
@@ -2707,6 +3408,79 @@
 {
     AppDelegate *appDelegate = (AppDelegate *)[[UIApplication sharedApplication] delegate];
     [appDelegate showMainView];
+}
+
+- (IBAction)goUserPage:(id)sender
+{
+    KikMyViewController *vc = [kMyBoard instantiateViewControllerWithIdentifier:@"KikMyViewController"];
+//    vc.str_UserIdx = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+    vc.user = [SBDMain getCurrentUser];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (IBAction)goMenu:(id)sender
+{
+    __weak __typeof__(self) weakSelf = self;
+
+    self.btn_Menu.hidden = YES;
+    
+    KikMenuViewController *vc = [kMyBoard instantiateViewControllerWithIdentifier:@"KikMenuViewController"];
+    [vc setCompletionBlock:^(id completeResult) {
+    
+        weakSelf.btn_Menu.hidden = NO;
+    }];
+    [vc setCompletionMenuSelectBlock:^(SelectType completeResult) {
+       
+        if( completeResult == kOneOnOneChat )
+        {
+            KikOneOnOneViewController *vc = [kMyBoard instantiateViewControllerWithIdentifier:@"KikOneOnOneViewController"];
+            [weakSelf.navigationController pushViewController:vc animated:YES];
+        }
+        else if( completeResult == kMakeGroupChat )
+        {
+            KikGroupMakeViewController *vc = [kMyBoard instantiateViewControllerWithIdentifier:@"KikGroupMakeViewController"];
+            [weakSelf.navigationController pushViewController:vc animated:YES];
+        }
+        else if( completeResult == kGroups )
+        {
+            KikGroupsViewController *vc = [kMyBoard instantiateViewControllerWithIdentifier:@"KikGroupsViewController"];
+            [weakSelf.navigationController pushViewController:vc animated:YES];
+        }
+        else if( completeResult == kExamBot )
+        {
+            KikBotMainViewController *vc = [kMyBoard instantiateViewControllerWithIdentifier:@"KikBotMainViewController"];
+            [weakSelf.navigationController pushViewController:vc animated:YES];
+        }
+
+    }];
+    [self presentViewController:vc animated:NO completion:^{
+        
+    }];
+}
+
+- (IBAction)goSearch:(id)sender
+{
+    [SBDMain unblockUserId:@"154" completionHandler:^(SBDError * _Nullable error) {
+        
+    }];
+    
+    __weak __typeof__(self) weakSelf = self;
+
+    if( self.arM_List && self.arM_List.count > 0 )
+    {
+        KikMainSearchViewController *vc = [kMyBoard instantiateViewControllerWithIdentifier:@"KikMainSearchViewController"];
+        vc.str_ImagePrefix = str_ImagePrefix;
+//        vc.arM_Original = self.arM_List;
+        [vc setCompletionBlock:^(id completeResult) {
+           
+            SBDGroupChannel *groupChannel = completeResult;
+            [weakSelf moveChatRoom:groupChannel];
+        }];
+        [self presentViewController:vc animated:NO completion:^{
+            
+        }];
+    }
+
 }
 
 @end

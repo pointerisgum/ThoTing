@@ -96,13 +96,14 @@
 
                                                 self.dic_Info = [NSDictionary dictionaryWithDictionary:resulte];
                                                 
+                                                NSString *str_Profile = [resulte objectForKey:@"userThumgnail"];
                                                 if( self.i_User )
                                                 {
                                                     self.iv_User.image = self.i_User;
                                                 }
                                                 else
                                                 {
-                                                    [self.iv_User sd_setImageWithURL:[NSURL URLWithString:[resulte objectForKey:@"userThumgnail"]]];
+                                                    [self.iv_User sd_setImageWithURL:[NSURL URLWithString:str_Profile]];
                                                 }
                                                 self.tf_Email.text = [[NSUserDefaults standardUserDefaults] objectForKey:@"email"];
                                                 self.tf_Name.text = [resulte objectForKey:@"userName"];
@@ -294,6 +295,8 @@
 
 - (void)updateData
 {
+    __weak __typeof__(self) weakSelf = self;
+
     NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
                                         [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
                                         [Util getUUID], @"uuid",
@@ -317,15 +320,21 @@
                                             NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
                                             if( nCode == 200 )
                                             {
+                                                [SBDMain updateCurrentUserInfoWithNickname:[weakSelf.dic_Info objectForKey:@"userName"]
+                                                                                profileUrl:[weakSelf.dic_Info objectForKey:@"userThumgnail"]
+                                                                         completionHandler:^(SBDError * _Nullable error) {
+                                                                             
+                                                                         }];
+
                                                 UIWindow *window = [[UIApplication sharedApplication] keyWindow];
                                                 [window makeToast:@"프로필이 변경 되었습니다" withPosition:kPositionCenter];
-                                                [self dismissViewControllerAnimated:YES completion:^{
+                                                [weakSelf dismissViewControllerAnimated:YES completion:^{
                                                     
                                                 }];
                                             }
                                             else
                                             {
-                                                [self.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
+                                                [weakSelf.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
                                             }
                                         }
                                     }];

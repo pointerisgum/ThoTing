@@ -26,6 +26,7 @@
 {
     BOOL isUserMode;
     NSInteger nSelectedSubjectIdx;
+    NSInteger nSelectedUploadSubjectIdx;
     NSInteger nInCorrectQuestionCount;  //오답 카운트
     NSInteger nStarQuestionCount;       //별표 카운트
     NSInteger nUploadExamCount;         //업로드 카운트
@@ -40,6 +41,10 @@
 @property (nonatomic, weak) IBOutlet UICollectionView *cv_Subject;
 @property (nonatomic, weak) IBOutlet UITableView *tbv_BottomList;
 @property (nonatomic, weak) IBOutlet UIButton *btn_Close;
+@property (nonatomic, weak) IBOutlet UIView *v_SegBg;
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_LibraryWidth;
+@property (nonatomic, weak) IBOutlet UIButton *btn_Library;
+@property (nonatomic, weak) IBOutlet UIButton *btn_Upload;
 @end
 
 @implementation LibraryMainViewController
@@ -50,7 +55,10 @@
     
     self.view.backgroundColor = [UIColor colorWithRed:240.f/255.f green:240.f/255.f blue:240.f/255.f alpha:1];  //탭바 사이즈를 줄였더니 self.view의 백그라운드 색이 보여서 처리함
 
-    nSelectedSubjectIdx = 0;
+    self.v_SegBg.hidden = YES;
+    self.v_SegBg.layer.cornerRadius = 4.f;
+    
+    nSelectedSubjectIdx = nSelectedUploadSubjectIdx = 0;
     self.lc_TopHeight.constant = 0.f;
     
 //    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
@@ -143,57 +151,14 @@
                                             
                                             self.arM_TopList = [NSMutableArray array];
                                             
-                                            CGFloat fTopListHeight = 0;
-                                            
-                                            if( nUploadExamCount > 0 && (nInCorrectQuestionCount + nStarQuestionCount) > 0 )
+                                            if( nUploadExamCount > 0 )
                                             {
-                                                fTopListHeight = 60.f;
-                                                
-                                                if( nUploadExamCount > (nInCorrectQuestionCount + nStarQuestionCount) )
-                                                {
-                                                    [self.arM_TopList addObject:@{@"title":@"올린문제",
-                                                                                  @"count":[NSString stringWithFormat:@"%ld", nUploadExamCount]}];
-                                                    
-                                                    if( 1 )
-                                                    {
-                                                        [self.arM_TopList addObject:@{@"title":@"오답,별표",
-                                                                                      @"count":[NSString stringWithFormat:@"%ld", nInCorrectQuestionCount + nStarQuestionCount]}];
-                                                        
-                                                        fTopListHeight += 60.f;
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    if( 1 )
-                                                    {
-                                                        [self.arM_TopList addObject:@{@"title":@"오답,별표",
-                                                                                      @"count":[NSString stringWithFormat:@"%ld", nInCorrectQuestionCount + nStarQuestionCount]}];
-                                                        
-                                                        fTopListHeight += 60.f;
-                                                    }
-                                                    
-                                                    [self.arM_TopList addObject:@{@"title":@"올린문제",
-                                                                                  @"count":[NSString stringWithFormat:@"%ld", nUploadExamCount]}];
-                                                }
+                                                self.lc_LibraryWidth.constant = 100.f;
                                             }
-                                            else if( nUploadExamCount > 0 )
+                                            else
                                             {
-                                                fTopListHeight = 60.f;
-                                                [self.arM_TopList addObject:@{@"title":@"올린문제",
-                                                                              @"count":[NSString stringWithFormat:@"%ld", nUploadExamCount]}];
+                                                self.lc_LibraryWidth.constant = 200.f;
                                             }
-                                            else if( nInCorrectQuestionCount > 0 || nStarQuestionCount > 0 )
-                                            {
-                                                fTopListHeight = 60.f;
-                                                if( 1 )
-                                                {
-                                                    [self.arM_TopList addObject:@{@"title":@"오답,별표",
-                                                                                  @"count":[NSString stringWithFormat:@"%ld", nInCorrectQuestionCount + nStarQuestionCount]}];
-                                                }
-                                            }
-                                            
-                                            [self.tbv_TopList reloadData];
-                                            self.lc_TopHeight.constant = fTopListHeight;
                                             
                                             self.arM_Subject = [NSMutableArray array];
                                             [self.arM_Subject addObject:@{@"examCount":[NSString stringWithFormat:@"%ld", [[resulte objectForKey:@"myPaidExamCount"] integerValue]],
@@ -202,6 +167,36 @@
                                             [self.cv_Subject reloadData];
                                             
                                             [self updateBottomList];
+                                        }
+                                        
+                                        self.v_SegBg.hidden = NO;
+                                    }];
+}
+
+- (void)updateUploadExam
+{
+    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+                                        [Util getUUID], @"uuid",
+                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"], @"pUserId",
+                                        nil];
+    
+    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/get/user/my"
+                                        param:dicM_Params
+                                   withMethod:@"GET"
+                                    withBlock:^(id resulte, NSError *error) {
+                                        
+                                        [MBProgressHUD hide];
+                                        
+                                        if( resulte )
+                                        {
+                                            self.arM_Subject = [NSMutableArray array];
+                                            [self.arM_Subject addObject:@{@"examCount":[NSString stringWithFormat:@"%ld", [[resulte objectForKey:@"myUploadExamCount"] integerValue]],
+                                                                          @"subjectName":@"전체"}];
+                                            [self.arM_Subject addObjectsFromArray:[resulte objectForKey:@"myUploadSubjectNameInfos"]];
+                                            [self.cv_Subject reloadData];
+                                            
+                                            [self updateUploadBottomList];
                                         }
                                     }];
 }
@@ -274,6 +269,56 @@
     }
 
     
+}
+
+- (void)updateUploadBottomList
+{
+    NSDictionary *dic = self.arM_Subject[nSelectedUploadSubjectIdx];
+    NSString *str_SubjectName = [dic objectForKey:@"subjectName"];
+
+    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+                                        [Util getUUID], @"uuid",
+                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"], @"pUserId",
+                                        @"uploadExam", @"pageType",
+                                        nil];
+    
+    if( [str_SubjectName isEqualToString:@"전체"] )
+    {
+        [dicM_Params setObject:@"0" forKey:@"subjectName"];
+    }
+    else
+    {
+        [dicM_Params setObject:str_SubjectName forKey:@"subjectName"];
+    }
+    
+    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/get/my/page/package/exam/browse"
+                                        param:dicM_Params
+                                   withMethod:@"GET"
+                            withShowIndicator:YES
+                                    withBlock:^(id resulte, NSError *error) {
+                                        
+                                        [MBProgressHUD hide];
+                                        
+                                        if( resulte )
+                                        {
+                                            NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+                                            if( nCode == 200 )
+                                            {
+                                                NSString *str_Key = [NSString stringWithFormat:@"Library_%@_%@_%@",//Upload_전체_138
+                                                                     @"Upload",
+                                                                     str_SubjectName,
+                                                                     [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+                                                
+                                                NSData *data = [NSKeyedArchiver archivedDataWithRootObject:resulte];
+                                                [[NSUserDefaults standardUserDefaults] setObject:data forKey:str_Key];
+                                                [[NSUserDefaults standardUserDefaults] synchronize];
+                                                
+                                                self.arM_BottomList = [NSMutableArray arrayWithArray:[resulte objectForKey:@"recommendInfo"]];
+                                                [self.tbv_BottomList reloadData];
+                                            }
+                                        }
+                                    }];
 }
 
 - (void)updateUserBottomList
@@ -799,26 +844,48 @@
     NSString *str_Title = [NSString stringWithFormat:@"%ld\n%@", [[dic objectForKey:@"examCount"] integerValue], [dic objectForKey:@"subjectName"]];
     [cell.btn_Title setTitle:str_Title forState:0];
 
-    if( indexPath.row == nSelectedSubjectIdx )
+    if( self.btn_Library.selected )
     {
-        cell.btn_Title.selected = YES;
+        if( indexPath.row == nSelectedSubjectIdx )
+        {
+            cell.btn_Title.selected = YES;
+        }
+        else
+        {
+            cell.btn_Title.selected = NO;
+        }
     }
     else
     {
-        cell.btn_Title.selected = NO;
+        if( indexPath.row == nSelectedUploadSubjectIdx )
+        {
+            cell.btn_Title.selected = YES;
+        }
+        else
+        {
+            cell.btn_Title.selected = NO;
+        }
     }
-    
+
     return cell;
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath
 {
-    nSelectedSubjectIdx = indexPath.row;
-    [self.cv_Subject reloadData];
-    [self updateBottomList];
-    
+    if( self.btn_Library.selected )
+    {
+        nSelectedSubjectIdx = indexPath.row;
+        [self updateBottomList];
+    }
+    else
+    {
+        nSelectedUploadSubjectIdx = indexPath.row;
+        [self updateUploadBottomList];
+    }
     //다른 과목을 선택했을때 스크롤뷰 오프셋 초기화
     [self.tbv_BottomList setContentOffset:CGPointZero animated:NO];
+    
+    [self.cv_Subject reloadData];
 }
 
 
@@ -941,6 +1008,22 @@
     ReciveSendViewController *vc = [kMainBoard instantiateViewControllerWithIdentifier:@"ReciveSendViewController"];
     vc.str_ChannelId = str_ChannelId;
     [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (IBAction)goLibrary:(id)sender
+{
+    self.btn_Library.selected = YES;
+    self.btn_Upload.selected = NO;
+
+    [self updateUserList];
+}
+
+- (IBAction)goUpload:(id)sender
+{
+    self.btn_Library.selected = NO;
+    self.btn_Upload.selected = YES;
+
+    [self updateUploadExam];
 }
 
 @end

@@ -67,11 +67,19 @@
 #import "ChatDateCell.h"
 #import "AudioSessionManager.h"
 #import "MyAudioCell.h"
+#import "KikRoomInfoViewController.h"
+#import "ChatIngUserCell.h"
+#import "TwoOtherChatCell.h"
+#import "TwoAutoChatAudioCell.h"
 
 @import AVFoundation;
 @import MediaPlayer;
 
-static NSInteger kMoreCount = 50;
+#import "KikMyViewController.h"
+#import "DZImageEditingController.h"
+#import <AssetsLibrary/AssetsLibrary.h>
+
+static NSInteger kMoreCount = 30;
 static AVPlayer *currentPlayer = nil;
 static NSURL *currentUrl = nil;
 static AutoChatAudioCell *currentCell = nil;
@@ -100,9 +108,10 @@ typedef enum {
     kPrintAnswer    = 1,    //답 선택
     kNextExam       = 2,    //다음 문제
     kPrintContinue  = 3,    //계속풀기
+    kEtc            = 4,    //etc
 } AutoChatMode;
 
-@interface ChatFeedViewController () <AVAudioPlayerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, MWPhotoBrowserDelegate, SBDChannelDelegate, SBDConnectionDelegate, TTTAttributedLabelDelegate, UIGestureRecognizerDelegate, UITableViewDelegate, UITableViewDataSource, SWTableViewCellDelegate, UITextFieldDelegate, MPMediaPickerControllerDelegate>
+@interface ChatFeedViewController () <AVAudioPlayerDelegate, AVAudioRecorderDelegate, UIActionSheetDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, MWPhotoBrowserDelegate, SBDChannelDelegate, SBDConnectionDelegate, TTTAttributedLabelDelegate, UIGestureRecognizerDelegate, UITableViewDelegate, UITableViewDataSource, SWTableViewCellDelegate, UITextFieldDelegate, MPMediaPickerControllerDelegate, DZImageEditingControllerDelegate>
 {
     BOOL isLoding;
     BOOL isFirstLoad;   //첫 로드인지 기억했다가 첫로드면 로드중 추가된 메세지는 로드후 애드 시키기 위함
@@ -124,6 +133,8 @@ typedef enum {
     
     NSString *str_UserImagePrefix;
     NSString *str_ImagePreFix;
+    NSString *str_TargetUserImageUrl;
+    NSString *str_TargetUserName;
     
     NSString *str_ChatType;
     NSString *str_NormalTmpMessage;
@@ -138,6 +149,11 @@ typedef enum {
     //    NSString *str_ChannelUrl;
     
     NSInteger nAutoAnswerIdx;
+    
+    NSString *str_MsgQuestionId;
+    NSString *str_MsgTesterId;
+    NSString *str_MsgExamId;
+    NSString *str_MsgCorrectAnswer;
 }
 @property (nonatomic, strong) id timeObserver;
 @property (nonatomic, strong) NSMutableArray *ar_Photo;
@@ -145,6 +161,8 @@ typedef enum {
 @property (nonatomic, strong) NSMutableArray *arM_List;
 @property (nonatomic, strong) NSMutableArray *arM_TempList;
 @property (nonatomic, strong) NSMutableArray *arM_MessageQ;
+@property (nonatomic, strong) NSMutableArray *arM_AtList;
+@property (nonatomic, strong) NSMutableArray *arM_AtListBackUp;
 @property (nonatomic, strong) NSMutableDictionary *dicM_TempMyContents;
 @property (nonatomic, strong) NSMutableDictionary *dicM_NextPlayInfo;
 @property (nonatomic, strong) NSDictionary *dic_PrintItemInfo;
@@ -152,16 +170,20 @@ typedef enum {
 @property (nonatomic, strong) NSDictionary *dic_Data;
 @property (nonatomic, strong) NSMutableArray *arM_User;
 @property (nonatomic, strong) NSMutableArray *arM_AutoAnswer;
+@property (nonatomic, strong) NSArray *ar_AutoAnswerBtnInfo;
 @property (nonatomic, strong) NSMutableDictionary *dicM_AutoAudio;
 @property (nonatomic, strong) MPMoviePlayerViewController *vc_Movie;
 @property (nonatomic, assign) AutoChatMode autoChatMode;
 @property (nonatomic, strong) NSTimer *tm_Mic;
+@property (nonatomic, strong) NSDictionary *dic_SelectedMention;
 @property (nonatomic, weak) IBOutlet UILabel *lb_Title;
 @property (nonatomic, weak) IBOutlet UILabel *lb_TotalUserCount;
 @property (nonatomic, weak) IBOutlet UILabel *lb_GroupCount;
 @property (nonatomic, weak) IBOutlet UIImageView *iv_TopUser;
 @property (nonatomic, weak) IBOutlet UIButton *btn_GroupInfo;
 @property (nonatomic, weak) IBOutlet UITableView *tbv_List;
+@property (nonatomic, weak) IBOutlet UITableView *tbv_AtList;
+@property (nonatomic, weak) IBOutlet NSLayoutConstraint *lc_AtHeight;
 @property (nonatomic, weak) IBOutlet CommentKeyboardAccView *v_CommentKeyboardAccView;
 @property (nonatomic, strong) MyChatBasicCell *c_MyChatBasicCell;
 @property (nonatomic, strong) OtherChatBasicCell *c_OtherChatBasicCell;
@@ -182,7 +204,8 @@ typedef enum {
 
 @property (nonatomic, strong) NormalQuestionCell *c_NormalQuestionCell;
 @property (nonatomic, strong) ChatDateCell *c_ChatDateCell;
-
+@property (nonatomic, strong) TwoOtherChatCell *c_TwoOtherChatCell;
+@property (nonatomic, strong) TwoAutoChatAudioCell *c_TwoAutoChatAudioCell;
 @property (atomic) long long minMessageTimestamp;
 //@property (strong, nonatomic) NSArray<SBDBaseMessage *> *dumpedMessages;
 //@property (strong, nonatomic) NSMutableArray<SBDBaseMessage *> *messages;
@@ -219,29 +242,34 @@ typedef enum {
 @property (nonatomic, strong)     NSString            *mic_RecordedAudioFileName;
 @property (nonatomic, strong)     NSURL               *mic_RecordedAudioURL;
 
+@property (nonatomic, weak) IBOutlet UIButton *btn_Title;
+
+@property (nonatomic, strong) UIImageView *overlayImageView;
+@property (nonatomic, assign) CGRect frameRect;
+
 @end
 
 @implementation ChatFeedViewController
 
 - (void)onEnterForegroundNoti
 {
-    NSLog(@"BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK ");
-    if( self.dic_BotInfo )
-    {
-        isSendPassible = YES;
-        [self sendBotWelcome];
-    }
-    else
-    {
-        [self.view endEditing:YES];
-        self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
-        self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
-
-        [UIView animateWithDuration:0.25f animations:^{
-            [self.view layoutIfNeeded];
-        }];
-
-    }
+//    NSLog(@"BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK BACK ");
+//    if( self.dic_BotInfo )
+//    {
+//        isSendPassible = YES;
+//        [self sendBotWelcome];
+//    }
+//    else
+//    {
+//        [self.view endEditing:YES];
+//        self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+//        self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+//
+//        [UIView animateWithDuration:0.25f animations:^{
+//            [self.view layoutIfNeeded];
+//        }];
+//
+//    }
 }
 
 //- (void)onShareExamNoti:(NSNotification *)noti
@@ -259,11 +287,59 @@ typedef enum {
 ////    [self updateOneList:dicM];
 //}
 
+//- (void)updateRoomStatus:(NSString *)aStatus
+//{
+////    __weak __typeof(&*self)weakSelf = self;
+//
+//    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+//                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+//                                        [Util getUUID], @"uuid",
+//                                        aStatus, @"status",
+//                                        self.str_RId, @"rId",
+//                                        nil];
+//
+//    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/update/chat/user/status"
+//                                        param:dicM_Params
+//                                   withMethod:@"GET"
+//                                    withBlock:^(id resulte, NSError *error) {
+//
+//                                        [MBProgressHUD hide];
+//
+//                                        if( resulte )
+//                                        {
+//                                            NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+//                                            if( nCode == 200 )
+//                                            {
+//
+//                                            }
+//                                        }
+//                                    }];
+//}
+
+- (UIImageView *)createOverlayImageViewWithImage:(UIImage *)image
+{
+    CGFloat newX = [UIScreen mainScreen].bounds.size.width / 2 - [UIScreen mainScreen].bounds.size.width / 2;
+    CGFloat newY = [UIScreen mainScreen].bounds.size.height / 2 - [UIScreen mainScreen].bounds.size.width / 2;
+    self.frameRect = CGRectMake(newX, newY, [UIScreen mainScreen].bounds.size.width, [UIScreen mainScreen].bounds.size.width);
+    return [[UIImageView alloc] initWithFrame:self.frameRect];
+}
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view from its nib.
     
     //    [self startSendBird];
+    
+//    [self updateRoomStatus:@"enter"];
+    
+    UIImage *overlayImage = [UIImage imageNamed:@"kik_image_edith.png"];
+    self.overlayImageView = [self createOverlayImageViewWithImage:overlayImage];
+    self.overlayImageView.image = overlayImage;
+
+    self.v_Mic.hidden = YES;
+
+    self.tbv_AtList.layer.borderWidth = 1.f;
+    self.tbv_AtList.layer.borderColor = [UIColor colorWithRed:240.f/255.f green:240.f/255.f blue:240.f/255.f alpha:1].CGColor;
     
     if (IMPEDE_PLAYBACK)
     {
@@ -289,6 +365,71 @@ typedef enum {
 //            [weakSelf performSelector:@selector(scrollToTheBottom2:) withObject:[NSNumber numberWithBool:YES] afterDelay:0.4f];
         });
 //        [weakSelf moveToScroll:YES];
+    }];
+    [self.v_CommentKeyboardAccView setCompletionTextChangeBlock:^(id completeResult) {
+        
+        NSLog(@"%@", completeResult);
+
+        /*
+         cc = 2;
+         rId = 2492;
+         userAffiliation = "\Uc9c4\Uba85\Ud559\Uc6d0\Uc120\Uc0dd";
+         userEmail = "ss4@t.com";
+         userId = 141;
+         userMajor = "";
+         userName = jason4;
+         userThumbnail = "000/000/noImage3.png";
+         userType = user;
+         */
+
+        NSMutableString *strM_InputWord = [NSMutableString stringWithString:completeResult];;
+
+        [weakSelf.arM_AtList removeAllObjects];
+
+        if( strM_InputWord.length > 0 )
+        {
+            if( [strM_InputWord hasPrefix:@"@"] )
+            {
+                self.v_CommentKeyboardAccView.tv_Contents.textColor = kMainColor;
+
+                if( [strM_InputWord hasPrefix:@"@"] )
+                {
+                    [strM_InputWord deleteCharactersInRange:NSMakeRange(0, 1)];
+                }
+
+                if( strM_InputWord.length == 0 )
+                {
+                    weakSelf.arM_AtList = [NSMutableArray arrayWithArray:weakSelf.arM_AtListBackUp];
+                }
+                else
+                {
+                    NSArray *ar = [weakSelf.arM_AtListBackUp filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"userName contains[c] %@", strM_InputWord]];
+                    weakSelf.arM_AtList = [NSMutableArray arrayWithArray:ar];
+                }
+            }
+            else
+            {
+                self.v_CommentKeyboardAccView.tv_Contents.textColor = [UIColor blackColor];
+            }
+
+            [weakSelf.tbv_AtList reloadData];
+        }
+        else
+        {
+//            weakSelf.arM_AtList = [NSMutableArray arrayWithArray:weakSelf.arM_AtListBackUp];
+
+        }
+
+        NSInteger nLineCount = weakSelf.arM_AtList.count;
+        if( nLineCount > 3 )
+        {
+            nLineCount = 3;
+        }
+        weakSelf.lc_AtHeight.constant = nLineCount * 44.f;
+        [UIView animateWithDuration:0.3f animations:^{
+
+            [weakSelf.view layoutIfNeeded];
+        }];
     }];
     
     self.autoChatMode = kPrintExam;
@@ -364,16 +505,22 @@ typedef enum {
     if( self.dic_BotInfo )
     {
         self.v_CommentKeyboardAccView.btn_TempleteKeyboard.alpha = YES;
-        self.lc_MicWidth.constant = 45.f;
+//        self.lc_MicWidth.constant = 45.f;
         [self sendBotWelcome];
+        
+//        [self updateAtList:@"user"];
     }
     else
     {
         self.v_CommentKeyboardAccView.btn_TempleteKeyboard.alpha = NO;
-        self.lc_MicWidth.constant = 0.f;
+//        self.lc_MicWidth.constant = 0.f;
         self.tbv_TempleteList.backgroundColor = [UIColor whiteColor];
+        
+//        [self updateAtList:@"all"];
     }
     
+    [self updateAtList:@"bot"];
+
     //스크롤뷰 내릴때 키보드도 함께 내리기
     BABFrameObservingInputAccessoryView *inputView = [[BABFrameObservingInputAccessoryView alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, 0)];
     inputView.userInteractionEnabled = NO;
@@ -459,6 +606,10 @@ typedef enum {
     self.c_NormalQuestionCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([NormalQuestionCell class])];
     self.c_ChatDateCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([ChatDateCell class])];
     
+    self.c_TwoOtherChatCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([TwoOtherChatCell class])];
+    
+    self.c_TwoAutoChatAudioCell = [self.tbv_List dequeueReusableCellWithIdentifier:NSStringFromClass([TwoAutoChatAudioCell class])];
+    
     self.c_AutoAnswerCell = [self.tbv_TempleteList dequeueReusableCellWithIdentifier:NSStringFromClass([AutoAnswerCell class])];
     
 //    NSArray *topLevelObjects = [[NSBundle mainBundle]loadNibNamed:@"AutoAnswerCell" owner:self options:nil];
@@ -495,18 +646,22 @@ typedef enum {
     NSArray *ar = [NSKeyedUnarchiver unarchiveObjectWithData:dictionaryData];
     if( ar && ar.count > 0 )
     {
-        self.messages = [NSMutableArray arrayWithArray:ar];
-        for( NSInteger i = 0; i < self.messages.count; i++ )
-        {
-            NSDictionary *dic = self.messages[i];
-            if( [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_ENTER"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"enterBotRoom"] )
-            {
-                [self.messages removeObjectAtIndex:i];
-            }
-        }
-        [self.tbv_List reloadData];
-        [self.tbv_List layoutIfNeeded];
-        [self scrollToTheBottom:NO];
+//        self.messages = [NSMutableArray arrayWithArray:ar];
+//        for( NSInteger i = 0; i < self.messages.count; i++ )
+//        {
+//            id obj = self.messages[i];
+//            if( [obj isKindOfClass:[NSDictionary class]] )
+//            {
+//                NSDictionary *dic = self.messages[i];
+//                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_ENTER"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"enterBotRoom"] )
+//                {
+//                    [self.messages removeObjectAtIndex:i];
+//                }
+//            }
+//        }
+//        [self.tbv_List reloadData];
+//        [self.tbv_List layoutIfNeeded];
+//        [self scrollToTheBottom:NO];
         [self updateChatList:YES];
     }
     else
@@ -530,10 +685,13 @@ typedef enum {
         //        }
     }
     
+//    [self.btn_Title setTitle:self.channel.name forState:UIControlStateNormal];
+    
     if( self.str_RoomTitle )
     {
         //신규방
-        self.lb_Title.text = self.str_RoomTitle;
+//        self.lb_Title.text = self.str_RoomTitle;
+//        [self.btn_Title setTitle:self.str_RoomTitle forState:UIControlStateNormal];
         
         if( self.str_RoomThumb )
         {
@@ -714,6 +872,7 @@ typedef enum {
 {
     [self.tbv_TempleteList reloadData];
     
+    [self.v_CommentKeyboardAccView.tv_Contents resignFirstResponder];
     self.v_CommentKeyboardAccView.keyboardStatus = kTemplete;
     self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
     
@@ -780,52 +939,81 @@ typedef enum {
     {
         isSendPassible = NO;
         
-        NSString *str_UserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
-        NSString *str_UserName = [[NSUserDefaults standardUserDefaults] objectForKey:@"userName"];
-        
-        
+//        NSString *str_UserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+//        NSString *str_UserName = [[NSUserDefaults standardUserDefaults] objectForKey:@"userName"];
+//
+//
+//        NSMutableDictionary *dicM_Param = [NSMutableDictionary dictionary];
+//        [dicM_Param setObject:@"ADMM" forKey:@"message_type"];
+//        [dicM_Param setObject:@"test" forKey:@"message"];
+//        [dicM_Param setObject:@"cmd" forKey:@"custom_type"];
+//        [dicM_Param setObject:@"enterBotRoom" forKey:@"custom_type"];
+//
+//        NSMutableDictionary *dicM_Data = [NSMutableDictionary dictionary];
+//        [dicM_Data setObject:@"enterBotRoom" forKey:@"type"];
+//
+//        NSMutableDictionary *dicM_Inviter = [NSMutableDictionary dictionary];
+//        [dicM_Inviter setObject:str_UserId forKey:@"user_id"];
+//        [dicM_Inviter setObject:str_UserName forKey:@"nickname"];
+//        [dicM_Data setObject:dicM_Inviter forKey:@"sender"];
+//
+//
+//        //    NSMutableArray *arM_Users = [NSMutableArray array];
+//        //    [dicM_Data setObject:arM_Users forKey:@"users"];
+//
+//        [dicM_Data setObject:@"test" forKey:@"message"];
+//        [dicM_Data setObject:[NSString stringWithFormat:@"%@", [self.dic_BotInfo objectForKey:@"userId"]] forKey:@"botUserId"];
+//        [dicM_Data setObject:@"botChat" forKey:@"roomType"];
+//        [dicM_Data setObject:@"user" forKey:@"userType"];
+//        [dicM_Data setObject:@"" forKey:@"chatScreen"];
+//        [dicM_Data setObject:@"" forKey:@"mesgAction"];
+//
+//        NSError *error;
+//        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_Data
+//                                                           options:NSJSONWritingPrettyPrinted
+//                                                             error:&error];
+//        NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+//
+//        [dicM_Param setObject:jsonString forKey:@"data"];
+//
+//        [dicM_Param setObject:@"true" forKey:@"is_silent"];
+
+        SBDUser *user = [SBDMain getCurrentUser];
+        NSString *str_BotUserId = [NSString stringWithFormat:@"%@", [self.dic_BotInfo objectForKey:@"userId"]];
+
         NSMutableDictionary *dicM_Param = [NSMutableDictionary dictionary];
         [dicM_Param setObject:@"ADMM" forKey:@"message_type"];
+        [dicM_Param setObject:str_BotUserId forKey:@"user_id"];
         [dicM_Param setObject:@"test" forKey:@"message"];
-        [dicM_Param setObject:@"cmd" forKey:@"custom_type"];
         [dicM_Param setObject:@"enterBotRoom" forKey:@"custom_type"];
+        [dicM_Param setObject:@"true" forKey:@"is_silent"];
         
-        NSMutableDictionary *dicM_Data = [NSMutableDictionary dictionary];
-        [dicM_Data setObject:@"enterBotRoom" forKey:@"type"];
+        NSMutableDictionary *dicM_MessageData = [NSMutableDictionary dictionary];
+        [dicM_MessageData setObject:@"test" forKey:@"message"];
+        [dicM_MessageData setObject:@"chatBot" forKey:@"roomType"];
+        [dicM_MessageData setObject:str_BotUserId forKey:@"botUserId"];
+        [dicM_MessageData setObject:@"user" forKey:@"userType"];
         
-        NSMutableDictionary *dicM_Inviter = [NSMutableDictionary dictionary];
-        [dicM_Inviter setObject:str_UserId forKey:@"user_id"];
-        [dicM_Inviter setObject:str_UserName forKey:@"nickname"];
-        [dicM_Data setObject:dicM_Inviter forKey:@"sender"];
-        
-        
-        //    NSMutableArray *arM_Users = [NSMutableArray array];
-        //    [dicM_Data setObject:arM_Users forKey:@"users"];
-        
-        [dicM_Data setObject:@"test" forKey:@"message"];
-        [dicM_Data setObject:[NSString stringWithFormat:@"%@", [self.dic_BotInfo objectForKey:@"userId"]] forKey:@"botUserId"];
-        [dicM_Data setObject:@"botChat" forKey:@"roomType"];
-        [dicM_Data setObject:@"user" forKey:@"userType"];
-        [dicM_Data setObject:@"" forKey:@"chatScreen"];
-        [dicM_Data setObject:@"" forKey:@"mesgAction"];
+        NSMutableDictionary *dicM_Sender = [NSMutableDictionary dictionary];
+        [dicM_Sender setObject:user.nickname forKey:@"nickname"];
+        [dicM_Sender setObject:user.userId forKey:@"user_id"];
+        [dicM_MessageData setObject:dicM_Sender forKey:@"sender"];
         
         NSError *error;
-        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_Data
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_MessageData
                                                            options:NSJSONWritingPrettyPrinted
                                                              error:&error];
         NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-        
         [dicM_Param setObject:jsonString forKey:@"data"];
-        
-        [dicM_Param setObject:@"true" forKey:@"is_silent"];
-        
-        
+
+        NSLog(@"계속 풀겠습니까 호출 시작");
         NSString *str_Path = [NSString stringWithFormat:@"v3/group_channels/%@/messages", self.channel.channelUrl];
         [[WebAPI sharedData] callAsyncSendBirdAPIBlock:str_Path
                                                  param:dicM_Param
                                             withMethod:@"POST"
                                              withBlock:^(id resulte, NSError *error) {
-                                                 
+        
+                                                 NSLog(@"계속 풀겠습니까 호출 끝");
                                                  if( resulte )
                                                  {
                                                      
@@ -873,7 +1061,7 @@ typedef enum {
                                        if( self.isAskMode && self.isPdfMode && self.str_PdfImageUrl.length > 0 )
                                        {
                                            [self performSelector:@selector(onKeyboardShow) withObject:nil afterDelay:0.3f];
-                                           [self addTmpImage];
+//                                           [self addTmpImage];
                                            [self performSelector:@selector(scrollToBottomInterval:) withObject:[NSNumber numberWithBool:NO] afterDelay:0.3f];
                                            self.v_CommentKeyboardAccView.lc_AddWidth.constant = 54.f;
                                        }
@@ -907,29 +1095,83 @@ typedef enum {
                                        //더보기
                                        if( messages.count > 0 )
                                        {
-                                           NSMutableArray *arM = [NSMutableArray arrayWithArray:messages];
+                                           NSMutableArray *arM = [NSMutableArray array];
                                            
-                                           for( NSInteger i = 0; i < arM.count; i++ )
+                                           for( NSInteger i = 0; i < messages.count; i++ )
                                            {
-                                               SBDBaseMessage *baseMessage = arM[i];
+                                               SBDBaseMessage *baseMessage = messages[i];
                                                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-                                               NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-                                               NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//                                               NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+//                                               NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
                                                
-                                               if( [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_ENTER"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"enterBotRoom"] )
+                                               if( [userMessage.customType isEqualToString:@"USER_ENTER"] ||
+                                                  [userMessage.customType isEqualToString:@"enterBotRoom"] ||
+                                                  [userMessage.customType isEqualToString:@"cmd"] )
                                                {
                                                    [self.channel deleteMessage:baseMessage completionHandler:^(SBDError * _Nullable error) {
                                                        
                                                    }];
                                                    
-                                                   [arM removeObjectAtIndex:i];
+//                                                   [arM removeObjectAtIndex:i];
+                                               }
+                                               else
+                                               {
+                                                   [arM addObject:baseMessage];
                                                }
                                            }
                                            
-                                           [arM addObjectsFromArray:self.messages];
-                                           [self.messages removeAllObjects];
-                                           self.messages = [NSMutableArray arrayWithArray:arM];
+                                           
+                                           messages = [NSArray arrayWithArray:arM];
+
+                                           
+//                                           //이전 메세지 검사해서 날짜 넣어주기
+//                                           if( arM.count > 1 )
+//                                           {
+//                                               NSMutableArray *arM_Tmp = [NSMutableArray array];
+//                                               for( NSInteger i = 0; i < arM.count - 1; i++ )
+//                                               {
+//                                                   id obj = arM[i + 1];
+//
+//                                                   NSLog(@"%@", obj);
+//                                                   if( [obj isKindOfClass:[NSString class]] )
+//                                                   {
+//
+//                                                   }
+//                                                   else if( [obj isKindOfClass:[SBDBaseMessage class]] )
+//                                                   {
+//                                                       SBDBaseMessage *baseMessage = arM[i];
+//                                                       [arM_Tmp addObject:baseMessage];
+//
+//                                                       long long llCreateAt = baseMessage.createdAt;
+//                                                       long long llOldCreateAt = [[self getDateNumberHour:llCreateAt] longLongValue] ;
+//
+//                                                       SBDBaseMessage *nextBaseMessage = arM[i + 1];
+//                                                       llCreateAt = nextBaseMessage.createdAt;
+//                                                       long long llAfterCreateAt = [[self getDateNumberHour:llCreateAt] longLongValue] ;
+//
+//                                                       if( llOldCreateAt < llAfterCreateAt )
+//                                                       {
+//                                                           [arM_Tmp addObject:[self getDateNumber:llCreateAt]];
+//                                                       }
+//                                                   }
+//                                               }
+//
+//                                               SBDBaseMessage *baseMessage = [arM lastObject];
+//                                               [arM_Tmp addObject:baseMessage];
+//
+//
+//                                               [arM_Tmp addObjectsFromArray:self.messages];
+//                                               [self.messages removeAllObjects];
+//                                               self.messages = [NSMutableArray arrayWithArray:arM_Tmp];
+//                                           }
+//                                           else
+//                                           {
+//                                               [arM addObjectsFromArray:self.messages];
+//                                               [self.messages removeAllObjects];
+//                                               self.messages = [NSMutableArray arrayWithArray:arM];
+//                                           }
                                        }
+
                                        
                                        for (SBDBaseMessage *message in messages)
                                        {
@@ -938,7 +1180,12 @@ typedef enum {
                                                self.minMessageTimestamp = message.createdAt;
                                            }
                                        }
-                                       
+
+                                       NSMutableArray *arM_Messages = [NSMutableArray arrayWithArray:messages];
+                                       [arM_Messages addObjectsFromArray:self.messages];
+                                       [self.messages removeAllObjects];
+                                       self.messages = [NSMutableArray arrayWithArray:arM_Messages];
+
                                        dispatch_async(dispatch_get_main_queue(), ^{
                                            CGSize contentSizeBefore = self.tbv_List.contentSize;
                                            
@@ -961,22 +1208,27 @@ typedef enum {
                                    else
                                    {
                                        //초기 로드
-                                       NSMutableArray *arM = [NSMutableArray arrayWithArray:messages];
-                                       for( NSInteger i = 0; i < arM.count; i++ )
+                                       NSMutableArray *arM = [NSMutableArray array];
+                                       for( NSInteger i = 0; i < messages.count; i++ )
                                        {
-                                           SBDBaseMessage *baseMessage = arM[i];
+                                           SBDBaseMessage *baseMessage = messages[i];
                                            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
                                            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-                                           NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//                                           NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
                                            
-                                           if( [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_ENTER"] ||
-                                              [[dic objectForKey_YM:@"type"] isEqualToString:@"enterBotRoom"] )
+                                           if( [userMessage.customType isEqualToString:@"USER_ENTER"] ||
+                                              [userMessage.customType isEqualToString:@"enterBotRoom"] ||
+                                              [userMessage.customType isEqualToString:@"cmd"] )
                                            {
                                                [self.channel deleteMessage:baseMessage completionHandler:^(SBDError * _Nullable error) {
                                                    
                                                }];
                                                
-                                               [arM removeObjectAtIndex:i];
+//                                               [arM removeObjectAtIndex:i];
+                                           }
+                                           else
+                                           {
+                                               [arM addObject:baseMessage];
                                            }
                                        }
                                        
@@ -997,11 +1249,44 @@ typedef enum {
                                            }
                                        }
                                        
+//                                       if( arM.count > 1 )
+//                                       {
+//                                           //이전 메세지 검사해서 날짜 넣어주기
+//                                           NSMutableArray *arM_Tmp = [NSMutableArray array];
+//                                           for( NSInteger i = 0; i < self.messages.count - 1; i++ )
+//                                           {
+//                                               SBDBaseMessage *baseMessage = self.messages[i];
+//                                               [arM_Tmp addObject:baseMessage];
+//
+//                                               long long llCreateAt = baseMessage.createdAt;
+//                                               long long llOldCreateAt = [[self getDateNumberHour:llCreateAt] longLongValue] ;
+//
+//                                               SBDBaseMessage *nextBaseMessage = self.messages[i + 1];
+//                                               llCreateAt = nextBaseMessage.createdAt;
+//                                               long long llAfterCreateAt = [[self getDateNumberHour:llCreateAt] longLongValue] ;
+//
+//                                               if( llOldCreateAt < llAfterCreateAt )
+//                                               {
+//                                                   [arM_Tmp addObject:[self getDateNumber:llCreateAt]];
+//                                               }
+//                                           }
+//
+//                                           SBDBaseMessage *baseMessage = [self.messages lastObject];
+//                                           [arM_Tmp addObject:baseMessage];
+//
+//                                           id lastObj = [arM_Tmp lastObject];
+//                                           if( [lastObj isKindOfClass:[NSString class]] )
+//                                           {
+//                                               [arM_Tmp removeLastObject];
+//                                           }
+//
+//                                           self.messages = [NSMutableArray arrayWithArray:arM_Tmp];
+//                                       }
                                        
                                        if( self.isAskMode && self.isPdfMode && self.str_PdfImageUrl.length > 0 )
                                        {
                                            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
-                                           [self addTmpImage];
+//                                           [self addTmpImage];
                                            [self performSelector:@selector(scrollToBottomInterval:) withObject:[NSNumber numberWithBool:NO] afterDelay:0.3f];
                                            self.v_CommentKeyboardAccView.lc_AddWidth.constant = 54.f;
                                        }
@@ -1018,11 +1303,12 @@ typedef enum {
                                            
                                            [self.tbv_List reloadData];
                                            [self.tbv_List layoutIfNeeded];
-                                           [self performSelector:@selector(scrollToBottomInterval:) withObject:[NSNumber numberWithBool:NO] afterDelay:0.3f];
+//                                           [self performSelector:@selector(scrollToBottomInterval:) withObject:[NSNumber numberWithBool:NO] afterDelay:0.3f];
                                            
                                            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                                                
                                                [self.tbv_List reloadData];
+                                               [self performSelector:@selector(scrollToBottomInterval:) withObject:[NSNumber numberWithBool:NO] afterDelay:0.1f];
                                                //                                               [self.tbv_List layoutIfNeeded];
                                            });
                                            
@@ -1142,14 +1428,17 @@ typedef enum {
                                              selector:@selector(keyboardWillAnimate:)
                                                  name:UIKeyboardWillHideNotification
                                                object:nil];
+    
+//    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onUpdateRoomStatus) name:@"UpdateRoomStatus" object:nil];
+
 
     [self getNextMessage];
     
-    if( self.dic_MoveExamInfo )
-    {
-        [self didSelectedItem:self.dic_MoveExamInfo];
-        self.dic_MoveExamInfo = nil;
-    }
+//    if( self.dic_MoveExamInfo )
+//    {
+//        [self didSelectedItem:self.dic_MoveExamInfo];
+//        self.dic_MoveExamInfo = nil;
+//    }
     
     //    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onShareExamNoti:) name:@"ShareExamNoti" object:nil];
     
@@ -1162,6 +1451,11 @@ typedef enum {
     //    self.tm_MessageQ = [NSTimer scheduledTimerWithTimeInterval:1.0f target:self selector:@selector(onSendMessage) userInfo:nil repeats:YES];
     //    [[NSRunLoop mainRunLoop] addTimer:self.tm_MessageQ forMode:NSRunLoopCommonModes];  //메인스레드에 돌리면 터치를 잡고 있을때 어는 현상이 있어서 스레드 분기시킴
 }
+
+//- (void)onUpdateRoomStatus
+//{
+//    [self updateRoomStatus:@"leave"];
+//}
 
 - (void)viewDidAppear:(BOOL)animated
 {
@@ -1199,6 +1493,10 @@ typedef enum {
                                                     name:UIKeyboardWillHideNotification
                                                   object:nil];
     
+//    [[NSNotificationCenter defaultCenter] removeObserver:self
+//                                                    name:@"UpdateRoomStatus"
+//                                                  object:nil];
+
     //    [[NSNotificationCenter defaultCenter] removeObserver:self
     //                                                    name:@"ShareExamNoti"
     //                                                  object:nil];
@@ -1404,6 +1702,36 @@ typedef enum {
     
 }
 
+- (void)updateAtList:(NSString *)aType
+{
+    __weak __typeof(&*self)weakSelf = self;
+
+    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+                                        [Util getUUID], @"uuid",
+                                        aType, @"userType",
+                                        nil];
+
+    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/get/exist/chat/room/user/list"
+                                        param:dicM_Params
+                                   withMethod:@"GET"
+                                    withBlock:^(id resulte, NSError *error) {
+                                        
+                                        [MBProgressHUD hide];
+                                        
+                                        if( resulte )
+                                        {
+                                            NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+                                            if( nCode == 200 )
+                                            {
+                                                weakSelf.arM_AtList = [NSMutableArray arrayWithArray:[resulte objectForKey:@"userListInfos"]];
+                                                weakSelf.arM_AtListBackUp = [NSMutableArray arrayWithArray:[resulte objectForKey:@"userListInfos"]];
+
+                                            }
+                                        }
+                                    }];
+}
+
 
 #pragma mark - Notification
 - (void)keyboardWillAnimate:(NSNotification *)notification
@@ -1428,14 +1756,24 @@ typedef enum {
 //                [self showTempleteKeyboard];
 //            }
             
+            if( self.dic_BotInfo && self.arM_AutoAnswer.count > 0 )
+            {
+                self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = NO;
+            }
+
             self.v_CommentKeyboardAccView.lc_Bottom.constant = keyboardBounds.size.height;
             
             //            self.v_CommentKeyboardAccView.lc_AddWidth.constant = 63.f;
-            
-            [self moveToScroll:NO];
+            [self performSelector:@selector(moveToScrollNumber:) withObject:@YES afterDelay:0.3f];
+//            [self moveToScroll:YES];
         }
         else if([notification name] == UIKeyboardWillHideNotification)
         {
+//            if( self.dic_BotInfo && self.arM_AutoAnswer.count > 0 )
+//            {
+//                self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = NO;
+//            }
+            
 //            if( bLastKeybaordStatus )
 //            {
 //                //템플릿 키보드면
@@ -1469,6 +1807,11 @@ typedef enum {
         [self.v_CommentKeyboardAccView setNeedsLayout];
         
     }];
+}
+
+- (void)moveToScrollNumber:(NSNumber *)num
+{
+    [self moveToScroll:[num boolValue]];
 }
 
 - (void)moveToScroll:(BOOL)isAnimation
@@ -1516,106 +1859,150 @@ typedef enum {
 
 - (void)updateTopData
 {
-    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
-                                        [Util getUUID], @"uuid",
-                                        self.str_RId, @"rId",
-                                        nil];
-    //http://dev2.thoting.com/api/v1/get/chat/room/header/info?uuid=3FF1C31A-7B8A-48DF-8EDB-ACC7212C85B4&rId=515&apiToken=753a15183f55198a4e85bb10542836a9
-    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/get/chat/room/header/info"
-                                        param:dicM_Params
-                                   withMethod:@"GET"
-                                    withBlock:^(id resulte, NSError *error) {
-                                        
-                                        [MBProgressHUD hide];
-                                        
-                                        if( resulte )
-                                        {
-                                            NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
-                                            if( nCode == 200 )
-                                            {
-                                                NSArray *ar_Tmp = [NSArray arrayWithArray:[resulte objectForKey:@"userListInfos"]];
-                                                for( NSInteger i = 0; i < ar_Tmp.count; i++ )
-                                                {
-                                                    NSDictionary *dic = [ar_Tmp objectAtIndex:i];
-                                                    [self.arM_User addObject:[dic objectForKey:@"userId"]];
-                                                }
-                                                
-                                                self.dic_Data = [NSDictionary dictionaryWithDictionary:resulte];
-                                                
-                                                str_UserImagePrefix = [resulte objectForKey:@"userImg_prefix"];
-                                                
-                                                str_ChannelId = [resulte objectForKey_YM:@"channelId"];
-                                                
-                                                NSString *str_HeaderUrl = [resulte objectForKey_YM:@"userImg_prefix"];
-                                                if( str_HeaderUrl.length > 0 )
-                                                {
-                                                    str_ImagePrefix = [resulte objectForKey_YM:@"userImg_prefix"];
-                                                }
-                                                
-                                                str_HeaderUrl = [resulte objectForKey_YM:@"image_prefix"];
-                                                if( str_HeaderUrl.length > 0 )
-                                                {
-                                                    str_ImagePreFix = [resulte objectForKey_YM:@"image_prefix"];
-                                                }
-                                                else
-                                                {
-                                                    str_ImagePreFix = @"http://data.thoting.com:8282/c_edujm/exam/";
-                                                }
-                                                
-                                                self.lb_Title.text = [resulte objectForKey_YM:@"roomName"];
-                                                self.lb_GroupCount.text = @"";
-                                                
-                                                str_ChatType = [resulte objectForKey:@"roomType"];
-                                                if( [str_ChatType isEqualToString:@"group"] )
-                                                {
-                                                    self.btn_GroupInfo.hidden = NO;
-                                                    self.iv_TopUser.hidden = YES;
-                                                }
-                                                else if( [str_ChatType isEqualToString:@"channel"] )
-                                                {
-                                                    self.btn_GroupInfo.hidden = YES;
-                                                    self.iv_TopUser.hidden = NO;
-                                                }
-                                                else if( [str_ChatType isEqualToString:@"user"] )
-                                                {
-                                                    self.btn_GroupInfo.hidden = YES;
-                                                    self.iv_TopUser.hidden = NO;
-                                                }
-                                                
-                                                if( [str_ChatType isEqualToString:@"group"] )
-                                                {
-                                                    self.lb_TotalUserCount.text = [NSString stringWithFormat:@"%@", [resulte objectForKey_YM:@"userCount"]];
-                                                    self.iv_TopUser.backgroundColor = self.roomColor ? self.roomColor : [UIColor colorWithHexString:@"9ED8EB"];
-                                                }
-                                                else if( [str_ChatType isEqualToString:@"channel"] )
-                                                {
-                                                    self.lb_TotalUserCount.text = [NSString stringWithFormat:@"%@", [resulte objectForKey_YM:@"userCount"]];
-                                                    [self.iv_TopUser sd_setImageWithURL:self.channelImageUrl];
-                                                }
-                                                else if( [str_ChatType isEqualToString:@"user"] )
-                                                {
-                                                    self.lb_Title.text = [resulte objectForKey_YM:@"userName"];
-                                                    [self.iv_TopUser sd_setImageWithURL:[Util createImageUrl:str_UserImagePrefix
-                                                                                                  withFooter:[resulte objectForKey_YM:@"thumbnail"]] placeholderImage:BundleImage(@"no_image.png")];
-                                                }
-                                                
-                                                dispatch_queue_t dumpLoadQueue = dispatch_queue_create("com.sendbird.dumploadqueue", DISPATCH_QUEUE_CONCURRENT);
-                                                dispatch_async(dumpLoadQueue, ^{
-                                                    
-                                                    dispatch_async(dispatch_get_main_queue(), ^{
-                                                        
-                                                        [self.tbv_List reloadData];
-                                                        [self.tbv_List setNeedsLayout];
-                                                    });
-                                                });
-                                            }
-                                            else
-                                            {
-                                                [self.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
-                                            }
-                                        }
-                                    }];
+    if( str_UserImagePrefix == nil || str_UserImagePrefix.length <= 0 )
+    {
+        str_UserImagePrefix = [[NSUserDefaults standardUserDefaults] objectForKey:@"userImg_prefix"];
+    }
+
+//    SBDUserMessage *lastMessage = (SBDUserMessage *)self.channel.lastMessage;
+//    self.lb_Title.text = self.channel.name;
+    
+    if( self.channel.memberCount == 2 )
+    {
+        for( NSInteger i = 0; i < self.channel.memberCount; i++ )
+        {
+            SBDUser *user = self.channel.members[i];
+            NSString *str_MyUserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+            if( [str_MyUserId isEqualToString:user.userId] == NO )
+            {
+                [self.btn_Title setTitle:user.nickname forState:UIControlStateNormal];
+                break;
+            }
+        }
+    }
+    else
+    {
+        [self.btn_Title setTitle:self.channel.name forState:UIControlStateNormal];
+    }
+    
+    
+    
+//    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+//                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+//                                        [Util getUUID], @"uuid",
+//                                        self.str_RId, @"rId",
+//                                        nil];
+//    //http://dev2.thoting.com/api/v1/get/chat/room/header/info?uuid=3FF1C31A-7B8A-48DF-8EDB-ACC7212C85B4&rId=515&apiToken=753a15183f55198a4e85bb10542836a9
+//    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/get/chat/room/header/info"
+//                                        param:dicM_Params
+//                                   withMethod:@"GET"
+//                                    withBlock:^(id resulte, NSError *error) {
+//
+//                                        [MBProgressHUD hide];
+//
+//                                        if( resulte )
+//                                        {
+//                                            NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+//                                            if( nCode == 200 )
+//                                            {
+//                                                NSArray *ar_Tmp = [NSArray arrayWithArray:[resulte objectForKey:@"userListInfos"]];
+//                                                for( NSInteger i = 0; i < ar_Tmp.count; i++ )
+//                                                {
+//                                                    NSDictionary *dic = [ar_Tmp objectAtIndex:i];
+//                                                    [self.arM_User addObject:[dic objectForKey:@"userId"]];
+//                                                }
+//
+//                                                self.dic_Data = [NSDictionary dictionaryWithDictionary:resulte];
+//
+//                                                str_UserImagePrefix = [resulte objectForKey:@"userImg_prefix"];
+//
+//                                                str_ChannelId = [resulte objectForKey_YM:@"channelId"];
+//
+//                                                NSString *str_HeaderUrl = [resulte objectForKey_YM:@"userImg_prefix"];
+//                                                if( str_HeaderUrl.length > 0 )
+//                                                {
+//                                                    str_ImagePrefix = [resulte objectForKey_YM:@"userImg_prefix"];
+//                                                }
+//
+//                                                str_HeaderUrl = [resulte objectForKey_YM:@"image_prefix"];
+//                                                if( str_HeaderUrl.length > 0 )
+//                                                {
+//                                                    str_ImagePreFix = [resulte objectForKey_YM:@"image_prefix"];
+//                                                }
+//                                                else
+//                                                {
+//                                                    str_ImagePreFix = @"http://data.thoting.com:8282/c_edujm/exam/";
+//                                                }
+//
+////                                                self.lb_Title.text = [resulte objectForKey_YM:@"roomName"];
+//                                                [self.btn_Title setTitle:self.channel.name forState:UIControlStateNormal];
+//                                                self.lb_GroupCount.text = @"";
+//
+//                                                str_ChatType = [resulte objectForKey:@"roomType"];
+//                                                if( [str_ChatType isEqualToString:@"group"] )
+//                                                {
+////                                                    self.btn_GroupInfo.hidden = NO;
+////                                                    self.iv_TopUser.hidden = YES;
+//                                                }
+//                                                else if( [str_ChatType isEqualToString:@"channel"] )
+//                                                {
+////                                                    self.btn_GroupInfo.hidden = YES;
+////                                                    self.iv_TopUser.hidden = NO;
+//                                                }
+//                                                else if( [str_ChatType isEqualToString:@"user"] || [str_ChatType isEqualToString:@"chatBot"] )
+//                                                {
+////                                                    self.btn_GroupInfo.hidden = YES;
+////                                                    self.iv_TopUser.hidden = NO;
+//                                                }
+//
+//                                                if( self.channel.memberCount > 2 && [str_ChatType isEqualToString:@"group"] )
+//                                                {
+////                                                    self.lb_TotalUserCount.text = str_TotalUserCount;
+//                                                    self.iv_TopUser.backgroundColor = self.roomColor ? self.roomColor : [UIColor colorWithHexString:@"9ED8EB"];
+//                                                }
+//                                                else if( [str_ChatType isEqualToString:@"channel"] )
+//                                                {
+//                                                    self.lb_TotalUserCount.text = [NSString stringWithFormat:@"%@", [resulte objectForKey_YM:@"userCount"]];
+//                                                    [self.iv_TopUser sd_setImageWithURL:self.channelImageUrl];
+//                                                }
+//                                                else if( [str_ChatType isEqualToString:@"user"] || [str_ChatType isEqualToString:@"chatBot"] )
+//                                                {
+//                                                    str_TargetUserImageUrl = [resulte objectForKey_YM:@"thumbnail"];
+//                                                    str_TargetUserName = [resulte objectForKey_YM:@"userName"];
+//
+//                                                    if( self.channel.memberCount <= 2 || [str_ChatType isEqualToString:@"chatBot"] )
+////                                                    if( 1 )
+//                                                    {
+//                                                        [self.btn_Title setTitle:@"       " forState:UIControlStateNormal];
+//                                                        self.iv_TopUser.alpha = YES;
+//                                                        self.iv_TopUser.hidden = NO;
+//                                                    }
+//                                                    else
+//                                                    {
+//                                                        [self.btn_Title setTitle:str_TargetUserName forState:UIControlStateNormal];
+//                                                    }
+////                                                    self.lb_Title.text = [resulte objectForKey_YM:@"userName"];
+//                                                    [self.iv_TopUser sd_setImageWithURL:[Util createImageUrl:str_UserImagePrefix
+//                                                                                                  withFooter:[resulte objectForKey_YM:@"thumbnail"]] placeholderImage:BundleImage(@"no_image.png")];
+////                                                    [self.btn_Title setTitle:self.str_RoomTitle forState:UIControlStateNormal];
+//                                                }
+//
+//                                                dispatch_queue_t dumpLoadQueue = dispatch_queue_create("com.sendbird.dumploadqueue", DISPATCH_QUEUE_CONCURRENT);
+//                                                dispatch_async(dumpLoadQueue, ^{
+//
+//                                                    dispatch_async(dispatch_get_main_queue(), ^{
+//
+//                                                        [self.tbv_List reloadData];
+//                                                        [self.tbv_List setNeedsLayout];
+//                                                    });
+//                                                });
+//                                            }
+//                                            else
+//                                            {
+//                                                [self.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
+//                                            }
+//                                        }
+//                                    }];
 }
 
 - (void)updateList:(BOOL)isNew
@@ -1862,7 +2249,13 @@ typedef enum {
     if( self.messages.count > 0 )
     {
         CGPoint offset = CGPointMake(0, self.tbv_List.contentSize.height - self.tbv_List.frame.size.height);
-        [self.tbv_List setContentOffset:offset animated:animated];
+        
+        [UIView animateWithDuration:0.1f animations:^{
+        
+            [self.tbv_List setContentOffset:offset];
+//            [self.tbv_List setContentOffset:offset animated:animated];
+        }];
+        
         
         //        NSIndexPath *indexPath = [NSIndexPath indexPathForRow:self.arM_List.count-1 inSection:0];
         //        [self.tbv_List scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionBottom animated:animated];
@@ -1989,6 +2382,7 @@ typedef enum {
 }
 
 
+
 #pragma mark - UIScrollViewDelegate
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView
 {
@@ -2033,6 +2427,931 @@ typedef enum {
 }
 
 
+- (NSString *)getDateNumber:(long long)lldate
+{
+    NSTimeInterval seconds = lldate / 1000;
+    NSDate *date = [NSDate dateWithTimeIntervalSince1970:seconds];
+    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init] ;
+    [dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss"];  // here replace your format dd.MM.yyyy
+    NSLog(@"result: %@", [dateFormatter stringFromDate:date]);
+    
+    NSCalendar* calendar = [NSCalendar currentCalendar];
+    NSDateComponents* components = [calendar components:NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay|NSCalendarUnitHour|NSCalendarUnitMinute|NSCalendarUnitSecond fromDate:date];
+    NSInteger nYear = [components year];
+    NSInteger nMonth = [components month];
+    NSInteger nDay = [components day];
+    NSInteger nHour = [components hour];
+    NSInteger nMinute = [components minute];
+    //        NSInteger nSecond = [components second];
+    
+    NSString *str_Date = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld", nYear, nMonth, nDay, nHour, nMinute];
+    return str_Date;
+}
+
+- (NSString *)getDateNumberHour:(long long)lldate
+{
+    NSTimeInterval seconds = lldate / 1000;
+    NSDate *date = [NSDate dateWithTimeIntervalSince1970:seconds];
+    NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init] ;
+    [dateFormatter setDateFormat:@"yyyy-MM-dd HH:mm:ss"];  // here replace your format dd.MM.yyyy
+    NSLog(@"result: %@", [dateFormatter stringFromDate:date]);
+    
+    NSCalendar* calendar = [NSCalendar currentCalendar];
+    NSDateComponents* components = [calendar components:NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay|NSCalendarUnitHour|NSCalendarUnitMinute|NSCalendarUnitSecond fromDate:date];
+    NSInteger nYear = [components year];
+    NSInteger nMonth = [components month];
+    NSInteger nDay = [components day];
+    NSInteger nHour = [components hour];
+//    NSInteger nMinute = [components minute];
+    //        NSInteger nSecond = [components second];
+    
+    NSString *str_Date = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld", nYear, nMonth, nDay, nHour];
+    return str_Date;
+}
+
+
+#pragma mark - setCell
+- (void)myTextCell:(MyChatBasicCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    SBDBaseMessage *baseMessage = self.messages[indexPath.row];
+    SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+    NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    
+    SBDUser *user = userMessage.sender;
+    NSLog(@"%@", user.userId);
+    NSLog(@"%@", user.profileUrl);
+    
+    cell.rightUtilityButtons = [self rightButtons];
+    cell.delegate = self;
+
+    long long llCreateAt = baseMessage.createdAt;
+    NSString *str_Date = [self getDateNumber:llCreateAt];
+
+    UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+    [btn_Date setTitle:[Util getDetailDate:[NSString stringWithFormat:@"%@", str_Date]] forState:0];
+
+    cell.lc_Top.constant = 12.f;
+    
+    
+    if( indexPath.row > 0 )
+    {
+        //이전 메세지
+        id message = self.messages[indexPath.row - 1];
+        if( [message isKindOfClass:[SBDAdminMessage class]] == NO && [message isKindOfClass:[NSString class]] == NO )
+        {
+            SBDBaseMessage *prev_baseMessage = self.messages[indexPath.row - 1];
+            SBDUserMessage *prev_userMessage = (SBDUserMessage *)prev_baseMessage;
+            //        SBDUser *prev_user = prev_userMessage.sender;
+            
+            //        NSData *data = [prev_userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+            //        NSDictionary *dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            
+            NSInteger nTime = 0;
+            NSInteger nPrevTime = 0;
+            
+            NSInteger nUserId = [userMessage.sender.userId integerValue];
+            NSInteger nNextUserId = [prev_userMessage.sender.userId integerValue];
+            
+            long long llprevCreateAt = prev_baseMessage.createdAt;
+            
+            NSString *str_PrevDate = [self getDateNumber:llprevCreateAt];
+            
+            if( str_Date.length >= 12 && str_PrevDate.length >= 12 )
+            {
+                nTime = [[str_Date substringWithRange:NSMakeRange(0, 12)] integerValue];
+                nPrevTime = [[str_PrevDate substringWithRange:NSMakeRange(0, 12)] integerValue];
+            }
+            
+            if( nUserId == nNextUserId )
+            {
+                //이전 메세지가 내 메세지면
+                if( nTime == nPrevTime )
+                {
+                    //1분 이내의 메세지
+                    cell.lc_Top.constant = 0.f;
+                }
+                else
+                {
+                    //1분이 지난 메세지
+                    //                cell.lc_Top.constant = 15.f;
+                }
+            }
+            else
+            {
+                //이전 메세지가 내 메세지가 아니면
+                cell.lc_Top.constant = 15.f;
+            }
+        }
+    }
+
+    [self hidenDateIfNeed:cell indexPath:indexPath];
+    
+    NSString *str_IsDone = [dic objectForKey_YM:@"isDone"];
+    cell.btn_Read.selected = ![str_IsDone isEqualToString:@"N"];
+    
+    [self addContent:cell withString:userMessage.message];
+    
+    cell.tag = indexPath.row;
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+    longPress.numberOfTouchesRequired = 1;
+    longPress.delegate = self;
+    longPress.cancelsTouchesInView = NO;
+    [cell addGestureRecognizer:longPress];
+    
+    [self addTapGesture:cell];
+}
+
+- (void)otherTextCell:(OtherChatBasicCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
+{
+//    if( self.channel.memberCount == 2 )
+//    {
+//        //1:1챗이면
+//        cell.lc_NameHeight.constant = 0.f;
+//    }
+
+    cell.lc_NameHeight.constant = 0.f;
+    
+    SBDBaseMessage *baseMessage = self.messages[indexPath.row];
+    SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+    NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    
+    SBDUser *user = userMessage.sender;
+    NSLog(@"%@", user.userId);
+    NSLog(@"%@", user.profileUrl);
+    
+    cell.lc_Top.constant = 8.f;
+    
+    cell.rightUtilityButtons = [self rightButtons];
+    cell.delegate = self;
+    
+    long long llCreateAt = baseMessage.createdAt;
+    NSString *str_Date = [self getDateNumber:llCreateAt];
+    
+    UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+    [btn_Date setTitle:[Util getDetailDate:[NSString stringWithFormat:@"%@", str_Date]] forState:0];
+
+    if( indexPath.row > 0 )
+    {
+        //이전 메세지
+        id message = self.messages[indexPath.row - 1];
+        if( [message isKindOfClass:[SBDAdminMessage class]] == NO && [message isKindOfClass:[NSString class]] == NO )
+        {
+            SBDBaseMessage *prev_baseMessage = self.messages[indexPath.row - 1];
+            SBDUserMessage *prev_userMessage = (SBDUserMessage *)prev_baseMessage;
+            //        SBDUser *prev_user = prev_userMessage.sender;
+            
+            //        NSData *data = [prev_userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+            //        NSDictionary *dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            
+            NSInteger nTime = 0;
+            NSInteger nPrevTime = 0;
+            
+            NSInteger nUserId = [userMessage.sender.userId integerValue];
+            NSInteger nNextUserId = [prev_userMessage.sender.userId integerValue];
+            
+            long long llprevCreateAt = prev_baseMessage.createdAt;
+            
+            NSString *str_PrevDate = [self getDateNumber:llprevCreateAt];
+            
+            if( str_Date.length >= 12 && str_PrevDate.length >= 12 )
+            {
+                nTime = [[str_Date substringWithRange:NSMakeRange(0, 12)] integerValue];
+                nPrevTime = [[str_PrevDate substringWithRange:NSMakeRange(0, 12)] integerValue];
+            }
+            
+            if( nUserId == nNextUserId )
+            {
+                //이전 메세지가 내 메세지면
+                if( nTime == nPrevTime )
+                {
+                    //1분 이내의 메세지
+                    cell.iv_User.hidden = YES;
+                    cell.lc_Top.constant = 0.f;
+                }
+                else
+                {
+                    //1분이 지난 메세지
+                    cell.lc_NameHeight.constant = 15.f;
+                    cell.iv_User.hidden = NO;
+                    cell.lc_Top.constant = 15.f;
+                }
+            }
+            else
+            {
+                //이전 메세지가 내 메세지가 아니면
+                cell.lc_NameHeight.constant = 15.f;
+                cell.iv_User.hidden = NO;
+                cell.lc_Top.constant = 15.f;
+            }
+        }
+    }
+//    [self hidenDateIfNeed:cell indexPath:indexPath];
+    
+    cell.lb_Contents.textColor = [UIColor blackColor];
+    cell.v_ContentsBg.backgroundColor = [UIColor whiteColor];
+    cell.v_ContentsBg.layer.borderColor = [UIColor colorWithRed:220.f/255.f green:220.f/255.f blue:220.f/255.f alpha:1].CGColor;
+    cell.v_ContentsBg.layer.borderWidth = 1.f;
+
+    NSString *str_IsDone = [dic objectForKey_YM:@"isDone"];
+    cell.btn_Read.selected = ![str_IsDone isEqualToString:@"N"];
+    
+    [self addContent:cell withString:userMessage.message];
+    
+    cell.lb_Name.text = user.nickname;
+    
+    [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"no_image.png")];
+    cell.iv_User.tag = indexPath.row;
+    cell.iv_User.userInteractionEnabled = YES;
+    UITapGestureRecognizer *imageTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(userImageTap:)];
+    [imageTap setNumberOfTapsRequired:1];
+    [cell.iv_User addGestureRecognizer:imageTap];
+
+    if( cell.lb_Name.text.length <= 0 )
+    {
+        cell.lc_NameHeight.constant = 0.f;
+    }
+    
+    [self addTapGesture:cell];
+    
+    cell.tag = indexPath.row;
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+    longPress.numberOfTouchesRequired = 1;
+    longPress.delegate = self;
+    longPress.cancelsTouchesInView = NO;
+    [cell addGestureRecognizer:longPress];
+    
+    [self addTapGesture:cell];
+}
+
+- (void)twoOtherTextCell:(TwoOtherChatCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    //    if( self.channel.memberCount == 2 )
+    //    {
+    //        //1:1챗이면
+    //        cell.lc_NameHeight.constant = 0.f;
+    //    }
+    
+    cell.lc_NameHeight.constant = 0.f;
+    
+    SBDBaseMessage *baseMessage = self.messages[indexPath.row];
+    SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+    NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    
+    SBDUser *user = userMessage.sender;
+    NSLog(@"%@", user.userId);
+    NSLog(@"%@", user.profileUrl);
+    
+    cell.lc_Top.constant = 8.f;
+    
+    cell.rightUtilityButtons = [self rightButtons];
+    cell.delegate = self;
+    
+    long long llCreateAt = baseMessage.createdAt;
+    NSString *str_Date = [self getDateNumber:llCreateAt];
+    
+    UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+    [btn_Date setTitle:[Util getDetailDate:[NSString stringWithFormat:@"%@", str_Date]] forState:0];
+    
+    if( indexPath.row > 0 )
+    {
+        //이전 메세지
+        id message = self.messages[indexPath.row - 1];
+        if( [message isKindOfClass:[SBDAdminMessage class]] == NO && [message isKindOfClass:[NSString class]] == NO )
+        {
+            SBDBaseMessage *prev_baseMessage = self.messages[indexPath.row - 1];
+            SBDUserMessage *prev_userMessage = (SBDUserMessage *)prev_baseMessage;
+            //        SBDUser *prev_user = prev_userMessage.sender;
+            
+            //        NSData *data = [prev_userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+            //        NSDictionary *dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            
+            NSInteger nTime = 0;
+            NSInteger nPrevTime = 0;
+            
+            NSInteger nUserId = [userMessage.sender.userId integerValue];
+            NSInteger nNextUserId = [prev_userMessage.sender.userId integerValue];
+            
+            long long llprevCreateAt = prev_baseMessage.createdAt;
+            
+            NSString *str_PrevDate = [self getDateNumber:llprevCreateAt];
+            
+            if( str_Date.length >= 12 && str_PrevDate.length >= 12 )
+            {
+                nTime = [[str_Date substringWithRange:NSMakeRange(0, 12)] integerValue];
+                nPrevTime = [[str_PrevDate substringWithRange:NSMakeRange(0, 12)] integerValue];
+            }
+            
+            if( nUserId == nNextUserId )
+            {
+                //이전 메세지가 내 메세지면
+                if( nTime == nPrevTime )
+                {
+                    //1분 이내의 메세지
+                    cell.iv_User.hidden = YES;
+                    cell.lc_Top.constant = 0.f;
+                }
+                else
+                {
+                    //1분이 지난 메세지
+                    cell.lc_NameHeight.constant = 15.f;
+                    cell.iv_User.hidden = NO;
+                    cell.lc_Top.constant = 15.f;
+                }
+            }
+            else
+            {
+                //이전 메세지가 내 메세지가 아니면
+                cell.lc_NameHeight.constant = 15.f;
+                cell.iv_User.hidden = NO;
+                cell.lc_Top.constant = 15.f;
+            }
+        }
+    }
+    //    [self hidenDateIfNeed:cell indexPath:indexPath];
+    
+    cell.lb_Contents.textColor = [UIColor blackColor];
+    cell.v_ContentsBg.backgroundColor = [UIColor whiteColor];
+    cell.v_ContentsBg.layer.borderColor = [UIColor colorWithRed:220.f/255.f green:220.f/255.f blue:220.f/255.f alpha:1].CGColor;
+    cell.v_ContentsBg.layer.borderWidth = 1.f;
+    
+    cell.lb_Contents2.textColor = kMainColor;
+    cell.v_ContentsBg2.backgroundColor = [UIColor whiteColor];
+    cell.v_ContentsBg2.layer.borderColor = kMainColor.CGColor;
+    cell.v_ContentsBg2.layer.borderWidth = 1.f;
+
+    NSDictionary *dic_BtnInfo = [dic objectForKey:@"btnInfo"];
+    cell.lb_Contents2.text = [NSString stringWithFormat:@"@%@", [dic_BtnInfo objectForKey:@"btnLabel"]];
+    cell.btn_BotName.tag = indexPath.row;
+    [cell.btn_BotName addTarget:self action:@selector(onAddInputBotName:) forControlEvents:UIControlEventTouchUpInside];
+
+    
+    
+    NSString *str_IsDone = [dic objectForKey_YM:@"isDone"];
+    cell.btn_Read.selected = ![str_IsDone isEqualToString:@"N"];
+    
+    [self addContent:cell withString:userMessage.message];
+    
+    
+    cell.lb_Name.text = user.nickname;
+    
+    [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"no_image.png")];
+    cell.iv_User.tag = indexPath.row;
+    cell.iv_User.userInteractionEnabled = YES;
+    UITapGestureRecognizer *imageTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(userImageTap:)];
+    [imageTap setNumberOfTapsRequired:1];
+    [cell.iv_User addGestureRecognizer:imageTap];
+    
+    if( cell.lb_Name.text.length <= 0 )
+    {
+        cell.lc_NameHeight.constant = 0.f;
+    }
+    
+//    [self addTapGesture:cell];
+    
+    cell.tag = indexPath.row;
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+    longPress.numberOfTouchesRequired = 1;
+    longPress.delegate = self;
+    longPress.cancelsTouchesInView = NO;
+    [cell addGestureRecognizer:longPress];
+    
+    [self addTapGesture:cell];
+}
+
+- (CGFloat)setMyImageCell:(id)message withCell:(MyImageCell *)cell withIndexPath:(NSIndexPath *)indexPath withVideo:(BOOL)isVideo
+{
+    SBDBaseMessage *baseMessage = nil;
+    SBDUserMessage *userMessage = nil;
+    NSDictionary *dic = nil;
+    if( [message isKindOfClass:[SBDBaseMessage class]] )
+    {
+        baseMessage = (SBDBaseMessage *)message;
+        userMessage = (SBDUserMessage *)baseMessage;
+        NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+        dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    }
+    else
+    {
+        dic = message;
+    }
+    
+    NSString *str_IsDone = [dic objectForKey_YM:@"isDone"];
+    cell.btn_Read.selected = ![str_IsDone isEqualToString:@"N"];
+    
+    if( isVideo )
+    {
+        cell.v_Video.hidden = NO;
+    }
+    else
+    {
+        cell.v_Video.hidden = YES;
+    }
+    
+    [cell.btn_Origin removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+
+
+    BOOL isPrevMy = NO;
+    long long llCreateAt = baseMessage.createdAt;
+    NSString *str_Date = [self getDateNumber:llCreateAt];
+    
+//    if( indexPath.row > 0 )
+//    {
+//        //이전 메세지
+//        id message = self.messages[indexPath.row - 1];
+//        if( [message isKindOfClass:[SBDAdminMessage class]] == NO )
+//        {
+//            SBDBaseMessage *prev_baseMessage = self.messages[indexPath.row - 1];
+//            SBDUserMessage *prev_userMessage = (SBDUserMessage *)prev_baseMessage;
+//
+//            NSInteger nTime = 0;
+//            NSInteger nPrevTime = 0;
+//
+//            NSInteger nUserId = [userMessage.sender.userId integerValue];
+//            NSInteger nNextUserId = [prev_userMessage.sender.userId integerValue];
+//
+//            long long llprevCreateAt = prev_baseMessage.createdAt;
+//
+//            NSString *str_PrevDate = [self getDateNumber:llprevCreateAt];
+//
+//            if( str_Date.length >= 12 && str_PrevDate.length >= 12 )
+//            {
+//                nTime = [[str_Date substringWithRange:NSMakeRange(0, 12)] integerValue];
+//                nPrevTime = [[str_PrevDate substringWithRange:NSMakeRange(0, 12)] integerValue];
+//            }
+//
+//            if( nUserId == nNextUserId )
+//            {
+//                isPrevMy = YES;
+//                //이전 메세지가 내 메세지면
+//                if( nTime == nPrevTime )
+//                {
+//                    //1분 이내의 메세지
+//                    cell.lc_NameHeight.constant = 0.f;
+//                    cell.iv_User.hidden = YES;
+//                    cell.lc_Top.constant = 0.f;
+//                }
+//                else
+//                {
+//                    //1분이 지난 메세지
+//                    cell.lc_NameHeight.constant = 15.f;
+//                    cell.iv_User.hidden = NO;
+//                    //                    cell.lc_Top.constant = 15.f;
+//                    isPrevMy = NO;
+//                }
+//            }
+//            else
+//            {
+//                //이전 메세지가 내 메세지가 아니면
+//                cell.lc_NameHeight.constant = 15.f;
+//                cell.iv_User.hidden = NO;
+//                //                cell.lc_Top.constant = 15.f;
+//            }
+//        }
+//    }
+
+    
+    NSDictionary *dic_ImageSize = [dic objectForKey:@"file_data"];
+    
+    CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
+    CGFloat fImageWidth = self.view.frame.size.width;
+    CGFloat fImageHeight = self.view.frame.size.height;
+    
+    if( [userMessage.customType isEqualToString:@"video"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"video"] )
+    {
+        fImageWidth = [[dic_ImageSize objectForKey_YM:@"coverImgWidth"] floatValue];
+        fImageHeight = [[dic_ImageSize objectForKey_YM:@"coverImgHeight"] floatValue];
+    }
+    else if( [userMessage.customType isEqualToString:@"image"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"image"] )
+    {
+        fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
+        fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
+    }
+    
+    if( isnan(fImageHeight) || fImageHeight <= 0 )
+    {
+        fImageHeight = self.view.frame.size.height - kImageMargin;
+    }
+    
+    if( isnan(fImageWidth) || fImageWidth <= 0 )
+    {
+        fImageWidth = self.view.frame.size.width - kImageMargin;
+    }
+    
+    if( fImageWidth > fImageHeight )
+    {
+        //가로형
+        //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+        CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+        //            fImageHeight = fScale * fImageHeight;
+        
+        cell.lc_ImageWidth.constant = self.view.bounds.size.width - kImageMargin;
+        cell.lc_ImageHeight.constant = fScale * fImageHeight;
+    }
+    else
+    {
+        CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageHeight;//0.57
+        fImageWidth = fScale * fImageWidth;//196.6f
+        
+        cell.lc_ImageWidth.constant = fImageWidth;
+        cell.lc_ImageHeight.constant = self.view.bounds.size.width - kImageMargin;
+    }
+
+    if( [[dic objectForKey:@"temp"] isEqualToString:@"YES"] )
+    {
+        //템프면
+        NSData *data = [dic objectForKey:@"obj"];
+        UIImage *image = [UIImage imageWithData:data];
+        cell.iv_Contents.image = image;
+
+        //        NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        //        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+        //        [btn_Date setTitle:str_Date forState:0];
+    }
+    else
+    {
+        NSURL *url = nil;
+        if( isVideo )
+        {
+            NSString *str_CoverImageUrl = [NSString stringWithFormat:@"%@", [dic_ImageSize objectForKey_YM:@"coverImgUrl"]];
+            if( [str_CoverImageUrl hasPrefix:@"/"] )
+            {
+                NSMutableString *strM = [NSMutableString stringWithString:str_CoverImageUrl];
+                [strM deleteCharactersInRange:NSMakeRange(0, 1)];
+                str_CoverImageUrl = [NSString stringWithFormat:@"%@", strM];
+            }
+
+            url = [NSURL URLWithString:[NSString stringWithFormat:@"%@%@", [dic objectForKey_YM:@"userImg_prefix"], str_CoverImageUrl]];
+            //http://data.thoting.com:8282/c_edujm/exam/c_edujm/temp/138/7617284d1c073c04941d4a83b503559e.jpg
+            
+        }
+        else
+        {
+            url = [NSURL URLWithString:[NSString stringWithFormat:@"%@", userMessage.message]];
+            //http://data.thoting.com:8282/c_edujm/exam/000/000/515287db824f3f9daaa35ef9fdcfd53c.jpg
+        }
+
+        [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
+        
+        cell.iv_Contents.userInteractionEnabled = YES;
+        cell.iv_Contents.tag = indexPath.row;
+        UIPinchGestureRecognizer *pinchZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinch:)];
+        pinchZoom.delegate = self;
+        [cell.iv_Contents addGestureRecognizer:pinchZoom];
+        
+        UITapGestureRecognizer *imageTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(imageTap:)];
+        [imageTap setNumberOfTapsRequired:1];
+        [cell.iv_Contents addGestureRecognizer:imageTap];
+
+        
+        cell.rightUtilityButtons = [self rightButtons];
+        cell.delegate = self;
+
+        long long llCreateAt = baseMessage.createdAt;
+        NSString *str_Date = [self getDateNumber:llCreateAt];
+        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+        [btn_Date setTitle:[Util getDetailDate:[NSString stringWithFormat:@"%@", str_Date]] forState:0];
+    }
+
+//    if( isPrevMy )
+//    {
+//        return cell.lc_ImageHeight.constant - 15.f;
+//    }
+ 
+    cell.tag = indexPath.row;
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+    longPress.numberOfTouchesRequired = 1;
+    longPress.delegate = self;
+    longPress.cancelsTouchesInView = NO;
+    [cell addGestureRecognizer:longPress];
+    
+    [self addTapGesture:cell];
+
+    [cell.iv_Contents setNeedsLayout];
+    [cell.iv_Contents layoutIfNeeded];
+    [cell.contentView setNeedsLayout];
+    [cell.contentView layoutIfNeeded];
+    [cell setNeedsLayout];
+    [cell layoutIfNeeded];
+
+    return cell.lc_ImageHeight.constant;//295
+}
+
+- (CGFloat)setOtherImageCell:(id)message withCell:(OtherImageCell *)cell withIndexPath:(NSIndexPath *)indexPath withVideo:(BOOL)isVideo
+{
+    SBDBaseMessage *baseMessage = nil;
+    SBDUserMessage *userMessage = nil;
+    NSDictionary *dic = nil;
+    if( [message isKindOfClass:[SBDBaseMessage class]] )
+    {
+        baseMessage = (SBDBaseMessage *)message;
+        userMessage = (SBDUserMessage *)baseMessage;
+        NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+        dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    }
+    else
+    {
+        dic = message;
+    }
+    
+    NSString *str_IsDone = [dic objectForKey_YM:@"isDone"];
+    cell.btn_Read.selected = ![str_IsDone isEqualToString:@"N"];
+    
+    if( isVideo )
+    {
+        cell.v_Video.hidden = NO;
+    }
+    else
+    {
+        cell.v_Video.hidden = YES;
+    }
+
+    cell.btn_Origin.hidden = YES;
+    [cell.btn_Origin removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    
+    BOOL isPrevMy = NO;
+    long long llCreateAt = baseMessage.createdAt;
+    NSString *str_Date = [self getDateNumber:llCreateAt];
+
+    if( indexPath.row > 0 )
+    {
+        //이전 메세지
+        id message = self.messages[indexPath.row - 1];
+        if( [message isKindOfClass:[SBDAdminMessage class]] == NO && [message isKindOfClass:[NSString class]] == NO )
+        {
+            SBDBaseMessage *prev_baseMessage = self.messages[indexPath.row - 1];
+            SBDUserMessage *prev_userMessage = (SBDUserMessage *)prev_baseMessage;
+
+            NSInteger nTime = 0;
+            NSInteger nPrevTime = 0;
+            
+            NSInteger nUserId = [userMessage.sender.userId integerValue];
+            NSInteger nNextUserId = [prev_userMessage.sender.userId integerValue];
+            
+            long long llprevCreateAt = prev_baseMessage.createdAt;
+            
+            NSString *str_PrevDate = [self getDateNumber:llprevCreateAt];
+            
+            if( str_Date.length >= 12 && str_PrevDate.length >= 12 )
+            {
+                nTime = [[str_Date substringWithRange:NSMakeRange(0, 12)] integerValue];
+                nPrevTime = [[str_PrevDate substringWithRange:NSMakeRange(0, 12)] integerValue];
+            }
+            
+            if( nUserId == nNextUserId )
+            {
+                isPrevMy = YES;
+                //이전 메세지가 내 메세지면
+                if( nTime == nPrevTime )
+                {
+                    //1분 이내의 메세지
+                    cell.lc_NameHeight.constant = 0.f;
+                    cell.iv_User.hidden = YES;
+                    cell.lc_Top.constant = 0.f;
+                }
+                else
+                {
+                    //1분이 지난 메세지
+                    cell.lc_NameHeight.constant = 15.f;
+                    cell.iv_User.hidden = NO;
+//                    cell.lc_Top.constant = 15.f;
+                }
+            }
+            else
+            {
+                //이전 메세지가 내 메세지가 아니면
+                cell.lc_NameHeight.constant = 15.f;
+                cell.iv_User.hidden = NO;
+//                cell.lc_Top.constant = 15.f;
+            }
+        }
+    }
+
+    BOOL isOrigin = NO;
+    NSDictionary *dic_ImageSize = [dic objectForKey:@"file_data"];
+    
+    CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
+    CGFloat fImageWidth = self.view.frame.size.width;
+    CGFloat fImageHeight = self.view.frame.size.height;
+    
+    if( [userMessage.customType isEqualToString:@"video"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"video"] )
+    {
+        fImageWidth = [[dic_ImageSize objectForKey_YM:@"coverImgWidth"] floatValue];
+        fImageHeight = [[dic_ImageSize objectForKey_YM:@"coverImgHeight"] floatValue];
+    }
+    else if( [userMessage.customType isEqualToString:@"image"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"image"] )
+    {
+        fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
+        fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
+    }
+    else if( [userMessage.customType isEqualToString:@"pdfImage"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"pdfImage"] )
+    {
+        isOrigin = YES;
+        
+        fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
+        fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
+
+//        cell.btn_Origin.tag = indexPath.row;
+////        cell.btn_Read.hidden = YES;
+////        cell.lb_Date.hidden = YES;
+//
+//        cell.btn_Origin.hidden = NO;
+//        [cell.btn_Origin setTitle:[NSString stringWithFormat:@"출처:%@", [dic objectForKey_YM:@"examTitle"]] forState:UIControlStateNormal];
+//        [cell.btn_Origin addTarget:self action:@selector(onMoveToPdf:) forControlEvents:UIControlEventTouchUpInside];
+    }
+    
+    if( isnan(fImageHeight) || fImageHeight <= 0 )
+    {
+        fImageHeight = self.view.frame.size.height - kImageMargin;
+    }
+    
+    if( isnan(fImageWidth) || fImageWidth <= 0 )
+    {
+        fImageWidth = self.view.frame.size.width - kImageMargin;
+    }
+    
+    if( fImageWidth > fImageHeight )
+    {
+        //가로형
+        //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+        CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+        //            fImageHeight = fScale * fImageHeight;
+        
+        cell.lc_ImageWidth.constant = self.view.bounds.size.width - kImageMargin;
+        cell.lc_ImageHeight.constant = fScale * fImageHeight;
+    }
+    else
+    {
+        CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageHeight;//0.57
+        fImageWidth = fScale * fImageWidth;//196.6f
+        
+        cell.lc_ImageWidth.constant = fImageWidth;
+        cell.lc_ImageHeight.constant = self.view.bounds.size.width - kImageMargin;
+    }
+    
+    if( [[dic objectForKey:@"temp"] isEqualToString:@"YES"] )
+    {
+        //템프면
+        NSData *data = [dic objectForKey:@"obj"];
+        UIImage *image = [UIImage imageWithData:data];
+        cell.iv_Contents.image = image;
+        
+        //        NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        //        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+        //        [btn_Date setTitle:str_Date forState:0];
+    }
+    else
+    {
+        SBDUser *user = userMessage.sender;
+
+        cell.lb_Name.text = user.nickname;
+        
+        [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"no_image.png")];
+        cell.iv_User.tag = indexPath.row;
+        cell.iv_User.userInteractionEnabled = YES;
+        UITapGestureRecognizer *userImageTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(userImageTap:)];
+        [userImageTap setNumberOfTapsRequired:1];
+        [cell.iv_User addGestureRecognizer:userImageTap];
+
+        
+        NSURL *url = nil;
+        if( isVideo )
+        {
+            url = [NSURL URLWithString:[NSString stringWithFormat:@"%@%@", [dic objectForKey_YM:@"userImg_prefix"], [dic_ImageSize objectForKey_YM:@"coverImgUrl"]]];
+        }
+        else
+        {
+//            url = [Util createImageUrl:str_ImagePreFix withFooter:[dic objectForKey_YM:@"data_prefix"]];
+            url = [NSURL URLWithString:[NSString stringWithFormat:@"%@", userMessage.message]];
+        }
+        
+        [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
+        
+        cell.iv_Contents.userInteractionEnabled = YES;
+        cell.iv_Contents.tag = indexPath.row;
+        UIPinchGestureRecognizer *pinchZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinch:)];
+        pinchZoom.delegate = self;
+        [cell.iv_Contents addGestureRecognizer:pinchZoom];
+        
+        UITapGestureRecognizer *imageTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(imageTap:)];
+        [imageTap setNumberOfTapsRequired:1];
+        [cell.iv_Contents addGestureRecognizer:imageTap];
+
+        cell.rightUtilityButtons = [self rightButtons];
+        cell.delegate = self;
+
+        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+        [btn_Date setTitle:[Util getDetailDate:[NSString stringWithFormat:@"%@", str_Date]] forState:0];
+    }
+    
+//    if( isPrevMy )
+//    {
+//        return cell.lc_ImageHeight.constant;
+//    }
+    
+    
+    cell.tag = indexPath.row;
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+    longPress.numberOfTouchesRequired = 1;
+    longPress.delegate = self;
+    longPress.cancelsTouchesInView = NO;
+    [cell addGestureRecognizer:longPress];
+    
+    [self addTapGesture:cell];
+
+    return cell.lc_ImageHeight.constant;//295
+}
+
+- (CGFloat)setPdfImageCell:(id)message withCell:(NormalQuestionCell *)cell withIndexPath:(NSIndexPath *)indexPath
+{
+    SBDBaseMessage *baseMessage = nil;
+    SBDUserMessage *userMessage = nil;
+    NSDictionary *dic = nil;
+    if( [message isKindOfClass:[SBDBaseMessage class]] )
+    {
+        baseMessage = (SBDBaseMessage *)message;
+        userMessage = (SBDUserMessage *)baseMessage;
+        NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+        dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    }
+    else
+    {
+        dic = message;
+    }
+    
+    for( id subView in cell.sv_Contents.subviews )
+    {
+        [subView removeFromSuperview];
+    }
+    
+    [cell.btn_Origin removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+    
+    cell.btn_Origin.tag = indexPath.row;
+ 
+    cell.btn_Origin.hidden = NO;
+    NSDictionary *dic_BotData = [dic objectForKey:@"bot_data"];
+    [cell.btn_Origin setTitle:[NSString stringWithFormat:@"출처:%@", [dic_BotData objectForKey_YM:@"examTitle"]] forState:UIControlStateNormal];
+    [cell.btn_Origin addTarget:self action:@selector(onMoveToPdf:) forControlEvents:UIControlEventTouchUpInside];
+    
+    
+    SBDUser *user = userMessage.sender;
+    
+    cell.lb_Name.text = user.nickname;
+    
+    [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"no_image.png")];
+    cell.iv_User.tag = indexPath.row;
+    cell.iv_User.userInteractionEnabled = YES;
+    UITapGestureRecognizer *imageTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(userImageTap:)];
+    [imageTap setNumberOfTapsRequired:1];
+    [cell.iv_User addGestureRecognizer:imageTap];
+
+    
+    __block CGFloat fSampleViewTotalHeight = 20.f;
+
+    NSDictionary *dic_ImageSize = [dic objectForKey:@"file_data"];
+    
+    NSString *str_ImageUrl = userMessage.message;
+    
+    CGFloat fWidth = [[dic_ImageSize objectForKey:@"width"] floatValue];
+    CGFloat fHeight = [[dic_ImageSize objectForKey:@"height"] floatValue];
+    
+    CGFloat fScale = self.tbv_List.frame.size.width / fWidth;
+    fHeight = fHeight * fScale;
+    if( isnan(fHeight) )
+    {
+        fHeight = 300.f;
+    }
+    
+    UIImageView *iv = [[UIImageView alloc] initWithFrame:CGRectMake(0, fSampleViewTotalHeight, self.tbv_List.frame.size.width, fHeight)];
+    [iv sd_setImageWithURL:[Util createImageUrl:str_ImagePreFix withFooter:str_ImageUrl]];
+    //            iv.image = [Util imageWithImage:iv.image convertToWidth:self.tbv_List.frame.size.width];
+    iv.userInteractionEnabled = YES;
+    iv.tag = indexPath.row;
+    
+    UIPinchGestureRecognizer *pinchZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinch:)];
+    pinchZoom.delegate = self;
+    [iv addGestureRecognizer:pinchZoom];
+    
+    UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapGesture:)];
+    tapGesture.delegate = self;
+    [iv addGestureRecognizer:tapGesture];
+    
+    fSampleViewTotalHeight += iv.frame.size.height;
+    
+    [cell.sv_Contents addSubview:iv];
+    cell.sv_Contents.userInteractionEnabled = YES;
+
+    long long llCreateAt = baseMessage.createdAt;
+    NSString *str_Date = [self getDateNumber:llCreateAt];
+    UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+    [btn_Date setTitle:[Util getDetailDate:[NSString stringWithFormat:@"%@", str_Date]] forState:0];
+    
+    return iv.frame.size.height + 30.f;//295
+}
+
+
 #pragma mark - Table view methods
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
 {
@@ -2046,132 +3365,228 @@ typedef enum {
 {
     if( tableView == self.tbv_List )
     {
-        NSMutableArray *arM_Tmp = [NSMutableArray arrayWithArray:self.messages];
-        for( id message in arM_Tmp )
+        if( self.messages.count > 1 )
         {
-            if( [message isKindOfClass:[NSDictionary class]] )
+            //이전 메세지 검사해서 날짜 넣어주기
+            NSMutableArray *arM_Tmp = [NSMutableArray array];
+            for( NSInteger i = 0; i < self.messages.count; i++ )
             {
-                if( [[message objectForKey_YM:@"type"] isEqualToString:@"USER_ENTER"] ||
-                   [[message objectForKey_YM:@"type"] isEqualToString:@"enterBotRoom"] )
+                id obj = self.messages[i];
+                if( [obj isKindOfClass:[NSString class]] == NO )
                 {
-                    [self.messages removeObject:message];
-                }
-            }
-            else if( [message isKindOfClass:[SBDBaseMessage class]] )
-            {
-                SBDBaseMessage *baseMessage = message;
-                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                
-                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_ENTER"] ||
-                   [[dic objectForKey_YM:@"type"] isEqualToString:@"enterBotRoom"] )
-                {
-                    [self.messages removeObject:message];
-                }
-            }
-        }
-
-        arM_Tmp = [NSMutableArray arrayWithArray:self.messages];
-        for( NSInteger i = 1; i < arM_Tmp.count; i++ )
-        {
-            id message = [arM_Tmp objectAtIndex:i];
-            if( [message isKindOfClass:[NSDictionary class]] )
-            {
-                if( [[message objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
-                {
-                    [arM_Tmp removeObject:message];
-                }
-            }
-            else if( [message isKindOfClass:[SBDBaseMessage class]] )
-            {
-                SBDBaseMessage *baseMessage = message;
-                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                
-                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
-                {
-                    [arM_Tmp removeObject:dic];
-                }
-            }
-        }
-        
-        self.messages = arM_Tmp;
-        
-        
-        NSInteger nCnt = 0;
-        arM_Tmp = [NSMutableArray arrayWithArray:self.messages];
-        for( NSInteger i = 1; i < arM_Tmp.count; i++ )
-        {
-            NSString *str_TimeTmp = @"";
-            NSString *str_PrevTimeTmp = @"";
-            
-            id message = [arM_Tmp objectAtIndex:i];
-            if( [message isKindOfClass:[NSDictionary class]] )
-            {
-                str_TimeTmp = [message objectForKey_YM:@"createDate"];
-                if( [[message objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
-                {
-                    [arM_Tmp removeObject:message];
-                }
-            }
-            else if( [message isKindOfClass:[SBDBaseMessage class]] )
-            {
-                SBDBaseMessage *baseMessage = message;
-                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                
-                str_TimeTmp = [dic objectForKey_YM:@"createDate"];
-                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
-                {
-                    [arM_Tmp removeObject:dic];
+                    [arM_Tmp addObject:obj];
                 }
             }
             
-            message = [arM_Tmp objectAtIndex:i - 1];
-            if( [message isKindOfClass:[NSDictionary class]] )
+            self.messages = [NSMutableArray arrayWithArray:arM_Tmp];
+            [arM_Tmp removeAllObjects];
+            
+            for( NSInteger i = 0; i < self.messages.count - 1; i++ )
             {
-                str_PrevTimeTmp = [message objectForKey_YM:@"createDate"];
-                if( [[message objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
-                {
-                    [arM_Tmp removeObject:message];
-                }
-            }
-            else if( [message isKindOfClass:[SBDBaseMessage class]] )
-            {
-                SBDBaseMessage *baseMessage = message;
-                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//                id obj1 = self.messages[i];
+//                id obj2 = self.messages[i + 1];
+//                if( [obj1 isKindOfClass:[SBDBaseMessage class]] == NO )  continue;
+//                if( [obj2 isKindOfClass:[SBDBaseMessage class]] == NO )  continue;
                 
-                str_PrevTimeTmp = [dic objectForKey_YM:@"createDate"];
-                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+                SBDBaseMessage *baseMessage = self.messages[i];
+                [arM_Tmp addObject:baseMessage];
+                
+                long long llCreateAt = baseMessage.createdAt;
+                long long llOldCreateAt = [[self getDateNumberHour:llCreateAt] longLongValue] ;
+                
+                id nextBaseMessage = self.messages[i + 1];
+                if( [nextBaseMessage isKindOfClass:[NSDictionary class]] )
                 {
-                    [arM_Tmp removeObject:dic];
+                    NSDictionary *nextBaseMessage = self.messages[i + 1];
+                    llCreateAt = [[nextBaseMessage objectForKey:@"createDate"] longLongValue] / 10000;
+                }
+                else
+                {
+                    SBDBaseMessage *nextBaseMessage = (SBDBaseMessage *)self.messages[i + 1];
+                    llCreateAt = nextBaseMessage.createdAt;
+                }
+                
+                long long llAfterCreateAt = [[self getDateNumberHour:llCreateAt] longLongValue] ;
+                
+                if( llOldCreateAt < llAfterCreateAt )
+                {
+                    [arM_Tmp addObject:[self getDateNumber:llCreateAt]];
                 }
             }
-
-            if( str_TimeTmp.length >= 10 && str_PrevTimeTmp.length >= 10 )
+            
+            SBDBaseMessage *baseMessage = [self.messages lastObject];
+            [arM_Tmp addObject:baseMessage];
+            
+            id lastObj = [arM_Tmp lastObject];
+            if( [lastObj isKindOfClass:[NSString class]] )
             {
-                NSInteger nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 10)] integerValue];
-                NSInteger nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 10)] integerValue];
-
-                if( nTime > nPrevTime )
-                {
-                    NSLog(@"nTime: %ld", nTime);
-                    NSLog(@"nPrevTime: %ld", nPrevTime);
-
-                    //1시간 이상이면
-                    [self.messages insertObject:@{@"type":@"createDate", @"createDate":str_TimeTmp} atIndex:i + nCnt];
-                    nCnt++;
-                }
+                [arM_Tmp removeLastObject];
             }
-
+            
+            self.messages = [NSMutableArray arrayWithArray:arM_Tmp];
         }
+
+        
+//        NSMutableArray *arM = [NSMutableArray array];
+//        for( NSInteger i = 0; i < self.messages.count; i++ )
+//        {
+//            id obj = self.messages[i];
+//            if( [obj isKindOfClass:[NSString class]] == NO )
+//            {
+//                [arM addObject:obj];
+//            }
+//        }
+//
+//        self.messages = arM;
+        
+
+//        NSMutableArray *arM_Tmp = [NSMutableArray arrayWithArray:self.messages];
+//        for( id message in arM_Tmp )
+//        {
+//            if( [message isKindOfClass:[NSDictionary class]] )
+//            {
+//                if( [[message objectForKey_YM:@"type"] isEqualToString:@"USER_ENTER"] ||
+//                   [[message objectForKey_YM:@"type"] isEqualToString:@"enterBotRoom"] )
+//                {
+//                    [self.messages removeObject:message];
+//                }
+//            }
+//            else if( [message isKindOfClass:[SBDBaseMessage class]] )
+//            {
+//                SBDBaseMessage *baseMessage = message;
+//                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+//                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+//                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//
+//                if( [userMessage.customType isEqualToString:@"USER_ENTER"] ||
+//                   [userMessage.customType isEqualToString:@"enterBotRoom"] ||
+//                   [userMessage.customType isEqualToString:@"cmd"] )
+//                {
+//                    [self.messages removeObject:message];
+//                }
+//            }
+//        }
+//
+//        arM_Tmp = [NSMutableArray arrayWithArray:self.messages];
+//        for( NSInteger i = 1; i < arM_Tmp.count; i++ )
+//        {
+//            id message = [arM_Tmp objectAtIndex:i];
+//            if( [message isKindOfClass:[NSDictionary class]] )
+//            {
+//                if( [[message objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+//                {
+//                    [arM_Tmp removeObject:message];
+//                }
+//            }
+//            else if( [message isKindOfClass:[SBDBaseMessage class]] )
+//            {
+//                SBDBaseMessage *baseMessage = message;
+//                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+//                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+//                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//
+//                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+//                {
+//                    [arM_Tmp removeObject:dic];
+//                }
+//            }
+//        }
+//
+//        self.messages = arM_Tmp;
+//
+//
+//        NSInteger nCnt = 0;
+//        arM_Tmp = [NSMutableArray arrayWithArray:self.messages];
+//        for( NSInteger i = 1; i < arM_Tmp.count; i++ )
+//        {
+//            NSString *str_TimeTmp = @"";
+//            NSString *str_PrevTimeTmp = @"";
+//
+//            id message = [arM_Tmp objectAtIndex:i];
+//            if( [message isKindOfClass:[NSDictionary class]] )
+//            {
+//                str_TimeTmp = [message objectForKey_YM:@"createDate"];
+//                if( [[message objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+//                {
+//                    [arM_Tmp removeObject:message];
+//                }
+//            }
+//            else if( [message isKindOfClass:[SBDBaseMessage class]] )
+//            {
+//                SBDBaseMessage *baseMessage = message;
+//                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+//                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+//                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//
+//                str_TimeTmp = [dic objectForKey_YM:@"createDate"];
+//                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+//                {
+//                    [arM_Tmp removeObject:dic];
+//                }
+//            }
+//
+//            message = [arM_Tmp objectAtIndex:i - 1];
+//            if( [message isKindOfClass:[NSDictionary class]] )
+//            {
+//                str_PrevTimeTmp = [message objectForKey_YM:@"createDate"];
+//                if( [[message objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+//                {
+//                    [arM_Tmp removeObject:message];
+//                }
+//            }
+//            else if( [message isKindOfClass:[SBDBaseMessage class]] )
+//            {
+//                SBDBaseMessage *baseMessage = message;
+//                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+//                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+//                NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+//
+//                str_PrevTimeTmp = [dic objectForKey_YM:@"createDate"];
+//                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
+//                {
+//                    [arM_Tmp removeObject:dic];
+//                }
+//            }
+//
+//            if( str_TimeTmp.length >= 10 && str_PrevTimeTmp.length >= 10 )
+//            {
+//                NSInteger nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 10)] integerValue];
+//                NSInteger nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 10)] integerValue];
+//
+//                if( nTime > nPrevTime )
+//                {
+//                    NSLog(@"nTime: %ld", nTime);
+//                    NSLog(@"nPrevTime: %ld", nPrevTime);
+//
+//                    //1시간 이상이면
+//                    [self.messages insertObject:@{@"type":@"createDate", @"createDate":str_TimeTmp} atIndex:i + nCnt];
+//                    nCnt++;
+//                }
+//            }
+//
+//        }
         
         return self.messages.count;
+    }
+    else if( tableView == self.tbv_AtList )
+    {
+        NSArray *ar_Tmp = [NSArray arrayWithArray:self.arM_AtList];
+        for( NSInteger i = 0; i < ar_Tmp.count; i++ )
+        {
+            NSDictionary *dic = ar_Tmp[i];
+            NSString *str_UserId = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"userId"]];
+            for( NSInteger j = 0; j < self.arM_User.count; j++ )
+            {
+                NSString *str_SubUserId = [NSString stringWithFormat:@"%@", [self.arM_User objectAtIndex:j]];
+                if( [str_UserId isEqualToString:str_SubUserId] )
+                {
+                    [self.arM_AtList removeObject:dic];
+                    break;
+                }
+            }
+        }
+        
+        return self.arM_AtList.count;
     }
     
     return self.arM_AutoAnswer.count;
@@ -2188,6 +3603,22 @@ typedef enum {
         long long llMessageId = 0;
         
         NSDictionary *dic = nil;
+        if( [message isKindOfClass:[SBDAdminMessage class]] )
+        {
+            SBDUserMessage *userMessage = (SBDUserMessage *)message;
+            if( [userMessage.customType isEqualToString:@"USER_JOIN"] || [userMessage.customType isEqualToString:@"USER_LEFT"] )
+            {
+                CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
+                [tableView deselectRowAtIndexPath:indexPath animated:YES];
+                [self cmdCell:cell forRowAtIndexPath:indexPath];
+                [self addTapGesture:cell];
+                return cell;
+            }
+
+            MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
+            return cell;
+        }
+
         if( [message isKindOfClass:[SBDBaseMessage class]] )
         {
             SBDBaseMessage *baseMessage = self.messages[indexPath.row];
@@ -2196,1111 +3627,416 @@ typedef enum {
             NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
             dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
             
-            if( [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_JOIN"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_LEFT"] )
-            {
-                //조인
-                CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
-//                cell.rightUtilityButtons = [self rightButtons];
-//                cell.delegate = self;
-                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                [self cmdCell:cell forRowAtIndexPath:indexPath];
-                [self addTapGesture:cell];
-                return cell;
-            }
+//            NSDictionary *dic_BotDataTmp = [dic objectForKey:@"bot_data"];
+//            if( dic_BotDataTmp == nil || [dic_BotDataTmp isKindOfClass:[NSNull class]] || [dic_BotDataTmp isKindOfClass:[NSDictionary class]] == NO )
+//            {
+//                MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
+//                return cell;
+//            }
+
+            SBDUser *user = userMessage.sender;
+            NSLog(@"%@", user.userId);
+            NSLog(@"%@", user.profileUrl);
             
-            if( [userMessage.customType isEqualToString:@"cmd"] )
+            NSString *str_MyUserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+            NSString *str_SenderId = [NSString stringWithFormat:@"%@", user.userId];
+            if( [str_MyUserId isEqualToString:str_SenderId] )
             {
-                CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
-//                cell.rightUtilityButtons = [self rightButtons];
-//                cell.delegate = self;
-
-                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                [self cmdCell:cell forRowAtIndexPath:indexPath];
-                [self addTapGesture:cell];
-                return cell;
-            }
-        }
-        else
-        {
-            dic = message;
-            
-            if( [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_JOIN"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_LEFT"] )
-            {
-                //조인
-                CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
-//                cell.rightUtilityButtons = [self rightButtons];
-//                cell.delegate = self;
-
-                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                [self cmdCell:cell forRowAtIndexPath:indexPath];
-                [self addTapGesture:cell];
-                return cell;
-            }
-            else if( [[dic objectForKey_YM:@"type"] isEqualToString:@"createDate"] )
-            {
-                ChatDateCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ChatDateCell"];
-                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                
-                NSString *str_Date = [dic objectForKey_YM:@"createDate"];
-                if( str_Date.length >= 12 )
+                //나의 글
+                if( [userMessage.customType isEqualToString:@"image"] )
                 {
-                    NSString *str_Year = [str_Date substringWithRange:NSMakeRange(0, 4)];
-                    NSString *str_Month = [str_Date substringWithRange:NSMakeRange(4, 2)];
-                    NSString *str_Day = [str_Date substringWithRange:NSMakeRange(6, 2)];
-                    NSString *str_Hour = [str_Date substringWithRange:NSMakeRange(8, 2)];
-                    NSString *str_Minute = [str_Date substringWithRange:NSMakeRange(10, 2)];
-                    
-                    NSString *str = [NSString stringWithFormat:@"%@ %ld:%02ld",
-                                [str_Hour integerValue] > 12 ? @"오후" : @"오전",
-                                ([str_Hour integerValue] > 12) ? [str_Hour integerValue] - 12 : [str_Hour integerValue] == 0 ? 12 : [str_Hour integerValue], [str_Minute integerValue]];
+                    MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
+                    [self setMyImageCell:message withCell:cell withIndexPath:indexPath withVideo:NO];
+                    return cell;
+                }
+                else if( [userMessage.customType isEqualToString:@"video"] )
+                {
+                    MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
+                    [self setMyImageCell:message withCell:cell withIndexPath:indexPath withVideo:YES];
+                    return cell;
+                }
+                else if( [userMessage.customType isEqualToString:@"audio"] )
+                {
+                    MyAudioCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyAudioCell"];
 
-                    NSString *str_ShowingDate = [NSString stringWithFormat:@"%@월 %@일 %@", str_Month, str_Day, str];
-                    cell.lb_Date.text = str_ShowingDate;
+                    cell.tag = indexPath.row;
+                    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
+                    longPress.numberOfTouchesRequired = 1;
+                    longPress.delegate = self;
+                    longPress.cancelsTouchesInView = NO;
+                    [cell addGestureRecognizer:longPress];
+                    
+                    [self myAudioCell:cell indexPath:indexPath withData:dic withMessageId:llMessageId];
+                    
+                    return cell;
                 }
                 else
                 {
-                    NSLog(@"@#!@#!@#@!#");
-                }
-                return cell;
-            }
-        }
-        
-        if( dic == nil )
-        {
-            MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
-            cell.rightUtilityButtons = [self rightButtons];
-            cell.delegate = self;
-
-            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-            
-            return cell;
-        }
-        
-        //    NSDictionary *dic = self.arM_List[indexPath.row];
-        
-        //글 타입 여부 (채널, direct)
-        BOOL isChannelType = [[dic objectForKey:@"qnaType"] isEqualToString:@"channel"];
-        //내 글인지 여부
-        
-        if( [[dic objectForKey:@"type"] isEqualToString:@"date"] )
-        {
-            CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
-//            cell.rightUtilityButtons = [self rightButtons];
-//            cell.delegate = self;
-
-            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-            cell.v_Bg.backgroundColor = [UIColor clearColor];
-            cell.lb_Cmd.text = [dic objectForKey:@"contents"];
-            
-            [self addTapGesture:cell];
-            
-            return cell;
-        }
-        
-        //템프 글 (내 글 바로 붙인거)
-        if( [[dic objectForKey_YM:@"temp"] isEqualToString:@"YES"] )
-        {
-            if( [[dic objectForKey:@"type"] isEqualToString:@"text"] )
-            {
-                MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
-                cell.rightUtilityButtons = [self rightButtons];
-                cell.delegate = self;
-
-                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                
-                //        cell.contentView.backgroundColor = [UIColor redColor];
-                //        cell.lb_Contents.textColor = [UIColor blackColor];
-                //        cell.lb_Contents.backgroundColor = [UIColor blueColor];
-                
-                cell.tag = indexPath.row;
-                UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                longPress.numberOfTouchesRequired = 1;
-                longPress.delegate = self;
-                longPress.cancelsTouchesInView = NO;
-                [cell addGestureRecognizer:longPress];
-
-                [self addTapGesture:cell];
-                
-                [self myTextCellTemp:cell forRowAtIndexPath:indexPath];
-                
-                return cell;
-            }
-            else if( [[dic objectForKey:@"type"] isEqualToString:@"image"] )
-                //        else if( [[dic objectForKey:@"type"] isEqualToString:@"image"] )
-            {
-                MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
-                cell.rightUtilityButtons = [self rightButtons];
-                cell.delegate = self;
-
-                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                
-                cell.tag = cell.btn_Origin.tag = indexPath.row;
-                UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                longPress.numberOfTouchesRequired = 1;
-                longPress.delegate = self;
-                longPress.cancelsTouchesInView = NO;
-                [cell addGestureRecognizer:longPress];
-                
-                cell.btn_Origin.hidden = YES;
-                [cell.btn_Origin setTitle:@"" forState:UIControlStateNormal];
-                
-                cell.btn_Read.hidden = NO;
-                cell.lb_Date.hidden = NO;
-                
-                [self hidenDateIfNeed:cell indexPath:indexPath];
-                
-                cell.btn_Read.selected = NO;
-                
-                cell.v_Video.hidden = YES;
-                
-                
-                
-//                NSArray *ar_Body = [dic objectForKey:@"body"];
-//                NSDictionary *dic_Body = [ar_Body firstObject];
-                NSDictionary *dic_ImageSize = [dic objectForKey:@"imageSize"];
-
-                
-                CGFloat fImageWidth = self.view.frame.size.width;
-                CGFloat fImageHeight = self.view.frame.size.height;
-
-                fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
-                fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
-
-//                fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];
-//                fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue];
-
-                if( isnan(fImageHeight) || fImageHeight <= 0 )
-                {
-                    fImageHeight = self.view.frame.size.height - kImageMargin;
-                }
-                
-                if( isnan(fImageWidth) || fImageWidth <= 0 )
-                {
-                    fImageWidth = self.view.frame.size.width - kImageMargin;
-                }
-
-                if( fImageWidth > fImageHeight )
-                {
-                    //가로형
-                    //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
-                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
-                    //            fImageHeight = fScale * fImageHeight;
+                    MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
+                    [self myTextCell:cell forRowAtIndexPath:indexPath];
                     
-                    cell.lc_ImageWidth.constant = self.view.bounds.size.width - kImageMargin;
-                    cell.lc_ImageHeight.constant = fScale * fImageHeight;
-                }
-                else
-                {
-                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageHeight;
-//                    fImageWidth = fScale * fImageWidth;
-                    
-                    cell.lc_ImageWidth.constant = fScale * fImageWidth;
-                    cell.lc_ImageHeight.constant = self.view.bounds.size.width - kImageMargin;
-                }
-
-                
-                
-                NSData *data = [NSData dataWithData:[dic objectForKey:@"obj"]];
-                cell.iv_Contents.image = [UIImage imageWithData:data];
-                
-//                cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
-                NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
-                cell.lb_Date.text = @"";
-                
-                UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
-                [btn_Date setTitle:str_Date forState:0];
-
-                if( [[dic objectForKey_YM:@"isFail"] isEqualToString:@"YES"] )
-                {
-                    [cell.btn_Read setImage:BundleImage(@"chat_check_fail.png") forState:UIControlStateNormal];
-                }
-                else
-                {
-                    [cell.btn_Read setImage:BundleImage(@"chat_no_check.png") forState:UIControlStateNormal];
-                }
-                
-                [cell.btn_Origin removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
-                
-                if( [[dic objectForKey:@"type"] isEqualToString:@"pdfQuestion"] )
-                {
-                    cell.btn_Read.hidden = YES;
-                    cell.lb_Date.hidden = YES;
-                    
-                    cell.btn_Origin.hidden = NO;
-                    [cell.btn_Origin setTitle:[NSString stringWithFormat:@"출처:%@", [dic objectForKey_YM:@"examTitle"]] forState:UIControlStateNormal];
-                    [cell.btn_Origin addTarget:self action:@selector(onMoveToPdf:) forControlEvents:UIControlEventTouchUpInside];
-                }
-                
-                return cell;
-            }
-            else if( [[dic objectForKey:@"type"] isEqualToString:@"pdfQuestion"] )
-            {
-                NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
-                cell.rightUtilityButtons = [self rightButtons];
-                cell.delegate = self;
-
-                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                
-                [self pdfQuestionCell:cell forRowAtIndexPath:indexPath withMy:YES];
-                
-                return cell;
-            }
-            else if( [[dic objectForKey:@"type"] isEqualToString:@"normalQuestion"] )
-            {
-                NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
-                cell.rightUtilityButtons = [self rightButtons];
-                cell.delegate = self;
-
-                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                
-                [self normalQuestionCell:cell forRowAtIndexPath:indexPath withMy:YES];
-                
-                return cell;
-            }
-            else if( [[dic objectForKey:@"type"] isEqualToString:@"video"] )
-            {
-                MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
-                cell.rightUtilityButtons = [self rightButtons];
-                cell.delegate = self;
-
-                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                
-                cell.tag = indexPath.row;
-                UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                longPress.numberOfTouchesRequired = 1;
-                longPress.delegate = self;
-                longPress.cancelsTouchesInView = NO;
-                [cell addGestureRecognizer:longPress];
-                
-                cell.btn_Read.selected = NO;
-                
-                cell.v_Video.hidden = NO;
-                
-                
-                NSDictionary *dic_ImageSize = [dic objectForKey:@"imageSize"];
-
-                
-                CGFloat fImageWidth = self.view.frame.size.width;
-                CGFloat fImageHeight = self.view.frame.size.height;
-                
-//                fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
-//                fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
-                
-                fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
-                fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
-                
-                if( fImageWidth > fImageHeight )
-                {
-                    //가로형
-                    //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
-                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
-                    //            fImageHeight = fScale * fImageHeight;
-                    
-                    cell.lc_ImageWidth.constant = self.view.bounds.size.width - kImageMargin;
-                    cell.lc_ImageHeight.constant = fScale * fImageHeight;
-                }
-                else
-                {
-                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageHeight;
-                    fImageWidth = fScale * fImageWidth;
-                    
-                    cell.lc_ImageWidth.constant = fImageWidth;
-                    cell.lc_ImageHeight.constant = self.view.bounds.size.width - kImageMargin;
-                }
-
-                
-                
-                NSData *data = [NSData dataWithData:[dic objectForKey:@"obj"]];
-                cell.iv_Contents.image = [UIImage imageWithData:data];
-                
-//                cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
-                NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
-                cell.lb_Date.text = @"";
-                
-                UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
-                [btn_Date setTitle:str_Date forState:0];
-
-                
-                if( [[dic objectForKey_YM:@"isFail"] isEqualToString:@"YES"] )
-                {
-                    [cell.btn_Read setImage:BundleImage(@"chat_check_fail.png") forState:UIControlStateNormal];
-                }
-                else
-                {
-                    [cell.btn_Read setImage:BundleImage(@"chat_no_check.png") forState:UIControlStateNormal];
-                }
-                
-                return cell;
-            }
-            else if( [[dic objectForKey:@"type"] isEqualToString:@"audio"] )
-            {
-                //temp
-                MyAudioCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyAudioCell"];
-                
-//                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                
-                cell.btn_Read.selected = NO;
-                
-                double duration = [[dic objectForKey:@"duration"] doubleValue];
-                duration = ceil(duration);
-
-                NSLog(@"duration: %f", duration);
-                NSInteger nMinute = (NSInteger)duration / 60;
-                NSInteger nSecond = (NSInteger)duration % 60;
-                cell.lb_Time.hidden = YES;
-                cell.lb_BgTime.hidden = NO;
-                cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
-                cell.lb_BgTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
-//                cell.lb_Time.text = cell.lb_BgTime.text = @"123";
-                
-                [cell.btn_PlayPause removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
-                [cell.btn_Replay removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
-
-//                cell.lb_Time.text = @"123";
-//                cell.lb_BgTime.text = @"456";
-
-//                [self myAudioCell:cell indexPath:indexPath withData:dic withMessageId:-1];
-                
-                return cell;
-            }
-        }
-        
-        
-        NSInteger nMyId = [[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"] integerValue];
-        NSInteger nTargetId = [[dic objectForKey_YM:@"userId"] integerValue];
-        BOOL isMy = nMyId == nTargetId;
-        
-        if( isMy )
-        {
-            if( 1 )
-            {
-                NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
-                if( ar_Body && ar_Body.count > 0 )
-                {
-                    NSDictionary *dic_Body = [ar_Body firstObject];
-                    
-                    if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"image"] )
-                    {
-                        MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
-                        cell.rightUtilityButtons = [self rightButtons];
-                        cell.delegate = self;
-
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        
-                        cell.tag = indexPath.row;
-                        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                        longPress.numberOfTouchesRequired = 1;
-                        longPress.delegate = self;
-                        longPress.cancelsTouchesInView = NO;
-                        [cell addGestureRecognizer:longPress];
-                        
-                        cell.btn_Origin.hidden = YES;
-                        [cell.btn_Origin setTitle:@"" forState:UIControlStateNormal];
-                        
-                        cell.btn_Read.hidden = NO;
-                        cell.lb_Date.hidden = NO;
-                        
-                        [self myImageCell:cell forRowAtIndexPath:indexPath withVideo:NO];
-                        return cell;
-                    }
-                    else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"audio"] )
-                    {
-                        MyAudioCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyAudioCell"];
-                        
-                        //                [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        
-                        cell.tag = indexPath.row;
-                        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                        longPress.numberOfTouchesRequired = 1;
-                        longPress.delegate = self;
-                        longPress.cancelsTouchesInView = NO;
-                        [cell addGestureRecognizer:longPress];
-
-                        [self myAudioCell:cell indexPath:indexPath withData:dic withMessageId:llMessageId];
-                        
-                        return cell;
-                    }
-                    else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"pdfQuestion"] )
-                    {
-                        NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
-                        cell.rightUtilityButtons = [self rightButtons];
-                        cell.delegate = self;
-
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        
-                        [self pdfQuestionCell:cell forRowAtIndexPath:indexPath withMy:YES];
-                        
-                        return cell;
-                    }
-                    else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"video"] )
-                    {
-                        MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
-                        cell.rightUtilityButtons = [self rightButtons];
-                        cell.delegate = self;
-
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        
-                        cell.tag = indexPath.row;
-                        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                        longPress.numberOfTouchesRequired = 1;
-                        longPress.delegate = self;
-                        longPress.cancelsTouchesInView = NO;
-                        [cell addGestureRecognizer:longPress];
-                        
-                        [self myImageCell:cell forRowAtIndexPath:indexPath withVideo:YES];
-                        return cell;
-                    }
-                    else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"normalQuestion"] )
-                    {
-                        NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
-                        cell.rightUtilityButtons = [self rightButtons];
-                        cell.delegate = self;
-
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        
-                        [self normalQuestionCell:cell forRowAtIndexPath:indexPath withMy:YES];
-                        
-                        return cell;
-                    }
-                    else
-                    {
-                        if( [[dic objectForKey_YM:@"itemType"] isEqualToString:@"cmd"] )
-                        {
-                            CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
-                            cell.rightUtilityButtons = [self rightButtons];
-                            cell.delegate = self;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            [self cmdCell:cell forRowAtIndexPath:indexPath];
-                            [self addTapGesture:cell];
-                            return cell;
-                        }
-                        else
-                        {
-                            MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
-                            cell.rightUtilityButtons = [self rightButtons];
-                            cell.delegate = self;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            
-                            cell.tag = indexPath.row;
-                            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                            longPress.numberOfTouchesRequired = 1;
-                            longPress.delegate = self;
-                            longPress.cancelsTouchesInView = NO;
-                            [cell addGestureRecognizer:longPress];
-                            
-                            [self myTextCell:cell forRowAtIndexPath:indexPath];
-                            
-//                            [self addTapGesture:cell];
-                            
-                            return cell;
-                        }
-                    }
-                }
-                else
-                {
-                    NSDictionary *dic_ActionMap = [dic objectForKey:@"actionMap"];
-                    NSString *str_ShareMsg = [dic_ActionMap objectForKey_YM:@"shareMsg"];
-                    NSString *str_MsgType = [dic_ActionMap objectForKey:@"msgType"];
-                    
-                    if( [str_MsgType isEqualToString:@"shareExam"] )
-                    {
-                        if( str_ShareMsg.length > 0 )
-                        {
-                            //공유한 메세지가 있으면
-                            MyShareExamCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyShareExamCell"];
-                            cell.rightUtilityButtons = [self rightButtons];
-                            cell.delegate = self;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            
-                            cell.tag = indexPath.row;
-                            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                            longPress.numberOfTouchesRequired = 1;
-                            longPress.delegate = self;
-                            longPress.cancelsTouchesInView = NO;
-                            [cell addGestureRecognizer:longPress];
-                            
-                            [self myShareExamCell:cell forRowAtIndexPath:indexPath];
-                            return cell;
-                        }
-                        else
-                        {
-                            MyShareExamNoMsgCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyShareExamNoMsgCell"];
-                            cell.rightUtilityButtons = [self rightButtons];
-                            cell.delegate = self;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            
-                            cell.tag = indexPath.row;
-                            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                            longPress.numberOfTouchesRequired = 1;
-                            longPress.delegate = self;
-                            longPress.cancelsTouchesInView = NO;
-                            [cell addGestureRecognizer:longPress];
-                            
-                            [self myShareExamNoMsgCell:cell forRowAtIndexPath:indexPath];
-                            return cell;
-                        }
-                    }
-                    else if( [str_MsgType isEqualToString:@"shareQuestion"] )
-                    {
-                        if( str_ShareMsg.length > 0 )
-                        {
-                            //공유한 내용이 있으면
-                            MyDirectChatMsgCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyDirectChatMsgCell"];
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            
-                            cell.tag = indexPath.row;
-                            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                            longPress.numberOfTouchesRequired = 1;
-                            longPress.delegate = self;
-                            longPress.cancelsTouchesInView = NO;
-                            [cell addGestureRecognizer:longPress];
-                            
-                            [self myDirectMsgCell:cell forRowAtIndexPath:indexPath];
-                            
-                            //                    [self addTapGesture:cell];
-                            
-                            return cell;
-                        }
-                        else
-                        {
-                            //공유한 내용이 없으면
-                            MyDirectChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyDirectChatCell"];
-                            cell.rightUtilityButtons = [self rightButtons];
-                            cell.delegate = self;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            
-                            cell.tag = indexPath.row;
-                            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                            longPress.numberOfTouchesRequired = 1;
-                            longPress.delegate = self;
-                            longPress.cancelsTouchesInView = NO;
-                            [cell addGestureRecognizer:longPress];
-                            
-                            [self myDirectCell:cell forRowAtIndexPath:indexPath];
-                            
-                            //                    [self addTapGesture:cell];
-                            
-                            return cell;
-                        }
-                    }
-                    else if( [str_MsgType isEqualToString:@"channel-follow"] || [str_MsgType isEqualToString:@"regist-member"] )
-                    {
-                        MyCmdFollowingCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyCmdFollowingCell"];
-//                        cell.rightUtilityButtons = [self rightButtons];
-//                        cell.delegate = self;
-
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        [self myFollowingCell:cell forRowAtIndexPath:indexPath];
-                        return cell;
-                    }
-                    else if( [str_MsgType isEqualToString:@"directQNA"] )
-                    {
-                        //내가 쓴 다이렉트 질문
-                        MyDirectChatMsgCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyDirectChatMsgCell"];
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        
-                        cell.tag = indexPath.row;
-                        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                        longPress.numberOfTouchesRequired = 1;
-                        longPress.delegate = self;
-                        longPress.cancelsTouchesInView = NO;
-                        [cell addGestureRecognizer:longPress];
-                        
-                        [self myDirectMsgCell:cell forRowAtIndexPath:indexPath];
-                        
-                        //                    [self addTapGesture:cell];
-                        
-                        return cell;
-                    }
+                    return cell;
                 }
             }
             else
             {
-                
-            }
-        }
-        else
-        {
-            if( 1 )
-            {
-                NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
-                if( ar_Body && ar_Body.count > 0 )
+                //남의 글
+                NSDictionary *dic_BotData = [dic objectForKey:@"bot_data"];
+                if( [dic_BotData isKindOfClass:[NSNull class]] == NO )
                 {
-                    
-                    NSDictionary *dic_ActionMap = [dic objectForKey:@"actionMap"];
-                    //                NSString *str_ShareMsg = [dic_ActionMap objectForKey_YM:@"shareMsg"];
-                    
-                    NSDictionary *dic_Body = [ar_Body firstObject];
-                    //                NSString *str_MsgType = [dic_Body objectForKey:@"msgType"];
-                    
-                    if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"image"] )
+                    if( [[dic objectForKey:@"userType"] isEqualToString:@"bot"] )
                     {
-                        OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
-                        cell.rightUtilityButtons = [self rightButtons];
-                        cell.delegate = self;
-                        
-//                        cell.iv_User.hidden = isUserIconHidden;
-                        
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        
-                        cell.tag = indexPath.row;
-                        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                        longPress.numberOfTouchesRequired = 1;
-                        longPress.delegate = self;
-                        longPress.cancelsTouchesInView = NO;
-                        [cell addGestureRecognizer:longPress];
-                        
-                        cell.btn_Origin.hidden = YES;
-                        [cell.btn_Origin setTitle:@"" forState:UIControlStateNormal];
-                        
-                        cell.btn_Read.hidden = NO;
-                        cell.lb_Date.hidden = NO;
-                        
-                        [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:NO];
-                        
-//                        cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
-
-                        return cell;
-                    }
-                    else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"pdfQuestion"] )
-                    {
-                        NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
-                        cell.rightUtilityButtons = [self rightButtons];
-                        cell.delegate = self;
-
-//                        cell.iv_User.hidden = isUserIconHidden;
-                        
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        
-                        [self pdfQuestionCell:cell forRowAtIndexPath:indexPath withMy:NO];
+                        /*
+                         botUserId = 709;
+                         "bot_data" = "[{\"btnInfoCount\":2,\"btnInfoType\":\"menu\",\"btnInfo\":[{\"btnLabel\":\"\\uc804\\uccb4\",\"returnValue\":\"3731\",\"returnName\":\"examId\",\"chatScreen\":\"selectedExam\",\"mesgAction\":\"selectedExam\"},{\"btnLabel\":\"\\uad6d\\uc81c\\uc601\\uc5b4 \\ucd08\\uae09\",\"returnValue\":\"3361\",\"returnName\":\"examId\",\"chatScreen\":\"selectedExam\",\"mesgAction\":\"selectedExam\"}],\"examCount\":2,\"examList\":\"[{\\\"examTitle\\\":\\\"\\\\uc804\\\\uccb4\\\",\\\"examId\\\":\\\"3731\\\"},{\\\"examTitle\\\":\\\"\\\\uad6d\\\\uc81c\\\\uc601\\\\uc5b4 \\\\ucd08\\\\uae09\\\",\\\"examId\\\":\\\"3361\\\"}]\"}]";
+                         chatScreen = selectExamlist;
+                         dataCount = 1;
+                         "data_prefix" = "http://data.thoting.com:8282/c_edujm/exam/";
+                         examCount = 2;
+                         "image_prefix" = "http://data.thoting.com:8282/c_edujm/exam/";
+                         imgUrl = "http://data.thoting.com:8282/c_edujm/images/user/000/000/noImage11.png";
+                         itemType = chat;
+                         mesgAction = wellcomeMesg;
+                         roomType = chatBot;
+                         "userImg_prefix" = "http://data.thoting.com:8282/c_edujm/images/user/";
+                         userThumbnail = "000/000/noImage11.png";
+                         userType = bot;
+                         */
+                        //챗봇 메세지
+                        OtherChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherChatBasicCell"];
+                        [self otherTextCell:cell forRowAtIndexPath:indexPath];
                         
                         return cell;
                     }
-                    else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"video"] )
+                    else if( [[dic_BotData objectForKey:@"mesgAction"] isEqualToString:@"toMessage"] )
                     {
-                        OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
-                        cell.rightUtilityButtons = [self rightButtons];
-                        cell.delegate = self;
-
-//                        cell.iv_User.hidden = isUserIconHidden;
-
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        
-                        cell.tag = indexPath.row;
-                        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                        longPress.numberOfTouchesRequired = 1;
-                        longPress.delegate = self;
-                        longPress.cancelsTouchesInView = NO;
-                        [cell addGestureRecognizer:longPress];
-                        
-                        [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:YES];
-                        
-                        cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
-                        
-                        return cell;
-                    }
-                    else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"normalQuestion"] )
-                    {
-                        NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
-                        cell.rightUtilityButtons = [self rightButtons];
-                        cell.delegate = self;
-
-//                        cell.iv_User.hidden = isUserIconHidden;
-
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        
-                        [self normalQuestionCell:cell forRowAtIndexPath:indexPath withMy:NO];
-                        
-                        return cell;
-                    }
-                    else
-                    {
-                        if( [[dic objectForKey_YM:@"itemType"] isEqualToString:@"cmd"] )
+                        NSString *str_FileType = [NSString stringWithFormat:@"%@", [dic_BotData objectForKey:@"type"]];
+                        if( [str_FileType isEqualToString:@"audio"] )
                         {
-                            CmdChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CmdChatCell"];
-//                            cell.rightUtilityButtons = [self rightButtons];
-//                            cell.delegate = self;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            [self cmdCell:cell forRowAtIndexPath:indexPath];
-                            [self addTapGesture:cell];
-                            return cell;
-                        }
-                        else
-                        {
-                            id message = self.messages[indexPath.row];
+                            TwoAutoChatAudioCell *cell = [tableView dequeueReusableCellWithIdentifier:@"TwoAutoChatAudioCell"];
                             
-                            if( [message isKindOfClass:[SBDBaseMessage class]] )
+                            cell.rightUtilityButtons = [self rightButtons];
+                            cell.delegate = self;
+                            
+                            long long llCreateAt = baseMessage.createdAt;
+                            NSString *str_Date = [self getDateNumber:llCreateAt];
+                            
+                            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+                            [btn_Date setTitle:[Util getDetailDate:[NSString stringWithFormat:@"%@", str_Date]] forState:0];
+                            
+                            NSURL *url = [NSURL URLWithString:userMessage.message];
+                            
+                            NSDictionary *dic_FileData = [dic objectForKey:@"file_data"];
+                            
+                            cell.url = url;
+                            cell.nEId = llMessageId;
+                            cell.messageId = llMessageId;
+                            cell.fPlayDuration = [[dic_FileData objectForKey:@"playtime"] floatValue];
+                            
+                            if( llCurrentMessageId == -1 || llCurrentMessageId != llMessageId )
                             {
-                                SBDBaseMessage *baseMessage = self.messages[indexPath.row];
-                                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+                                AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:url];
+                                cell.player = [AVPlayer playerWithPlayerItem:playerItem];
+                                cell.player = [AVPlayer playerWithURL:url];
+                                cell.lb_Time.text = @"00:00";
+                                cell.lb_Time.hidden = YES;
+                                cell.lb_BgTime.hidden = NO;
+                                cell.btn_PlayPause.selected = NO;
                                 
-                                if( [userMessage.customType isEqualToString:@"audio"] )
+                                CGFloat fCurrentTime = cell.fPlayDuration;
+                                NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+                                NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+                                cell.lb_BgTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                
+                                if( cell.player && self.timeObserver )
                                 {
-                                    AutoChatAudioCell *cell = [tableView dequeueReusableCellWithIdentifier:@"AutoChatAudioCell"];
-//                                    cell.rightUtilityButtons = [self rightButtons];
-//                                    cell.delegate = self;
-
-                                    [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                                    
-                                    NSURL *url = [Util createImageUrl:[dic_Body objectForKey:@"image_prefix"] withFooter:[dic_Body objectForKey:@"qnaBody"]];
-                                    
-                                    //                                    aaaaaa
-                                    cell.url = url;
-                                    cell.nEId = [[dic_Body objectForKey:@"eId"] integerValue];
-//                                    if( cell.nEId == nPlayEId )
-//                                    {
-//                                        [self onAutoAudioPlayAndPause:cell.btn_PlayPause];
-//                                        nPlayEId = -1;
-//                                    }
-                                    
-//                                    long long llCreateTime = [[dic objectForKey:@"createDate"] longLongValue];
-//                                    cell.createTime = llCreateTime;
-                                    cell.messageId = llMessageId;
-                                    cell.fPlayDuration = [[dic objectForKey:@"playtime_seconds"] floatValue];
-                                    
-//                                    if( cell.nEId != currentEId )
-//                                    if( currentCreateTime != llCreateTime )
-                                    if( llCurrentMessageId == -1 || llCurrentMessageId != llMessageId )
-                                    {
-                                        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:url];
-                                        cell.player = [AVPlayer playerWithPlayerItem:playerItem];
-                                        cell.player = [AVPlayer playerWithURL:url];
-                                        cell.lb_Time.text = @"00:00";
-                                        cell.lb_Time.hidden = YES;
-                                        cell.lb_BgTime.hidden = NO;
-                                        cell.btn_PlayPause.selected = NO;
+                                    @try{
                                         
-                                        CGFloat fCurrentTime = cell.fPlayDuration;
-                                        NSInteger nMinute = (NSInteger)fCurrentTime / 60;
-                                        NSInteger nSecond = (NSInteger)fCurrentTime % 60;
-                                        cell.lb_BgTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
-
-                                        if( cell.player && self.timeObserver )
-                                        {
-                                            @try{
-                                                
-                                                [cell.player removeTimeObserver:self.timeObserver];
-                                                self.timeObserver = nil;
-
-                                            }@catch(id anException){
-//                                                [currentPlayer pause];
-//                                                currentPlayer = nil;
-                                            }@finally {
-                                                
-                                            }
-                                        }
+                                        [cell.player removeTimeObserver:self.timeObserver];
+                                        self.timeObserver = nil;
+                                        
+                                    }@catch(id anException){
+                                        //                                                [currentPlayer pause];
+                                        //                                                currentPlayer = nil;
+                                    }@finally {
+                                        
                                     }
-                                    else
-                                    {
-                                        NSLog(@"indexPath.row : %ld", indexPath.row);
-                                        cell.lb_Time.hidden = NO;
-                                        cell.lb_BgTime.hidden = YES;
-                                        cell.btn_PlayPause.selected = isPlay;
-                                        
-                                        CGFloat fCurrentTime = cell.fPlayDuration;
-                                        NSInteger nMinute = (NSInteger)fCurrentTime / 60;
-                                        NSInteger nSecond = (NSInteger)fCurrentTime % 60;
-                                        NSString *str_Time = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
-                                        if( [str_Time isEqualToString:@"00:00"] )
-                                        {
-                                            cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
-                                        }
-
-                                        
-//                                        cell.lb_Time.text = [NSString stringWithFormat:@"%f", cell.fPlayDuration];
-                                        
-//                                        currentCell = cell;
-                                    }
-                                    
-//                                    NSString *str_Key = [NSString stringWithFormat:@"%ld", indexPath.row];
-//                                    NSDictionary *dic_PlayerData = [self.dicM_AutoAudio objectForKey:str_Key];
-//                                    AVPlayer *player = [dic_PlayerData objectForKey:@"player"];
-//                                    if( player == nil )
-//                                    {
-//                                        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:url];
-//                                        player = [AVPlayer playerWithPlayerItem:playerItem];
-//                                        player = [AVPlayer playerWithURL:url];
-//                                        
-//                                        CGFloat fDuration = CMTimeGetSeconds(playerItem.asset.duration);
-//                                        NSLog(@"%f", fDuration);
-//                                        
-//                                        cell.lb_Time.text = @"00:00";
-//                                        
-//                                        __weak AutoChatAudioCell *weakCell = cell;
-//                                        [cell.player addPeriodicTimeObserverForInterval:CMTimeMake(1, 2)
-//                                                                                  queue:dispatch_get_main_queue()
-//                                                                             usingBlock:^(CMTime time)
-//                                         {
-//                                             CGFloat fCurrentTime = CMTimeGetSeconds(time);
-//                                             NSInteger nMinute = (NSInteger)fCurrentTime / 60;
-//                                             NSInteger nSecond = (NSInteger)fCurrentTime % 60;
-//                                             weakCell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
-//                                             
-//                                             NSLog(@"%f", CMTimeGetSeconds(time));
-//                                         }];
-//                                        
-//                                        [self.dicM_AutoAudio setObject:@{@"cell":cell, @"player":player} forKey:str_Key];
-//                                    }
-//                                    else
-//                                    {
-//                                        if ((player.rate != 0) && (player.error == nil))
-//                                        {
-//                                            cell.btn_PlayPause.selected = YES;
-//                                        }
-//                                        else
-//                                        {
-//                                            cell.btn_PlayPause.selected = NO;
-//                                        }
-//                                    }
-//                                    
-//                                    cell.player = player;
-                                    
-                                    cell.tag = cell.btn_PlayPause.tag = cell.btn_Replay.tag = indexPath.row;
-                                    [cell.btn_PlayPause removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
-                                    [cell.btn_Replay removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
-                                    [cell.btn_PlayPause addTarget:self action:@selector(onAutoAudioPlayAndPause:) forControlEvents:UIControlEventTouchUpInside];
-                                    [cell.btn_Replay addTarget:self action:@selector(onAutoAudioReplay:) forControlEvents:UIControlEventTouchUpInside];
-                                    
-                                    return cell;
                                 }
-                                else if( [userMessage.customType isEqualToString:@"pdf"] )
+                            }
+                            else
+                            {
+                                NSLog(@"indexPath.row : %ld", indexPath.row);
+                                cell.lb_Time.hidden = NO;
+                                cell.lb_BgTime.hidden = YES;
+                                cell.btn_PlayPause.selected = isPlay;
+                                
+                                CGFloat fCurrentTime = cell.fPlayDuration;
+                                NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+                                NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+                                NSString *str_Time = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                                if( [str_Time isEqualToString:@"00:00"] )
                                 {
-                                    NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
-                                    cell.rightUtilityButtons = [self rightButtons];
-                                    cell.delegate = self;
-                                    
-                                    [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                                    
-                                    [self pdfQuestionCell:cell forRowAtIndexPath:indexPath withMy:NO];
-                                    
-                                    return cell;
-                                }
-                                else if( [userMessage.customType isEqualToString:@"image"] )
-                                {
-                                    OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
-                                    cell.rightUtilityButtons = [self rightButtons];
-                                    cell.delegate = self;
-                                    
-                                    [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                                    
-                                    cell.tag = indexPath.row;
-                                    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                                    longPress.numberOfTouchesRequired = 1;
-                                    longPress.delegate = self;
-                                    longPress.cancelsTouchesInView = NO;
-                                    [cell addGestureRecognizer:longPress];
-                                    
-                                    cell.btn_Origin.hidden = YES;
-                                    [cell.btn_Origin setTitle:@"" forState:UIControlStateNormal];
-                                    
-                                    cell.btn_Read.hidden = NO;
-                                    cell.lb_Date.hidden = NO;
-                                    
-                                    [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:NO];
-
-//                                    cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
-                                    
-                                    return cell;
-                                }
-                                else if( [userMessage.customType isEqualToString:@"video"] )
-                                {
-                                    OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
-                                    cell.rightUtilityButtons = [self rightButtons];
-                                    cell.delegate = self;
-                                    
-                                    [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                                    
-                                    cell.tag = indexPath.row;
-                                    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                                    longPress.numberOfTouchesRequired = 1;
-                                    longPress.delegate = self;
-                                    longPress.cancelsTouchesInView = NO;
-                                    [cell addGestureRecognizer:longPress];
-                                    
-                                    cell.btn_Origin.hidden = YES;
-                                    [cell.btn_Origin setTitle:@"" forState:UIControlStateNormal];
-                                    
-                                    cell.btn_Read.hidden = NO;
-                                    cell.lb_Date.hidden = NO;
-                                    
-                                    [self otherImageCell:cell forRowAtIndexPath:indexPath withVideo:YES];
-                                    
-//                                    cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 0.f;
-                                    
-                                    return cell;
+                                    cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
                                 }
                             }
                             
-                            //aaaaaaa
-                            OtherChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherChatBasicCell"];
-                            cell.rightUtilityButtons = [self rightButtons];
-                            cell.delegate = self;
-
-//                            cell.iv_User.hidden = isUserIconHidden;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
+                            SBDUser *user = userMessage.sender;
+                            NSLog(@"%@", user.userId);
+                            NSLog(@"%@", user.profileUrl);
+                            cell.lb_Name.text = user.nickname;
+                            [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"no_image.png")];
                             
-                            cell.tag = indexPath.row;
-                            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                            longPress.numberOfTouchesRequired = 1;
-                            longPress.delegate = self;
-                            longPress.cancelsTouchesInView = NO;
-                            [cell addGestureRecognizer:longPress];
+                            cell.tag = cell.btn_BotName.tag = cell.btn_PlayPause.tag = cell.btn_Replay.tag = indexPath.row;
+                            [cell.btn_PlayPause removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+                            [cell.btn_Replay removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+                            [cell.btn_PlayPause addTarget:self action:@selector(onAutoAudioPlayAndPause:) forControlEvents:UIControlEventTouchUpInside];
+                            [cell.btn_Replay addTarget:self action:@selector(onAutoAudioReplay:) forControlEvents:UIControlEventTouchUpInside];
                             
-                            [self otherTextCell:cell forRowAtIndexPath:indexPath];
                             
-//                            cell.lc_NameHeight.constant = cell.lb_Name.hidden == NO ? 15.f : 10.f;
-                            //                            [self addTapGesture:cell];
+                            cell.lb_Contents2.textColor = kMainColor;
+                            cell.v_ContentsBg2.backgroundColor = [UIColor whiteColor];
+                            cell.v_ContentsBg2.layer.borderColor = kMainColor.CGColor;
+                            cell.v_ContentsBg2.layer.borderWidth = 1.f;
                             
-                      
-
+                            NSDictionary *dic_BtnInfo = [dic objectForKey:@"btnInfo"];
+                            cell.lb_Contents2.text = [NSString stringWithFormat:@"@%@", [dic_BtnInfo objectForKey:@"btnLabel"]];
+                            [cell.btn_BotName addTarget:self action:@selector(onAddInputBotName:) forControlEvents:UIControlEventTouchUpInside];
+                            
+                            return cell;
+                        }
+                        else
+                        {
+                            TwoOtherChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"TwoOtherChatCell"];
+                            [self twoOtherTextCell:cell forRowAtIndexPath:indexPath];
                             
                             return cell;
                         }
                     }
                 }
-                else
+                
+                if( [userMessage.customType isEqualToString:@"pdfImage"] )
                 {
-                    NSDictionary *dic_ActionMap = [dic objectForKey:@"actionMap"];
-                    NSString *str_ShareMsg = [dic_ActionMap objectForKey_YM:@"shareMsg"];
-                    NSString *str_MsgType = [dic_ActionMap objectForKey:@"msgType"];
-                    if( [str_MsgType isEqualToString:@"shareExam"] )
+                    //pdf문제일 경우 이미지
+                    NormalQuestionCell *cell = [tableView dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
+                    [self setPdfImageCell:message withCell:cell withIndexPath:indexPath];
+                    return cell;
+
+//                    OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
+//                    [self setOtherImageCell:message withCell:cell withIndexPath:indexPath withVideo:NO];
+//                    return cell;
+                }
+                else if( [userMessage.customType isEqualToString:@"image"] )
+                {
+                    OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
+                    [self setOtherImageCell:message withCell:cell withIndexPath:indexPath withVideo:NO];
+                    return cell;
+                }
+                else if( [userMessage.customType isEqualToString:@"video"] )
+                {
+                    OtherImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherImageCell"];
+                    [self setOtherImageCell:message withCell:cell withIndexPath:indexPath withVideo:YES];
+                    return cell;
+                }
+                else if( [userMessage.customType isEqualToString:@"audio"] )
+                {
+                    AutoChatAudioCell *cell = [tableView dequeueReusableCellWithIdentifier:@"AutoChatAudioCell"];
+                    
+                    cell.rightUtilityButtons = [self rightButtons];
+                    cell.delegate = self;
+                    
+                    long long llCreateAt = baseMessage.createdAt;
+                    NSString *str_Date = [self getDateNumber:llCreateAt];
+                    
+                    UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+                    [btn_Date setTitle:[Util getDetailDate:[NSString stringWithFormat:@"%@", str_Date]] forState:0];
+
+
+//                    SBDUser *user = userMessage.sender;
+//                    cell.lb_Name.text = user.nickname;
+//
+//                    [cell.iv_User sd_setImageWithURL:[NSURL URLWithString:user.profileUrl] placeholderImage:BundleImage(@"no_image.png")];
+//                    cell.iv_User.tag = indexPath.row;
+//                    cell.iv_User.userInteractionEnabled = YES;
+//                    UITapGestureRecognizer *imageTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(userImageTap:)];
+//                    [imageTap setNumberOfTapsRequired:1];
+//                    [cell.iv_User addGestureRecognizer:imageTap];
+
+                    
+                    
+                    NSURL *url = [NSURL URLWithString:userMessage.message];
+                    
+                    NSDictionary *dic_FileData = [dic objectForKey:@"file_data"];
+                    
+                    cell.url = url;
+                    cell.nEId = llMessageId;
+                    cell.messageId = llMessageId;
+                    cell.fPlayDuration = [[dic_FileData objectForKey:@"playtime"] floatValue];
+
+                    if( llCurrentMessageId == -1 || llCurrentMessageId != llMessageId )
                     {
-                        if( str_ShareMsg.length > 0 )
-                        {
-                            OtherShareExamCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherShareExamCell"];
-                            cell.rightUtilityButtons = [self rightButtons];
-                            cell.delegate = self;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            
-                            cell.tag = indexPath.row;
-                            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                            longPress.numberOfTouchesRequired = 1;
-                            longPress.delegate = self;
-                            longPress.cancelsTouchesInView = NO;
-                            [cell addGestureRecognizer:longPress];
-                            
-                            [self otherShareExamCell:cell forRowAtIndexPath:indexPath];
-                            
-                            return cell;
-                        }
-                        else
-                        {
-                            OtherShareExamNoMsgCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherShareExamNoMsgCell"];
-                            cell.rightUtilityButtons = [self rightButtons];
-                            cell.delegate = self;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            
-                            cell.tag = indexPath.row;
-                            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                            longPress.numberOfTouchesRequired = 1;
-                            longPress.delegate = self;
-                            longPress.cancelsTouchesInView = NO;
-                            [cell addGestureRecognizer:longPress];
-                            
-                            [self otherShareExamNoMsgCell:cell forRowAtIndexPath:indexPath];
-                            return cell;
-                        }
-                    }
-                    else if( [str_MsgType isEqualToString:@"channel-follow"] || [str_MsgType isEqualToString:@"regist-member"] )
-                    {
-                        OtherCmdFollowingCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherCmdFollowingCell"];
-//                        cell.rightUtilityButtons = [self rightButtons];
-//                        cell.delegate = self;
-
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                        [self otherFollowingCell:cell forRowAtIndexPath:indexPath];
-                        return cell;
-                    }
-                    else if( [str_MsgType isEqualToString:@"shareQuestion"] )
-                    {
-                        if( str_ShareMsg.length > 0 )
-                        {
-                            OtherDirectChatMsgCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherDirectChatMsgCell"];
-                            cell.rightUtilityButtons = [self rightButtons];
-                            cell.delegate = self;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            
-                            cell.tag = indexPath.row;
-                            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                            longPress.numberOfTouchesRequired = 1;
-                            longPress.delegate = self;
-                            longPress.cancelsTouchesInView = NO;
-                            [cell addGestureRecognizer:longPress];
-                            
-                            [self otherDirectMsgCell:cell forRowAtIndexPath:indexPath];
-                            //                    [self addTapGesture:cell];
-                            
-                            return cell;
-                        }
-                        else
-                        {
-                            OtherDirectChatCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherDirectChatCell"];
-                            cell.rightUtilityButtons = [self rightButtons];
-                            cell.delegate = self;
-
-                            [tableView deselectRowAtIndexPath:indexPath animated:YES];
-                            
-                            cell.tag = indexPath.row;
-                            UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                            longPress.numberOfTouchesRequired = 1;
-                            longPress.delegate = self;
-                            longPress.cancelsTouchesInView = NO;
-                            [cell addGestureRecognizer:longPress];
-                            
-                            [self otherDirectCell:cell forRowAtIndexPath:indexPath];
-                            //                    [self addTapGesture:cell];
-                            
-                            return cell;
-                        }
-                    }
-                    else if( [str_MsgType isEqualToString:@"directQNA"] )
-                    {
-                        //남이 쓴 다이렉트 질문일 경우
-                        OtherDirectChatMsgCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherDirectChatMsgCell"];
-                        cell.rightUtilityButtons = [self rightButtons];
-                        cell.delegate = self;
-
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
+                        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithURL:url];
+                        cell.player = [AVPlayer playerWithPlayerItem:playerItem];
+                        cell.player = [AVPlayer playerWithURL:url];
+                        cell.lb_Time.text = @"00:00";
+                        cell.lb_Time.hidden = YES;
+                        cell.lb_BgTime.hidden = NO;
+                        cell.btn_PlayPause.selected = NO;
                         
-                        cell.tag = indexPath.row;
-                        UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPressGestures:)];
-                        longPress.numberOfTouchesRequired = 1;
-                        longPress.delegate = self;
-                        longPress.cancelsTouchesInView = NO;
-                        [cell addGestureRecognizer:longPress];
+                        CGFloat fCurrentTime = cell.fPlayDuration;
+                        NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+                        NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+                        cell.lb_BgTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
                         
-                        [self otherDirectMsgCell:cell forRowAtIndexPath:indexPath];
-                        //                    [self addTapGesture:cell];
-                        
-                        return cell;
+                        if( cell.player && self.timeObserver )
+                        {
+                            @try{
+                                
+                                [cell.player removeTimeObserver:self.timeObserver];
+                                self.timeObserver = nil;
+                                
+                            }@catch(id anException){
+                                //                                                [currentPlayer pause];
+                                //                                                currentPlayer = nil;
+                            }@finally {
+                                
+                            }
+                        }
                     }
                     else
                     {
-                        MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
-                        cell.rightUtilityButtons = [self rightButtons];
-                        cell.delegate = self;
-
-                        [tableView deselectRowAtIndexPath:indexPath animated:YES];
+                        NSLog(@"indexPath.row : %ld", indexPath.row);
+                        cell.lb_Time.hidden = NO;
+                        cell.lb_BgTime.hidden = YES;
+                        cell.btn_PlayPause.selected = isPlay;
                         
-                        return cell;
+                        CGFloat fCurrentTime = cell.fPlayDuration;
+                        NSInteger nMinute = (NSInteger)fCurrentTime / 60;
+                        NSInteger nSecond = (NSInteger)fCurrentTime % 60;
+                        NSString *str_Time = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                        if( [str_Time isEqualToString:@"00:00"] )
+                        {
+                            cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                        }
                     }
+                    
+                    cell.tag = cell.btn_PlayPause.tag = cell.btn_Replay.tag = indexPath.row;
+                    [cell.btn_PlayPause removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+                    [cell.btn_Replay removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+                    [cell.btn_PlayPause addTarget:self action:@selector(onAutoAudioPlayAndPause:) forControlEvents:UIControlEventTouchUpInside];
+                    [cell.btn_Replay addTarget:self action:@selector(onAutoAudioReplay:) forControlEvents:UIControlEventTouchUpInside];
+                    
+                    return cell;
                 }
+                else
+                {
+                    OtherChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherChatBasicCell"];
+                    [self otherTextCell:cell forRowAtIndexPath:indexPath];
+                    
+                    return cell;
+                }
+            }
+        }
+        else if( [message isKindOfClass:[NSDictionary class]] )
+        {
+            //템프면 (이미지, 비디오)
+            NSDictionary *dic = (NSDictionary *)message;
+            if( [[dic objectForKey:@"temp"] isEqualToString:@"YES"] )
+            {
+                if( [[dic objectForKey:@"type"] isEqualToString:@"audio"] )
+                {
+                    MyAudioCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyAudioCell"];
+
+                    cell.btn_Read.selected = NO;
+                    
+                    double duration = [[dic objectForKey:@"duration"] doubleValue];
+                    duration = ceil(duration);
+                    
+                    NSLog(@"duration: %f", duration);
+                    NSInteger nMinute = (NSInteger)duration / 60;
+                    NSInteger nSecond = (NSInteger)duration % 60;
+                    cell.lb_Time.hidden = YES;
+                    cell.lb_BgTime.hidden = NO;
+                    cell.lb_Time.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                    cell.lb_BgTime.text = [NSString stringWithFormat:@"%02ld:%02ld", nMinute, nSecond];
+                    
+                    [cell.btn_PlayPause removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+                    [cell.btn_Replay removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+
+                    return cell;
+                }
+
+                MyImageCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyImageCell"];
+                [self myImageCell:cell forRowAtIndexPath:indexPath withVideo:NO];
+                return cell;
+            }
+            
+            MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
+            return cell;
+
+        }
+        else if( [message isKindOfClass:[NSString class]] )
+        {
+            //여기
+            ChatDateCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ChatDateCell"];
+            [tableView deselectRowAtIndexPath:indexPath animated:YES];
+            
+            NSString *str_Date = message;
+            if( str_Date.length >= 12 )
+            {
+                NSString *str_Year = [str_Date substringWithRange:NSMakeRange(0, 4)];
+                NSString *str_Month = [str_Date substringWithRange:NSMakeRange(4, 2)];
+                NSString *str_Day = [str_Date substringWithRange:NSMakeRange(6, 2)];
+                NSString *str_Hour = [str_Date substringWithRange:NSMakeRange(8, 2)];
+                NSString *str_Minute = [str_Date substringWithRange:NSMakeRange(10, 2)];
+                
+                NSString *str = [NSString stringWithFormat:@"%@ %ld:%02ld",
+                                 [str_Hour integerValue] > 12 ? @"오후" : @"오전",
+                                 ([str_Hour integerValue] > 12) ? [str_Hour integerValue] - 12 : [str_Hour integerValue] == 0 ? 12 : [str_Hour integerValue], [str_Minute integerValue]];
+                
+                NSString *str_ShowingDate = [NSString stringWithFormat:@"%@월 %@일 %@", str_Month, str_Day, str];
+                cell.lb_Date.text = str_ShowingDate;
             }
             else
             {
-                
+                NSLog(@"@#!@#!@#@!#");
             }
+            
+            return cell;
         }
+        else
+        {
+            MyChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
+//            cell.rightUtilityButtons = [self rightButtons];
+//            cell.delegate = self;
+//            cell.btn_Read.selected = YES;
+//            cell.lb_Contents.text = userMessage.message;
+            return cell;
+        }
+    }
+    else if( tableView == self.tbv_AtList )
+    {
+        /*
+         cc = 2;
+         rId = 2492;
+         userAffiliation = "\Uc9c4\Uba85\Ud559\Uc6d0\Uc120\Uc0dd";
+         userEmail = "ss4@t.com";
+         userId = 141;
+         userMajor = "";
+         userName = jason4;
+         userThumbnail = "000/000/noImage3.png";
+         userType = user;
+         */
+
+        NSDictionary *dic = self.arM_AtList[indexPath.row];
+        
+        ChatIngUserCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ChatIngUserCell"];
+        
+        [cell.iv_User sd_setImageWithURL:[Util createImageUrl:str_UserImagePrefix
+                                                   withFooter:[dic objectForKey_YM:@"userThumbnail"]] placeholderImage:BundleImage(@"no_image.png")];
+        cell.lb_Name.text = [dic objectForKey_YM:@"userName"];
+        cell.lb_NinkName.text = [dic objectForKey_YM:@"userAffiliation"];
+        
+        return cell;
     }
     else
     {
@@ -3356,7 +4092,13 @@ typedef enum {
         NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
         NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
         
-        [self didSelectedItem:dic];
+        [self didSelectedItem:dic withMessage:baseMessage];
+    }
+    else if( tableView == self.tbv_AtList )
+    {
+        NSDictionary *dic = [self.arM_AtList objectAtIndex:indexPath.row];
+        self.dic_SelectedMention = dic;
+        self.v_CommentKeyboardAccView.tv_Contents.text = [NSString stringWithFormat:@"@%@:", [dic objectForKey_YM:@"userName"]];
     }
     else
     {
@@ -3366,14 +4108,14 @@ typedef enum {
         NSString *str_AutoAnswer = @"";
         if( self.autoChatMode == kPrintExam )
         {
-            str_AutoAnswer = [dic objectForKey:@"examTitle"];
+            str_AutoAnswer = [dic objectForKey:@"btnLabel"];
             
 //            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = NO;
             [self performSelector:@selector(onKeyboardDownInterval) withObject:nil afterDelay:0.3f];
         }
         else if( self.autoChatMode == kPrintItem )
         {
-            str_AutoAnswer = [NSString stringWithFormat:@"%@ %@", [dic objectForKey:@"itemNo"], [dic objectForKey:@"itemBody"]];
+            str_AutoAnswer = [NSString stringWithFormat:@"%@. %@", [dic objectForKey:@"returnValue"], [dic objectForKey:@"btnLabel"]];
             
 //            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = NO;
             
@@ -3381,8 +4123,14 @@ typedef enum {
         }
         else if( self.autoChatMode == kPrintAnswer || self.autoChatMode == kNextExam || self.autoChatMode == kPrintContinue )
         {
-            str_AutoAnswer = [dic objectForKey:@"title"];
+            str_AutoAnswer = [dic objectForKey:@"btnLabel"];
 //            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = YES;
+            [self performSelector:@selector(onKeyboardShowInterval) withObject:nil afterDelay:0.3f];
+        }
+        else
+        {
+            str_AutoAnswer = [dic objectForKey:@"btnLabel"];
+            //            self.v_CommentKeyboardAccView.btn_KeyboardChange.selected = YES;
             [self performSelector:@selector(onKeyboardShowInterval) withObject:nil afterDelay:0.3f];
         }
         
@@ -3410,6 +4158,20 @@ typedef enum {
                 [currentPlayer pause];
                 currentPlayer = nil;
             }
+            
+//            nAutoAnswerIdx = -1;
+//            [self.tbv_TempleteList reloadData];
+//
+//            self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+//            self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+//
+//            [UIView animateWithDuration:0.25f animations:^{
+//                [self.view layoutIfNeeded];
+//            }];
+//
+//            [self.view endEditing:YES];
+
+            [self performSelector:@selector(onKeyboardShowInterval) withObject:nil afterDelay:0.3f];
         }
         
         [self goSendMsg:nil];
@@ -3417,9 +4179,290 @@ typedef enum {
     }
 }
 
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    if( tableView == self.tbv_List )
+    {
+        id message = self.messages[indexPath.row];
+        NSDictionary *dic = nil;
+        if( [message isKindOfClass:[SBDAdminMessage class]] )
+        {
+            SBDUserMessage *userMessage = (SBDUserMessage *)message;
+            if( [userMessage.customType isEqualToString:@"USER_JOIN"] || [userMessage.customType isEqualToString:@"USER_LEFT"] )
+            {
+                return 44.f;
+            }
+            
+            return 0;
+        }
+        else if( [message isKindOfClass:[SBDBaseMessage class]] )
+        {
+            SBDBaseMessage *baseMessage = self.messages[indexPath.row];
+            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+            dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            
+//            NSDictionary *dic_BotDataTmp = [dic objectForKey:@"bot_data"];
+//            if( dic_BotDataTmp == nil || [dic_BotDataTmp isKindOfClass:[NSNull class]] || [dic_BotDataTmp isKindOfClass:[NSDictionary class]] == NO )
+//            {
+//                return 0;
+//            }
+            
+            SBDUser *user = userMessage.sender;
+            NSString *str_MyUserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+            NSString *str_SenderId = [NSString stringWithFormat:@"%@", user.userId];
+            if( [str_MyUserId isEqualToString:str_SenderId] )
+            {
+                if( [userMessage.customType isEqualToString:@"text"] )
+                {
+                    //나의 글
+                    static MyChatBasicCell *sizingCell = nil;
+                    static dispatch_once_t onceToken;
+                    dispatch_once(&onceToken, ^{
+                        sizingCell = [self.tbv_List dequeueReusableCellWithIdentifier:@"MyChatBasicCell"];
+                    });
+                    
+                    [self myTextCell:sizingCell forRowAtIndexPath:indexPath];
+                    //                sizingCell.lb_Contents.text = userMessage.message;
+                    [sizingCell setNeedsLayout];
+                    [sizingCell layoutIfNeeded];
+                    CGFloat height = [sizingCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
+                    return height;
+                }
+
+                if( [userMessage.customType isEqualToString:@"image"] )
+                {
+                    static MyImageCell *sizingCell = nil;
+                    static dispatch_once_t onceToken;
+                    dispatch_once(&onceToken, ^{
+                        sizingCell = [self.tbv_List dequeueReusableCellWithIdentifier:@"MyImageCell"];
+                    });
+
+                    id message = self.messages[indexPath.row];
+                    CGFloat fAddHeightValue = 10.f;
+                    CGFloat fCellHeight = [self setMyImageCell:message withCell:sizingCell withIndexPath:indexPath withVideo:NO] + fAddHeightValue;
+                    
+                    [sizingCell setNeedsLayout];
+                    [sizingCell layoutIfNeeded];
+                    
+                    return fCellHeight;
+                }
+
+                if( [userMessage.customType isEqualToString:@"video"] )
+                {
+                    static MyImageCell *sizingCell = nil;
+                    static dispatch_once_t onceToken;
+                    dispatch_once(&onceToken, ^{
+                        sizingCell = [self.tbv_List dequeueReusableCellWithIdentifier:@"MyImageCell"];
+                    });
+                    
+                    id message = self.messages[indexPath.row];
+                    CGFloat fAddHeightValue = 10.f;
+                    CGFloat fCellHeight = [self setMyImageCell:message withCell:sizingCell withIndexPath:indexPath withVideo:YES] + fAddHeightValue;
+                    
+                    [sizingCell setNeedsLayout];
+                    [sizingCell layoutIfNeeded];
+                    
+                    return fCellHeight;
+                }
+                
+                if( [userMessage.customType isEqualToString:@"audio"] )
+                {
+                    return 38.f;
+                }
+                
+                return 0;
+            }
+            else
+            {
+//                NSDictionary *dic_BotDataTmp = [dic objectForKey:@"bot_data"];
+//                if( dic_BotDataTmp == nil || [dic_BotDataTmp isKindOfClass:[NSNull class]] || [dic_BotDataTmp isKindOfClass:[NSDictionary class]] == NO )
+//                {
+//                    return 0;
+//                }
+
+                NSDictionary *dic_BotData = [dic objectForKey:@"bot_data"];
+                if( [dic_BotData isKindOfClass:[NSNull class]] == NO )
+                {
+                    if( [[dic_BotData objectForKey:@"mesgAction"] isEqualToString:@"toMessage"] )
+                    {
+                        NSString *str_FileType = [NSString stringWithFormat:@"%@", [dic_BotData objectForKey:@"type"]];
+                        if( [str_FileType isEqualToString:@"audio"] )
+                        {
+                            //                        return 38.f;
+                            return 106.f;
+                        }
+                        else
+                        {
+                            static TwoOtherChatCell *sizingCell = nil;
+                            static dispatch_once_t onceToken;
+                            dispatch_once(&onceToken, ^{
+                                sizingCell = [self.tbv_List dequeueReusableCellWithIdentifier:@"TwoOtherChatCell"];
+                            });
+                            
+                            [self twoOtherTextCell:sizingCell forRowAtIndexPath:indexPath];
+                            //                sizingCell.lb_Contents.text = userMessage.message;
+                            [sizingCell setNeedsLayout];
+                            [sizingCell layoutIfNeeded];
+                            CGFloat height = [sizingCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
+                            return height;
+                        }
+                    }
+                }
+                
+                if( [userMessage.customType isEqualToString:@"text"] )
+                {
+                    //남의 글
+                    static OtherChatBasicCell *sizingCell = nil;
+                    static dispatch_once_t onceToken;
+                    dispatch_once(&onceToken, ^{
+                        sizingCell = [self.tbv_List dequeueReusableCellWithIdentifier:@"OtherChatBasicCell"];
+                    });
+                    
+                    [self otherTextCell:sizingCell forRowAtIndexPath:indexPath];
+                    //                sizingCell.lb_Contents.text = userMessage.message;
+                    [sizingCell setNeedsLayout];
+                    [sizingCell layoutIfNeeded];
+                    CGFloat height = [sizingCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
+                    return height;
+                }
+                
+                if( [userMessage.customType isEqualToString:@"pdfImage"] )
+                {
+                    static NormalQuestionCell *sizingCell = nil;
+                    static dispatch_once_t onceToken;
+                    dispatch_once(&onceToken, ^{
+                        sizingCell = [self.tbv_List dequeueReusableCellWithIdentifier:@"NormalQuestionCell"];
+                    });
+                    
+                    id message = self.messages[indexPath.row];
+                    CGFloat fAddHeightValue = 60.f;
+                    CGFloat fCellHeight = [self setPdfImageCell:message withCell:sizingCell withIndexPath:indexPath] + fAddHeightValue;
+
+                    [sizingCell setNeedsLayout];
+                    [sizingCell layoutIfNeeded];
+                    
+                    return fCellHeight;
+                }
+                
+                if( [userMessage.customType isEqualToString:@"image"] )
+                {
+                    static OtherImageCell *sizingCell = nil;
+                    static dispatch_once_t onceToken;
+                    dispatch_once(&onceToken, ^{
+                        sizingCell = [self.tbv_List dequeueReusableCellWithIdentifier:@"OtherImageCell"];
+                    });
+                    
+                    id message = self.messages[indexPath.row];
+                    CGFloat fAddHeightValue = 30.f;
+                    CGFloat fCellHeight = [self setOtherImageCell:message withCell:sizingCell withIndexPath:indexPath withVideo:NO] + fAddHeightValue;
+                    
+                    [sizingCell setNeedsLayout];
+                    [sizingCell layoutIfNeeded];
+                    
+                    return fCellHeight;
+                }
+                
+                if( [userMessage.customType isEqualToString:@"video"] )
+                {
+                    static OtherImageCell *sizingCell = nil;
+                    static dispatch_once_t onceToken;
+                    dispatch_once(&onceToken, ^{
+                        sizingCell = [self.tbv_List dequeueReusableCellWithIdentifier:@"OtherImageCell"];
+                    });
+                    
+                    id message = self.messages[indexPath.row];
+                    CGFloat fAddHeightValue = 30.f;
+                    CGFloat fCellHeight = [self setOtherImageCell:message withCell:sizingCell withIndexPath:indexPath withVideo:YES] + fAddHeightValue;
+                    
+                    [sizingCell setNeedsLayout];
+                    [sizingCell layoutIfNeeded];
+                    
+                    return fCellHeight;
+                }
+
+                if( [userMessage.customType isEqualToString:@"audio"] )
+                {
+                    return 38.f;
+                }
+                
+                return 0;
+
+                //                OtherChatBasicCell *cell = [tableView dequeueReusableCellWithIdentifier:@"OtherChatBasicCell"];
+                //                cell.rightUtilityButtons = [self rightButtons];
+                //                cell.delegate = self;
+                //                cell.lb_Contents.text = userMessage.message;
+                //
+                //                [self.c_OtherChatBasicCell updateConstraintsIfNeeded];
+                //                [self.c_OtherChatBasicCell layoutIfNeeded];
+                //
+                //                //            self.c_MyChatBasicCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyChatBasicCell.bounds));
+                //
+                //                return [self.c_OtherChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
+            }
+        }
+        else if( [message isKindOfClass:[NSString class]] )
+        {
+            return 37.f;
+        }
+        else
+        {
+            if( [message isKindOfClass:[NSDictionary class]] )
+            {
+                NSDictionary *dic = (NSDictionary *)message;
+                if( [[dic objectForKey:@"temp"] isEqualToString:@"YES"] )
+                {
+                    if( [[dic objectForKey:@"type"] isEqualToString:@"audio"] )
+                    {
+                        return 38.f;
+                    }
+                    
+                    BOOL isVideo = [[dic objectForKey_YM:@"type"] isEqualToString:@"video"];
+                    static MyImageCell *sizingCell = nil;
+                    static dispatch_once_t onceToken;
+                    dispatch_once(&onceToken, ^{
+                        sizingCell = [self.tbv_List dequeueReusableCellWithIdentifier:@"MyImageCell"];
+                    });
+                    
+                    id message = self.messages[indexPath.row];
+                    CGFloat fAddHeightValue = 10.f;
+
+                    return [self setMyImageCell:message withCell:sizingCell withIndexPath:indexPath withVideo:isVideo] + fAddHeightValue;
+                }
+            }
+            return 0.f;
+        }
+        
+        return 0.f;
+    }
+    else if( tableView == self.tbv_AtList )
+    {
+        return 44.f;
+    }
+    else
+    {
+        
+        [self autoAnswerSetData:self.c_AutoAnswerCell forRowAtIndexPath:indexPath];
+        
+        [self.c_AutoAnswerCell updateConstraintsIfNeeded];
+        [self.c_AutoAnswerCell layoutIfNeeded];
+        
+        self.c_AutoAnswerCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_AutoAnswerCell.bounds));
+        
+        NSLog(@"cell height : %f", [self.c_AutoAnswerCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
+        
+        return [self.c_AutoAnswerCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
+        
+        //        return 70.f;
+    }
+    
+    return 0;
+}
+
 - (void)myAudioCell:(MyAudioCell *)cell indexPath:(NSIndexPath *)indexPath withData:(NSDictionary *)dic withMessageId:(long long)llMessageId
 {
-    double duration = [[dic objectForKey:@"duration"] doubleValue];
+    NSDictionary *dic_FileData = [dic objectForKey:@"file_data"];
+    double duration = [[dic_FileData objectForKey:@"playtime"] doubleValue];
     duration = ceil(duration);
 
     if( [[dic objectForKey:@"temp"] isEqualToString:@"YES"] )
@@ -3433,20 +4476,15 @@ typedef enum {
         return;
     }
     
-    NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
-    if( ar_Body.count <= 0 )
-    {
-        return;
-    }
-    
+    SBDBaseMessage *baseMessage = self.messages[indexPath.row];
+    SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+
     cell.btn_Read.selected = YES;
 
-    NSDictionary *dic_Body = [ar_Body firstObject];
-
-    NSURL *url = [Util createImageUrl:[dic objectForKey:@"image_prefix"] withFooter:[dic_Body objectForKey:@"qnaBody"]];
+    NSURL *url = [NSURL URLWithString:userMessage.message];
     
     cell.url = url;
-    cell.nEId = [[dic_Body objectForKey:@"eId"] integerValue];
+    cell.nEId = llMessageId;
     cell.messageId = llMessageId;
     cell.fPlayDuration = duration;
 
@@ -3500,7 +4538,7 @@ typedef enum {
     NSMutableDictionary *dicM_Info = [NSMutableDictionary dictionary];
     [dicM_Info setObject:cell forKey:@"cell"];
     [dicM_Info setObject:url forKey:@"url"];
-    [dicM_Info setObject:[NSNumber numberWithInteger:[[dic_Body objectForKey:@"eId"] integerValue]] forKey:@"eId"];
+    [dicM_Info setObject:[NSNumber numberWithLongLong:llMessageId] forKey:@"eId"];
     [dicM_Info setObject:[NSNumber numberWithInteger:cell.tag] forKey:@"tag"];
     [dicM_Info setObject:[NSNumber numberWithInteger:llMessageId] forKey:@"messageId"];
 //    [dicM_Info setObject:cell.lb_Time forKey:@"timeLabel"];
@@ -4019,778 +5057,21 @@ typedef enum {
     nAutoAnswerIdx = -1;
 }
 
-- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    if( tableView == self.tbv_List )
-    {
-        id message = self.messages[indexPath.row];
-        
-        NSDictionary *dic = nil;
-        if( [message isKindOfClass:[SBDBaseMessage class]] )
-        {
-            SBDBaseMessage *baseMessage = self.messages[indexPath.row];
-            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-            dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        }
-        else
-        {
-            dic = message;
-        }
-        
-        if( [[dic objectForKey_YM:@"itemType"] isEqualToString:@"cmd"] )
-        {
-            return 44.f;
-        }
-        
-        if( [[dic objectForKey:@"type"] isEqualToString:@"createDate"] )
-        {
-            return 37.f;
-        }
-        
-        if( [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_JOIN"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_LEFT"] )
-        {
-            //조인
-            return 44.f;
-        }
-        else if( [[dic objectForKey_YM:@"temp"] isEqualToString:@"YES"] )
-        {
-            if( [[dic objectForKey_YM:@"type"] isEqualToString:@"text"] )
-            {
-//                self.c_MyChatBasicCell.lb_Contents.text = [dic objectForKey_YM:@"contents"];
-//                CGFloat fHeight = [Util getTextSize2:self.c_MyChatBasicCell.lb_Contents].height;
-//                //            NSLog(@"fHeight : %f", fHeight);
-//                
-//                [self.c_MyChatBasicCell updateConstraintsIfNeeded];
-//                [self.c_MyChatBasicCell layoutIfNeeded];
-//                
-//                self.c_MyChatBasicCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyChatBasicCell.bounds));
-//                
-//                //            NSLog(@"cell height : %f", fHeight + 30.f);
-//                return fHeight + 30.f;
-                
-                //            [self myTextCellTemp:self.c_MyChatBasicCell forRowAtIndexPath:indexPath];
-                //
-                //            [self.c_MyChatBasicCell updateConstraintsIfNeeded];
-                //            [self.c_MyChatBasicCell layoutIfNeeded];
-                //
-                //            self.c_MyChatBasicCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyChatBasicCell.bounds));
-                //
-                //            return self.c_MyChatBasicCell.bounds.size.height;
-                
-                //            return [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                
-                
-                
-                
-                
-//                [self myTextCell:self.c_MyChatBasicCell forRowAtIndexPath:indexPath];
-                [self myTextCellTemp:self.c_MyChatBasicCell forRowAtIndexPath:indexPath];
-                [self.c_MyChatBasicCell updateConstraintsIfNeeded];
-                [self.c_MyChatBasicCell layoutIfNeeded];
-                
-                self.c_MyChatBasicCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyChatBasicCell.bounds));
 
-                return [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-            }
-            else if( [[dic objectForKey_YM:@"type"] isEqualToString:@"image"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"video"] )
-            {
-                NSDictionary *dic_ImageSize = [dic objectForKey:@"imageSize"];
-
-                CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
-                CGFloat fImageWidth = self.view.frame.size.width;
-                CGFloat fImageHeight = self.view.frame.size.height;
-                
-                if( [[dic objectForKey_YM:@"type"] isEqualToString:@"video"] )
-                {
-                    fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
-                    fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
-                }
-                else if( [[dic objectForKey_YM:@"type"] isEqualToString:@"image"] )
-                {
-                    fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
-                    fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
-                }
-                
-                if( isnan(fImageHeight) || fImageHeight <= 0 )
-                {
-                    fImageHeight = self.view.frame.size.height - kImageMargin;
-                }
-                
-                if( isnan(fImageWidth) || fImageWidth <= 0 )
-                {
-                    fImageWidth = self.view.frame.size.width - kImageMargin;
-                }
-
-                if( fImageWidth > fImageHeight )
-                {
-                    //가로형
-                    //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
-                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
-//                    fImageHeight = fScale * fImageHeight;
-                    
-                    fHeight = fScale * fImageHeight;
-                }
-                
-                return 76.f + fHeight;
-            }
-            else if( [[dic objectForKey_YM:@"type"] isEqualToString:@"pdfQuestion"] )
-            {
-                [self pdfQuestionCell:self.c_NormalQuestionCell forRowAtIndexPath:indexPath withMy:YES];
-                return self.c_NormalQuestionCell.sv_Contents.contentSize.height;
-                //            NSString *str_Url = [dic objectForKey:@"url"];
-                //            NSArray *ar_Urls = [str_Url componentsSeparatedByString:@"|"];
-                //            return ar_Urls.count * 420.f;
-            }
-            else if( [[dic objectForKey_YM:@"type"] isEqualToString:@"normalQuestion"] )
-            {
-                [self normalQuestionCell:self.c_NormalQuestionCell forRowAtIndexPath:indexPath withMy:YES];
-                return self.c_NormalQuestionCell.sv_Contents.contentSize.height;
-            }
-            else if( [[dic objectForKey:@"type"] isEqualToString:@"audio"] )
-            {
-                return 38.f;
-            }
-        }
-        
-        //글 타입 여부 (채널, direct)
-        BOOL isChannelType = [[dic objectForKey:@"qnaType"] isEqualToString:@"channel"];
-        
-        //내 글인지 여부
-        NSInteger nMyId = [[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"] integerValue];
-        NSInteger nTargetId = [[dic objectForKey_YM:@"userId"] integerValue];
-        BOOL isMy = nMyId == nTargetId;
-        
-        if( isMy )
-        {
-            if( 1 )
-            {
-                NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
-                if( ar_Body && ar_Body.count > 0 )  //텍스트, 이미지, 동영상, 초대, 나감등 일반 메세지
-                {
-                    NSDictionary *dic_Body = [ar_Body firstObject];
-                    NSString *str_QnaType = [dic_Body objectForKey:@"qnaType"];
-                    
-                    if( [str_QnaType isEqualToString:@"text"] )
-                    {
-                        [self myTextCell:self.c_MyChatBasicCell forRowAtIndexPath:indexPath];
-                        
-                        [self.c_MyChatBasicCell updateConstraintsIfNeeded];
-                        [self.c_MyChatBasicCell layoutIfNeeded];
-                        
-                        self.c_MyChatBasicCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyChatBasicCell.bounds));
-                        
-                        //                        NSLog(@"c_MyChatBasicCell height : %f", [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                        //138, 228
-                        
-                        //                    CGSize size = [Util getTextSize:self.c_MyChatBasicCell.lb_Contents.text];
-                        CGRect rect = [self.c_MyChatBasicCell.lb_Contents.attributedText boundingRectWithSize:CGSizeMake(self.c_MyChatBasicCell.lb_Contents.frame.size.width, FLT_MAX) options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading | NSStringDrawingTruncatesLastVisibleLine context:nil];
-                        
-//                        NSLog(@"text hieght : %f", rect.size.height);
-//                        NSLog(@"c_MyChatBasicCell height : %f", [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-//                        return 61.f;
-                        return [self.c_MyChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                    }
-                    else if( [str_QnaType isEqualToString:@"image"] || [str_QnaType isEqualToString:@"video"] )
-                    {
-                        CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
-                        
-                        NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
-                        if( ar_Body && ar_Body.count > 0 )
-                        {
-                            NSDictionary *dic_Body = [ar_Body firstObject];
-                            
-                            CGFloat fImageWidth = self.view.frame.size.width;
-                            CGFloat fImageHeight = self.view.frame.size.height;
-                            
-                            if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"video"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"video"] )
-                            {
-                                fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];
-                                fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue];
-                            }
-                            else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"image"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"image"] )
-                            {
-                                fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
-                                fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
-                            }
-
-                            if( isnan(fImageHeight) || fImageHeight <= 0 )
-                            {
-                                fImageHeight = self.view.frame.size.height - kImageMargin;
-                            }
-                            
-                            if( isnan(fImageWidth) || fImageWidth <= 0 )
-                            {
-                                fImageWidth = self.view.frame.size.width - kImageMargin;
-                            }
-
-                            if( fImageWidth > fImageHeight )
-                            {
-                                //가로형
-                                //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
-                                CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
-                                
-
-                                fHeight = fScale * fImageHeight;
-                                
-//                                fHeight = fImageHeight;
-                            }
-                        }
-                        
-                        
-                        
-                        
-                        
-                        
-                        CGFloat fAddHeightValue = 10.f;
-//                        if( indexPath.row > 0 )
-//                        {
-//                            //이전 메세지
-//                            id message = self.messages[indexPath.row - 1];
-//                            NSDictionary *dic_Prev = nil;
-//                            if( [message isKindOfClass:[SBDBaseMessage class]] )
-//                            {
-//                                SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
-//                                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-//                                if( [userMessage.customType isEqualToString:@"audio"] )
-//                                {
-//                                    //                                isAudioMsg = YES;
-//                                }
-//                                
-//                                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-//                                dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-//                            }
-//                            else
-//                            {
-//                                //                            isAudioMsg = YES;
-//                                dic_Prev = message;
-//                            }
-//                            
-//                            NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
-//                            NSInteger nNextUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
-//                            
-//                            NSInteger nTime = 0;
-//                            NSInteger nPrevTime = 0;
-//                            NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
-//                            NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
-//                            if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
-//                            {
-//                                nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
-//                                nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
-//                            }
-//                            
-//                            if( nUserId == nNextUserId )
-//                            {
-//                                //이전 메세지가 내 메세지면
-//                                if( nTime == nPrevTime )
-//                                {
-//                                    //1분 이내의 메세지
-//                                    
-//                                }
-//                                else
-//                                {
-//                                    //1분이 지난 메세지
-//                                    fAddHeightValue = 25.f;
-//                                }
-//                            }
-//                            else
-//                            {
-//                                //이전 메세지가 내 메세지가 아니면
-//                                fAddHeightValue = 25.f;
-//                            }
-//                        }
-                        
-                        return fHeight + fAddHeightValue;
-
-                        
-                        
-                        
-                        
-                        
-                        
-//                        return 35.f + fHeight;
-                        
-//                        return 420.f;
-                    }
-                    else if( [str_QnaType isEqualToString:@"audio"] )
-                    {
-                        return 38.f;
-                    }
-                    else if( [str_QnaType isEqualToString:@"pdfQuestion"] )
-                    {
-                        [self pdfQuestionCell:self.c_NormalQuestionCell forRowAtIndexPath:indexPath withMy:YES];
-                        return self.c_NormalQuestionCell.sv_Contents.contentSize.height;
-                        
-                        //                    NSString *str_Body = [dic_Body objectForKey:@"qnaBody"];
-                        //                    NSArray *ar_Bodys = [str_Body componentsSeparatedByString:@"|"];
-                        //
-                        //                    return ar_Bodys.count * 420.f;
-                        //                    return 420.f;
-                    }
-                    else if( [str_QnaType isEqualToString:@"normalQuestion"] )
-                    {
-                        [self normalQuestionCell:self.c_NormalQuestionCell forRowAtIndexPath:indexPath withMy:YES];
-                        return self.c_NormalQuestionCell.sv_Contents.contentSize.height;
-                    }
-                }
-                else
-                {
-                    NSDictionary *dic_ActionMap = [dic objectForKey:@"actionMap"];
-                    NSString *str_ShareMsg = [dic_ActionMap objectForKey_YM:@"shareMsg"];
-                    NSString *str_MsgType = [dic_ActionMap objectForKey:@"msgType"];
-                    if( [str_MsgType isEqualToString:@"shareExam"] )
-                    {
-                        if( str_ShareMsg.length > 0 )
-                        {
-                            [self myShareExamCell:self.c_MyShareExamCell forRowAtIndexPath:indexPath];
-                            
-                            [self.c_MyShareExamCell updateConstraintsIfNeeded];
-                            [self.c_MyShareExamCell layoutIfNeeded];
-                            
-                            self.c_MyShareExamCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyShareExamCell.bounds));
-                            
-                            //                        return self.c_MyShareExamCell.bounds.size.height;
-                            
-                            //                        NSLog(@"cell height : %f", [self.c_MyShareExamCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                            
-                            return [self.c_MyShareExamCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                        }
-                        else
-                        {
-                            [self myShareExamNoMsgCell:self.c_MyShareExamNoMsgCell forRowAtIndexPath:indexPath];
-                            
-                            [self.c_MyShareExamNoMsgCell updateConstraintsIfNeeded];
-                            [self.c_MyShareExamNoMsgCell layoutIfNeeded];
-                            
-                            self.c_MyShareExamNoMsgCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyShareExamNoMsgCell.bounds));
-                            
-                            //                        NSLog(@"cell height : %f", [self.c_MyShareExamNoMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                            
-                            return [self.c_MyShareExamNoMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                        }
-                    }
-                    else if( [str_MsgType isEqualToString:@"shareQuestion"] )
-                    {
-                        if( str_ShareMsg.length > 0 )
-                        {
-                            [self myDirectMsgCell:self.c_MyDirectChatMsgCell forRowAtIndexPath:indexPath];
-                            
-                            [self.c_MyDirectChatMsgCell updateConstraintsIfNeeded];
-                            [self.c_MyDirectChatMsgCell layoutIfNeeded];
-                            
-                            self.c_MyDirectChatMsgCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyDirectChatMsgCell.bounds));
-                            
-                            //                        NSLog(@"c_MyDirectChatMsgCell height : %f", [self.c_MyDirectChatMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                            
-                            return [self.c_MyDirectChatMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                        }
-                        else
-                        {
-                            [self myDirectCell:self.c_MyDirectChatCell forRowAtIndexPath:indexPath];
-                            
-                            [self.c_MyDirectChatCell updateConstraintsIfNeeded];
-                            [self.c_MyDirectChatCell layoutIfNeeded];
-                            
-                            self.c_MyDirectChatCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyDirectChatCell.bounds));
-                            
-                            //                        NSLog(@"cell height : %f", [self.c_MyDirectChatCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                            
-                            return [self.c_MyDirectChatCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                        }
-                    }
-                    else if( [str_MsgType isEqualToString:@"channel-follow"] || [str_MsgType isEqualToString:@"regist-member"] )
-                    {
-                        [self myFollowingCell:self.c_MyCmdFollowingCell forRowAtIndexPath:indexPath];
-                        
-                        [self.c_MyCmdFollowingCell updateConstraintsIfNeeded];
-                        [self.c_MyCmdFollowingCell layoutIfNeeded];
-                        
-                        self.c_MyCmdFollowingCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyCmdFollowingCell.bounds));
-                        
-                        //                    NSLog(@"c_MyCmdFollowingCell height : %f", [self.c_MyCmdFollowingCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                        
-                        return [self.c_MyCmdFollowingCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                    }
-                    else if( [str_MsgType isEqualToString:@"directQNA"] )
-                    {
-                        //내가 쓴 다이렉트 질문
-                        [self myDirectMsgCell:self.c_MyDirectChatMsgCell forRowAtIndexPath:indexPath];
-                        
-                        [self.c_MyDirectChatMsgCell updateConstraintsIfNeeded];
-                        [self.c_MyDirectChatMsgCell layoutIfNeeded];
-                        
-                        self.c_MyDirectChatMsgCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_MyDirectChatMsgCell.bounds));
-                        
-                        //                    NSLog(@"c_MyDirectChatMsgCell height : %f", [self.c_MyDirectChatMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                        
-                        return [self.c_MyDirectChatMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                    }
-                }
-            }
-            else
-            {
-                NSLog(@"000000000000000");
-            }
-        }
-        else
-        {
-            if( 1 )
-            {
-                NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
-                if( ar_Body && ar_Body.count > 0 )
-                {
-                    NSDictionary *dic_Body = [ar_Body firstObject];
-                    NSString *str_QnaType = [dic_Body objectForKey:@"qnaType"];
-                    
-                    if( [str_QnaType isEqualToString:@"text"] )
-                    {
-                        id message = self.messages[indexPath.row];
-                        
-                        NSDictionary *dic = nil;
-                        if( [message isKindOfClass:[SBDBaseMessage class]] )
-                        {
-                            SBDBaseMessage *baseMessage = self.messages[indexPath.row];
-                            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-                            
-                            if( [userMessage.customType isEqualToString:@"audio"] )
-                            {
-                                return 38.f;
-                            }
-                            else if( [userMessage.customType isEqualToString:@"pdf"] )
-                            {
-                                [self pdfQuestionCell:self.c_NormalQuestionCell forRowAtIndexPath:indexPath withMy:NO];
-                                return self.c_NormalQuestionCell.sv_Contents.contentSize.height;
-                            }
-                            else if( [userMessage.customType isEqualToString:@"image"] )
-                            {
-                                CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
-                                //bbbbbbbbbbb
-                                CGFloat fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
-                                CGFloat fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
-                                
-                                if( isnan(fImageHeight) || fImageHeight <= 0 )
-                                {
-                                    fImageHeight = self.view.frame.size.height - kImageMargin;
-                                }
-                                
-                                if( isnan(fImageWidth) || fImageWidth <= 0 )
-                                {
-                                    fImageWidth = self.view.frame.size.width - kImageMargin;
-                                }
-
-                                if( fImageWidth > fImageHeight )
-                                {
-                                    //가로형
-                                    //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
-                                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
-//                                    fImageHeight = fScale * fImageHeight;
-                                    
-                                    fHeight = fScale * fImageHeight;
-                                }
-
-                                return 25.f + fHeight;
-                                
-//                                return 420.f;
-                            }
-                            else if( [userMessage.customType isEqualToString:@"video"] )
-                            {
-                                CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
-                                //bbbbbbbbbbb
-                                CGFloat fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];
-                                CGFloat fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue];
-                                
-                                if( isnan(fImageHeight) || fImageHeight <= 0 )
-                                {
-                                    fImageHeight = self.view.frame.size.height - kImageMargin;
-                                }
-                                
-                                if( isnan(fImageWidth) || fImageWidth <= 0 )
-                                {
-                                    fImageWidth = self.view.frame.size.width - kImageMargin;
-                                }
-                                
-                                if( fImageWidth > fImageHeight )
-                                {
-                                    //가로형
-                                    //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
-                                    CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
-                                    //                                    fImageHeight = fScale * fImageHeight;
-                                    
-                                    fHeight = fScale * fImageHeight;
-                                }
-                                
-                                return 25.f + fHeight;
-                                
-                                //                                return 420.f;
-                            }
-                        }
-                        
-                        [self otherTextCell:self.c_OtherChatBasicCell forRowAtIndexPath:indexPath];
-                        
-                        [self.c_OtherChatBasicCell updateConstraintsIfNeeded];
-                        [self.c_OtherChatBasicCell layoutIfNeeded];
-                        
-                        self.c_OtherChatBasicCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_OtherChatBasicCell.bounds));
-                        
-                        //                        NSLog(@"cell height : %f", [self.c_OtherCmdFollowingCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                        
-                        return [self.c_OtherChatBasicCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                    }
-                    else if( [str_QnaType isEqualToString:@"image"] || [str_QnaType isEqualToString:@"video"] )
-                    {
-                        CGFloat fHeight = (self.view.bounds.size.width - kImageMargin);
-                        CGFloat fImageWidth = self.view.frame.size.width;
-                        CGFloat fImageHeight = self.view.frame.size.height;
-                        
-                        if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"video"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"video"] )
-                        {
-                            fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];
-                            fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue];
-                        }
-                        else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"image"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"image"] )
-                        {
-                            fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
-                            fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
-                        }
-                        
-                        if( isnan(fImageHeight) || fImageHeight <= 0 )
-                        {
-                            fImageHeight = self.view.frame.size.height - kImageMargin;
-                        }
-                        
-                        if( isnan(fImageWidth) || fImageWidth <= 0 )
-                        {
-                            fImageWidth = self.view.frame.size.width - kImageMargin;
-                        }
-
-                        if( fImageWidth > fImageHeight )
-                        {
-                            //가로형
-                            //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
-                            CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
-//                            fImageHeight = fScale * fImageHeight;
-                            
-                            fHeight = fScale * fImageHeight;
-                        }
-
-                        
-                        
-                        CGFloat fAddHeightValue = 0.f;
-                        if( indexPath.row > 0 )
-//                        if( self.messages.count > indexPath.row + 1 )
-                        {
-                            //이전 메세지
-                            id message = self.messages[indexPath.row - 1];
-                            NSDictionary *dic_Prev = nil;
-                            if( [message isKindOfClass:[SBDBaseMessage class]] )
-                            {
-                                SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
-                                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-                                if( [userMessage.customType isEqualToString:@"audio"] )
-                                {
-                                    //                                isAudioMsg = YES;
-                                }
-                                
-                                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-                                dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                            }
-                            else
-                            {
-                                //                            isAudioMsg = YES;
-                                dic_Prev = message;
-                            }
-                            
-                            NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
-                            NSInteger nPrevUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
-                            
-                            NSInteger nTime = 0;
-                            NSInteger nPrevTime = 0;
-                            NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
-                            NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
-                            if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
-                            {
-                                nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
-                                nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
-                            }
-                            
-                            if( nUserId == nPrevUserId )
-                            {
-                                //이전 메세지가 내 메세지면
-                                if( nTime == nPrevTime )
-                                {
-                                    //1분 이내의 메세지
-                                    fAddHeightValue = 42.f - 15.f;
-                                }
-                                else
-                                {
-                                    //1분이 지난 메세지
-                                    fAddHeightValue = 42.f;
-                                }
-                            }
-                            else
-                            {
-                                //이전 메세지가 내 메세지가 아니면
-                                fAddHeightValue = 42.f;
-                            }
-                        }
-
-//                        if( [str_ChatType isEqualToString:@"group"] )
-//                        {
-//                            fAddHeightValue += 20.f;
-//                        }
-//                        else if( [str_ChatType isEqualToString:@"channel"] )
-//                        {
-//                            fAddHeightValue += 20.f;
-//                        }
-//                        else if( [str_ChatType isEqualToString:@"user"] )
-//                        {
-//                            
-//                        }
-
-                        return fHeight + fAddHeightValue;
-//                        return fHeight + 42.f;
-                    }
-                    else if( [str_QnaType isEqualToString:@"pdfQuestion"] )
-                    {
-                        [self pdfQuestionCell:self.c_NormalQuestionCell forRowAtIndexPath:indexPath withMy:NO];
-                        return self.c_NormalQuestionCell.sv_Contents.contentSize.height;
-                    }
-                    else if( [str_QnaType isEqualToString:@"normalQuestion"] )
-                    {
-                        [self normalQuestionCell:self.c_NormalQuestionCell forRowAtIndexPath:indexPath withMy:NO];
-                        return self.c_NormalQuestionCell.sv_Contents.contentSize.height;
-                    }
-                }
-                else
-                {
-                    NSDictionary *dic_ActionMap = [dic objectForKey:@"actionMap"];
-                    NSString *str_ShareMsg = [dic_ActionMap objectForKey_YM:@"shareMsg"];
-                    NSString *str_MsgType = [dic_ActionMap objectForKey:@"msgType"];
-                    
-                    if( [str_MsgType isEqualToString:@"shareExam"] )
-                    {
-                        if( str_ShareMsg.length > 0 )
-                        {
-                            [self otherShareExamCell:self.c_OtherShareExamCell forRowAtIndexPath:indexPath];
-                            
-                            [self.c_OtherShareExamCell updateConstraintsIfNeeded];
-                            [self.c_OtherShareExamCell layoutIfNeeded];
-                            
-                            self.c_OtherShareExamCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_OtherShareExamCell.bounds));
-                            
-                            //                        NSLog(@"cell height : %f", [self.c_OtherShareExamCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                            
-                            return [self.c_OtherShareExamCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                        }
-                        else
-                        {
-                            [self otherShareExamNoMsgCell:self.c_OtherShareExamNoMsgCell forRowAtIndexPath:indexPath];
-                            
-                            [self.c_OtherShareExamNoMsgCell updateConstraintsIfNeeded];
-                            [self.c_OtherShareExamNoMsgCell layoutIfNeeded];
-                            
-                            self.c_OtherShareExamNoMsgCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_OtherShareExamNoMsgCell.bounds));
-                            
-                            //                        NSLog(@"cell height : %f", [self.c_OtherShareExamNoMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                            
-                            return [self.c_OtherShareExamNoMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                        }
-                    }
-                    else if( [str_MsgType isEqualToString:@"shareQuestion"] )
-                    {
-                        if( str_ShareMsg.length > 0 )
-                        {
-                            [self otherDirectMsgCell:self.c_OtherDirectChatMsgCell forRowAtIndexPath:indexPath];
-                            
-                            [self.c_OtherDirectChatMsgCell updateConstraintsIfNeeded];
-                            [self.c_OtherDirectChatMsgCell layoutIfNeeded];
-                            
-                            self.c_OtherDirectChatMsgCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_OtherDirectChatMsgCell.bounds));
-                            
-                            //                        NSLog(@"cell height : %f", [self.c_OtherDirectChatMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                            
-                            return [self.c_OtherDirectChatMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                        }
-                        else
-                        {
-                            [self otherDirectCell:self.c_OtherDirectChatCell forRowAtIndexPath:indexPath];
-                            
-                            [self.c_OtherDirectChatCell updateConstraintsIfNeeded];
-                            [self.c_OtherDirectChatCell layoutIfNeeded];
-                            
-                            self.c_OtherDirectChatCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_OtherDirectChatCell.bounds));
-                            
-                            //                        NSLog(@"cell height : %f", [self.c_OtherDirectChatCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                            
-                            return [self.c_OtherDirectChatCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                        }
-                    }
-                    else if( [str_MsgType isEqualToString:@"channel-follow"] || [str_MsgType isEqualToString:@"regist-member"] )
-                    {
-                        [self otherFollowingCell:self.c_OtherCmdFollowingCell forRowAtIndexPath:indexPath];
-                        
-                        [self.c_OtherCmdFollowingCell updateConstraintsIfNeeded];
-                        [self.c_OtherCmdFollowingCell layoutIfNeeded];
-                        
-                        self.c_OtherCmdFollowingCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_OtherCmdFollowingCell.bounds));
-                        
-                        //                    NSLog(@"cell height : %f", [self.c_OtherCmdFollowingCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                        
-                        return [self.c_OtherCmdFollowingCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                    }
-                    else if( [str_MsgType isEqualToString:@"directQNA"] )
-                    {
-                        //남이 쓴 다이렉트 질문일 경우
-                        [self otherDirectMsgCell:self.c_OtherDirectChatMsgCell forRowAtIndexPath:indexPath];
-                        
-                        [self.c_OtherDirectChatMsgCell updateConstraintsIfNeeded];
-                        [self.c_OtherDirectChatMsgCell layoutIfNeeded];
-                        
-                        self.c_OtherDirectChatMsgCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_OtherDirectChatMsgCell.bounds));
-                        
-                        //                    NSLog(@"cell height : %f", [self.c_OtherDirectChatMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-                        
-                        return [self.c_OtherDirectChatMsgCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-                    }
-                }
-            }
-            else
-            {
-                
-            }
-        }
-    }
-    else
-    {
-        
-        [self autoAnswerSetData:self.c_AutoAnswerCell forRowAtIndexPath:indexPath];
-        
-        [self.c_AutoAnswerCell updateConstraintsIfNeeded];
-        [self.c_AutoAnswerCell layoutIfNeeded];
-        
-        self.c_AutoAnswerCell.bounds = CGRectMake(0.0f, 0.0f, CGRectGetWidth(self.tbv_List.bounds), CGRectGetHeight(self.c_AutoAnswerCell.bounds));
-        
-        NSLog(@"cell height : %f", [self.c_AutoAnswerCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height);
-        
-        return [self.c_AutoAnswerCell.contentView systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height;
-        
-        //        return 70.f;
-    }
-    
-    return 0;
-}
 
 - (void)tableView:(UITableView *)tableView didEndDisplayingCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath*)indexPath
 {
     if( tableView == self.tbv_TempleteList )    return;
     
+    if( tableView == self.tbv_AtList )    return;
+
     if( indexPath == nil )  return;
     
-    if( indexPath.row > self.messages.count - 1 )
-    {
-        return;
-    }
+    if( self.messages.count == 0 )  return;
     
+    if( indexPath.row > self.messages.count - 1 )   return;
+
+        
     id message = self.messages[indexPath.row];
     
     if( [message isKindOfClass:[SBDBaseMessage class]] )
@@ -4993,20 +5274,25 @@ typedef enum {
     
     if( self.autoChatMode == kPrintExam )
     {
-        cell.lb_Title.text = [dic objectForKey:@"examTitle"];
+        cell.lb_Title.text = [dic objectForKey_YM:@"btnLabel"];
     }
     else if( self.autoChatMode == kPrintItem )
     {
-        cell.lb_Title.text = [NSString stringWithFormat:@"%@ %@", [dic objectForKey:@"itemNo"], [dic objectForKey:@"itemBody"]];
+        cell.lb_Title.text = [NSString stringWithFormat:@"%@. %@", [dic objectForKey:@"returnValue"], [dic objectForKey:@"btnLabel"]];
     }
     else if( self.autoChatMode == kPrintAnswer || self.autoChatMode == kNextExam || self.autoChatMode == kPrintContinue )
     {
-        cell.lb_Title.text = [dic objectForKey:@"title"];
+        cell.lb_Title.text = [dic objectForKey:@"btnLabel"];
+    }
+    else
+    {
+        cell.lb_Title.text = [dic objectForKey:@"btnLabel"];
     }
 }
 
-- (void)didSelectedItem:(NSDictionary *)dic
+- (void)didSelectedItem:(NSDictionary *)dic withMessage:(SBDBaseMessage *)baseMessage
 {
+    SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
     UIStoryboard *storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
     
     NSMutableDictionary *dic_Main = [NSMutableDictionary dictionaryWithDictionary:dic];
@@ -5261,109 +5547,123 @@ typedef enum {
     }
     else
     {
-        NSArray *ar_Body = [dic_Main objectForKey:@"qnaBody"];
-        if( ar_Body.count > 0 )
-        {
-            NSDictionary *dic_Body = [ar_Body firstObject];
-            if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"image"] || [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"pdfQuestion"] ||
-               [[dic objectForKey_YM:@"fileType"] isEqualToString:@"image"] )
-            {
-                self.ar_Photo = [NSMutableArray array];
-                self.thumbs = [NSMutableArray array];
-                
-                if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"pdfQuestion"] )
-                {
-                    NSString *str_Json = [dic_Body objectForKey:@"qnaBody"];
-                    NSData *data = [str_Json dataUsingEncoding:NSUTF8StringEncoding];
-                    id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                    NSArray *ar = [json objectForKey:@"examQuestionInfos"];
-                    for( NSInteger i = ar.count - 1; i >= 0; i-- )
-                    {
-                        NSDictionary *dic = [ar objectAtIndex:i];
-                        NSString *str_ImageUrl = [dic objectForKey:@"pdfImgUrl"];
-                        NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:str_ImageUrl];
-                        [self.thumbs addObject:[MWPhoto photoWithURL:url]];
-                        [self.ar_Photo addObject:[MWPhoto photoWithURL:url]];
-                    }
-                }
-                else
-                {
-                    NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
-                    NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:str_Contents];
-                    [self.thumbs addObject:[MWPhoto photoWithURL:url]];
-                    [self.ar_Photo addObject:[MWPhoto photoWithURL:url]];
-                }
-                
-                BOOL displayActionButton = NO;
-                BOOL displaySelectionButtons = NO;
-                BOOL displayNavArrows = YES;
-                BOOL enableGrid = NO;
-                BOOL startOnGrid = NO;
-                
-                browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
-                browser.displayActionButton = displayActionButton;
-                browser.displayNavArrows = displayNavArrows;
-                browser.displaySelectionButtons = displaySelectionButtons;
-                browser.alwaysShowControls = displaySelectionButtons;
-                browser.zoomPhotosToFill = YES;
-#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_7_0
-                browser.wantsFullScreenLayout = YES;
-#endif
-                browser.enableGrid = enableGrid;
-                browser.startOnGrid = startOnGrid;
-                browser.enableSwipeToDismiss = YES;
-                [browser setCurrentPhotoIndex:0];
-                
-                UINavigationController *nc = [[UINavigationController alloc] initWithRootViewController:browser];
-                nc.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
-                [self presentViewController:nc animated:YES completion:nil];
-                
-                // Release
-                
-                // Test reloading of data after delay
-                double delayInSeconds = 3;
-                dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
-                dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
-                });
-            }
-            else if( [[dic_Body objectForKey_YM:@"qnaType"] isEqualToString:@"video"] )
-            {
-                NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
-                NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:str_Contents];
-                self.vc_Movie = [[MPMoviePlayerViewController alloc]initWithContentURL:url];
-                self.vc_Movie.view.frame = self.view.bounds;
-                self.vc_Movie.moviePlayer.repeatMode = MPMovieRepeatModeOne;
-                self.vc_Movie.moviePlayer.movieSourceType = MPMovieSourceTypeStreaming;
-                self.vc_Movie.moviePlayer.controlStyle = MPMovieControlStyleFullscreen;
-                self.vc_Movie.moviePlayer.shouldAutoplay = YES;
-                self.vc_Movie.moviePlayer.repeatMode = NO;
-                [self.vc_Movie.moviePlayer prepareToPlay];
-                
-                [self presentViewController:self.vc_Movie animated:YES completion:nil];
-            }
-            else
-            {
-                self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
-                self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
-                
-                [UIView animateWithDuration:0.25f animations:^{
-                    [self.view layoutIfNeeded];
-                }];
-                
-                [self.view endEditing:YES];
-            }
-        }
-        else
-        {
-            self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
-            self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
-            
-            [UIView animateWithDuration:0.25f animations:^{
-                [self.view layoutIfNeeded];
-            }];
-            
-            [self.view endEditing:YES];
-        }
+        self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+        self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+        
+        [UIView animateWithDuration:0.25f animations:^{
+            [self.view layoutIfNeeded];
+        }];
+        
+        [self.view endEditing:YES];
+
+//        if( [userMessage.customType isEqualToString:@"image"] || [userMessage.customType isEqualToString:@"pdfImage"] )
+//        {
+//            self.ar_Photo = [NSMutableArray array];
+//            self.thumbs = [NSMutableArray array];
+//
+//            NSURL *url = [NSURL URLWithString:userMessage.message];
+//            [self.thumbs addObject:[MWPhoto photoWithURL:url]];
+//            [self.ar_Photo addObject:[MWPhoto photoWithURL:url]];
+//
+//            BOOL displayActionButton = NO;
+//            BOOL displaySelectionButtons = NO;
+//            BOOL displayNavArrows = YES;
+//            BOOL enableGrid = NO;
+//            BOOL startOnGrid = NO;
+//
+//            browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
+//            browser.displayActionButton = displayActionButton;
+//            browser.displayNavArrows = displayNavArrows;
+//            browser.displaySelectionButtons = displaySelectionButtons;
+//            browser.alwaysShowControls = displaySelectionButtons;
+//            browser.zoomPhotosToFill = YES;
+//#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_7_0
+//            browser.wantsFullScreenLayout = YES;
+//#endif
+//            browser.enableGrid = enableGrid;
+//            browser.startOnGrid = startOnGrid;
+//            browser.enableSwipeToDismiss = YES;
+//            [browser setCurrentPhotoIndex:0];
+//
+//            UINavigationController *nc = [[UINavigationController alloc] initWithRootViewController:browser];
+//            nc.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
+//            [self presentViewController:nc animated:YES completion:nil];
+//
+//            // Release
+//
+//            // Test reloading of data after delay
+//            double delayInSeconds = 3;
+//            dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+//            dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+//            });
+//        }
+//        else if( [userMessage.customType isEqualToString:@"video"] )
+//        {
+////            NSString *str_Contents = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"data_prefix"]];
+//
+//            NSURL *url = [NSURL URLWithString:userMessage.message];
+//            self.vc_Movie = [[MPMoviePlayerViewController alloc]initWithContentURL:url];
+//            self.vc_Movie.view.frame = self.view.bounds;
+//            self.vc_Movie.moviePlayer.repeatMode = MPMovieRepeatModeOne;
+//            self.vc_Movie.moviePlayer.movieSourceType = MPMovieSourceTypeStreaming;
+//            self.vc_Movie.moviePlayer.controlStyle = MPMovieControlStyleFullscreen;
+//            self.vc_Movie.moviePlayer.shouldAutoplay = YES;
+//            self.vc_Movie.moviePlayer.repeatMode = NO;
+//            [self.vc_Movie.moviePlayer prepareToPlay];
+//
+//            [self presentViewController:self.vc_Movie animated:YES completion:nil];
+//        }
+//        else
+//        {
+//            self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
+//            self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+//
+//            [UIView animateWithDuration:0.25f animations:^{
+//                [self.view layoutIfNeeded];
+//            }];
+//
+//            [self.view endEditing:YES];
+//        }
+    }
+}
+
+- (void)paste:(id)sender
+{
+//    NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:userMessage.message]];
+//    [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"video"];
+
+//    [[UIPasteboard generalPasteboard]
+
+    NSData *data = [[UIPasteboard generalPasteboard]dataForPasteboardType:@"video"];
+
+    UIImage *image = [UIPasteboard generalPasteboard].image;
+    if( image )
+    {
+        UIImage *resizeImage = [Util imageWithImage:image convertToWidth:self.view.bounds.size.width - 30];
+        [self uploadData:@{@"type":@"image", @"obj":UIImageJPEGRepresentation(resizeImage, 0.3f), @"thumb":resizeImage,
+                           @"file_data":@{@"width":[NSString stringWithFormat:@"%f", resizeImage.size.width], @"height":[NSString stringWithFormat:@"%f", resizeImage.size.height]}}];
+    }
+    else if( data )
+    {
+        NSString *str = [UIPasteboard generalPasteboard].string;
+        NSURL *url = [NSURL URLWithString:str];
+        
+        //비디오
+        AVAsset *asset = [AVAsset assetWithURL:url];
+        AVAssetImageGenerator *imageGenerator = [[AVAssetImageGenerator alloc] initWithAsset:asset];
+        CMTime time = [asset duration];
+        time.value = 1;
+        CGImageRef imageRef = [imageGenerator copyCGImageAtTime:time actualTime:NULL error:NULL];
+        UIImage *thumbnail = [UIImage imageWithCGImage:imageRef];
+        CGImageRelease(imageRef);
+
+        NSData *videoData = data;//[NSData dataWithContentsOfURL:url];
+        [self uploadData:@{@"type":@"video", @"obj":videoData, @"thumb":UIImageJPEGRepresentation(thumbnail, 0.3f), @"videoUrl":[url absoluteString],
+                           @"file_data":@{@"width":[NSString stringWithFormat:@"%f", thumbnail.size.width], @"height":[NSString stringWithFormat:@"%f", thumbnail.size.height]}}];
+    }
+    else
+    {
+        [super paste:sender];
     }
 }
 
@@ -5393,161 +5693,117 @@ typedef enum {
             NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
             dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
             
-        }
-        else
-        {
-            if( [message isKindOfClass:[NSDictionary class]] )
+            NSString *str_MyUserId = [NSString stringWithFormat:@"%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
+            NSString *str_SenderId = [NSString stringWithFormat:@"%@", user.userId];
+            if( [str_MyUserId isEqualToString:str_SenderId] )
             {
-                if( [[message objectForKey_YM:@"isFail"] isEqualToString:@"YES"] )
+//                [self deleteQna:view.tag];
+                NSMutableArray *arM = [NSMutableArray array];
+                if( [userMessage.customType isEqualToString:@"image"] ||
+                   [userMessage.customType isEqualToString:@"pdfImage"] ||
+                   [userMessage.customType isEqualToString:@"text"])
                 {
-                    NSMutableArray *arM = [NSMutableArray array];
-                    [arM addObject:@"재전송"];
-                    [arM addObject:@"삭제"];
-                    
-                    [OHActionSheet showSheetInView:self.view
-                                             title:nil
-                                 cancelButtonTitle:@"취소"
-                            destructiveButtonTitle:nil
-                                 otherButtonTitles:arM
-                                        completion:^(OHActionSheet* sheet, NSInteger buttonIndex)
-                     {
-                         if( buttonIndex == 0 )
-                         {
-                             //재전송
-                             [self deleteTempMsg:message];
-                             
-                             if( [[message objectForKey:@"type"] isEqualToString:@"text"] )
-                             {
-                                 [self sendMsg:[message objectForKey:@"contents"]];
-                             }
-                             else if( [[message objectForKey:@"type"] isEqualToString:@"image"] )
-                             {
-                                 NSData *data = [message objectForKey:@"obj"];
-                                 UIImage *outputImage = [UIImage imageWithData:data];
-                                 UIImage *resizeImage = [Util imageWithImage:outputImage convertToWidth:self.view.bounds.size.width - 30];
-                                 [self uploadData:@{@"type":@"image", @"obj":UIImageJPEGRepresentation(resizeImage, 0.3f), @"thumb":resizeImage}];
-                             }
-                             else if( [[message objectForKey:@"type"] isEqualToString:@"video"] )
-                             {
-                                 NSURL *videoUrl = [NSURL URLWithString:[message objectForKey:@"videoUrl"]];
-                                 
-                                 AVURLAsset *asset = [[AVURLAsset alloc] initWithURL:videoUrl options:nil];
-                                 AVAssetImageGenerator *gen = [[AVAssetImageGenerator alloc] initWithAsset:asset];
-                                 gen.appliesPreferredTrackTransform = YES;
-                                 CMTime time = CMTimeMakeWithSeconds(0.0, 1);
-                                 NSError *error = nil;
-                                 CMTime actualTime;
-                                 
-                                 CGImageRef image = [gen copyCGImageAtTime:time actualTime:&actualTime error:&error];
-                                 UIImage *thumb = [[UIImage alloc] initWithCGImage:image];
-                                 
-                                 UIImage *resizeImage = [Util imageWithImage:thumb convertToWidth:self.view.bounds.size.width - 30];
-                                 
-                                 NSData *videoData = [NSData dataWithContentsOfURL:videoUrl];
-                                 [self uploadData:@{@"type":@"video", @"obj":videoData, @"thumb":UIImageJPEGRepresentation(resizeImage, 0.3f), @"videoUrl":[videoUrl absoluteString]}];
-                             }
-                         }
-                         else if( buttonIndex == 1 )
-                         {
-                             //삭제
-                             [self deleteTempMsg:message];
-                             
-                             dispatch_async(dispatch_get_main_queue(), ^{
-                                 [self.tbv_List reloadData];
-                                 [self.tbv_List layoutIfNeeded];
-                             });
-                         }
-                     }];
+                    [arM addObject:@"복사하기"];
                 }
-            }
-            return;
-        }
-        
-        NSString *str_Type = [dic objectForKey:@"itemType"];
-        NSString *str_MyUserId = [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"];
-        
-        if( [str_WriteUserId integerValue] == [str_MyUserId integerValue] )
-        {
-            //내가 쓴 글
-            if( [str_Type isEqualToString:@"qna"] )
-            {
-                //질문일 경우 아래 달린 댓글도 삭제
-                [self deleteQna:view.tag];
+                [arM addObject:@"삭제하기"];
+
+                [OHActionSheet showSheetInView:self.view
+                                         title:nil
+                             cancelButtonTitle:@"취소"
+                        destructiveButtonTitle:nil
+                             otherButtonTitles:arM
+                                    completion:^(OHActionSheet* sheet, NSInteger buttonIndex)
+                 {
+                     if( arM.count <= buttonIndex ) return ;
+                     
+                     if( [[arM objectAtIndex:buttonIndex] isEqualToString:@"복사하기"] )
+                     {
+                         //복사
+                         if( [userMessage.customType isEqualToString:@"image"] || [userMessage.customType isEqualToString:@"pdfImage"] )
+                         {
+                             UIImage *image = [UIImage imageWithData:[NSData dataWithContentsOfURL:[NSURL URLWithString:userMessage.message]]];
+                             [[UIPasteboard generalPasteboard] setImage:image];
+                         }
+//                         else if( [userMessage.customType isEqualToString:@"video"] )
+//                         {
+//                             [[UIPasteboard generalPasteboard] setURL:[NSURL URLWithString:userMessage.message]];
+//                         }
+                         else
+                         {
+                             [[UIPasteboard generalPasteboard] setString:userMessage.message];
+                         }
+                     }
+                     else if( [[arM objectAtIndex:buttonIndex] isEqualToString:@"삭제하기"] )
+                     {
+                         UIAlertView *alert = CREATE_ALERT(nil, @"해당 메세지를 삭제하시겠습니까?", @"확인", @"취소");
+                         [alert showWithCompletion:^(UIAlertView *alertView, NSInteger buttonIndex) {
+                             
+                             if( buttonIndex == 0 )
+                             {
+                                 [self.channel deleteMessage:message completionHandler:^(SBDError * _Nullable error) {
+                                     
+                                 }];
+                             }
+                         }];
+                     }
+                 }];
             }
             else
             {
-                //답변일 경우
-                //                [self deleteReply:view.tag];
-            }
-        }
-        else if( [str_WriteUserId integerValue] <= 0 )
-        {
-            //이건 내 글 템프
-            //1.배열에서 삭제
-            //2.리로드
-            //3.아이템 하나 가져오기로 eId 얻기
-            //4.얻은 eId로 삭제 api 호출
-            
-            if( view.tag > -1 )
-            {
-                [self deleteQna:view.tag];
-            }
-            
-            
-        }
-        else
-        {
-            //다른 사람이 쓴 글
-            NSMutableArray *arM = [NSMutableArray array];
-            [arM addObject:@"신고하기"];
-            
-            [OHActionSheet showSheetInView:self.view
-                                     title:nil
-                         cancelButtonTitle:@"취소"
-                    destructiveButtonTitle:nil
-                         otherButtonTitles:arM
-                                completion:^(OHActionSheet* sheet, NSInteger buttonIndex)
-             {
-                 if( buttonIndex == 0 )
+                NSMutableArray *arM = [NSMutableArray array];
+                if( [userMessage.customType isEqualToString:@"image"] ||
+                   [userMessage.customType isEqualToString:@"pdfImage"] ||
+                   [userMessage.customType isEqualToString:@"text"])
+                {
+                    [arM addObject:@"복사하기"];
+                }
+                [arM addObject:@"신고하기"];
+                
+                [OHActionSheet showSheetInView:self.view
+                                         title:nil
+                             cancelButtonTitle:@"취소"
+                        destructiveButtonTitle:nil
+                             otherButtonTitles:arM
+                                    completion:^(OHActionSheet* sheet, NSInteger buttonIndex)
                  {
-                     //신고하기
-                     UIAlertView *alert = CREATE_ALERT(nil, @"해당 게시글을 신고하시겠습니까?", @"확인", @"취소");
-                     [alert showWithCompletion:^(UIAlertView *alertView, NSInteger buttonIndex) {
-                         
-                         if( buttonIndex == 0 )
+                     if( arM.count <= buttonIndex ) return ;
+
+                     if( [[arM objectAtIndex:buttonIndex] isEqualToString:@"복사하기"] )
+                     {
+                         if( [userMessage.customType isEqualToString:@"image"] || [userMessage.customType isEqualToString:@"pdfImage"] )
                          {
-                             NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                                                 [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
-                                                                 [Util getUUID], @"uuid",
-                                                                 [NSString stringWithFormat:@"%@", [dic objectForKey:@"eId"]], @"eId",
-                                                                 nil];
-                             
-                             __weak __typeof(&*self)weakSelf = self;
-                             
-                             [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/set/question/explain/report"
-                                                                 param:dicM_Params
-                                                            withMethod:@"POST"
-                                                             withBlock:^(id resulte, NSError *error) {
-                                                                 
-                                                                 [MBProgressHUD hide];
-                                                                 
-                                                                 if( resulte )
-                                                                 {
-                                                                     NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
-                                                                     if( nCode == 200 )
-                                                                     {
-                                                                         [ALToastView toastInView:self.view withText:@"신고 되었습니다."];
-                                                                     }
-                                                                     else
-                                                                     {
-                                                                         [ALToastView toastInView:self.view withText:[resulte objectForKey:@"error_message"]];
-                                                                     }
-                                                                 }
-                                                             }];
+                             UIImage *image = [UIImage imageWithData:[NSData dataWithContentsOfURL:[NSURL URLWithString:userMessage.message]]];
+                             [[UIPasteboard generalPasteboard] setImage:image];
                          }
-                     }];
-                 }
-             }];
+//                         else if( [userMessage.customType isEqualToString:@"video"] )
+//                         {
+////                             [[UIPasteboard generalPasteboard] setString:userMessage.message];
+////
+////                             NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:userMessage.message]];
+////                             [[UIPasteboard generalPasteboard] setData:data forPasteboardType:@"video"];
+//
+//                             [[UIPasteboard generalPasteboard] setURL:[NSURL URLWithString:userMessage.message]];
+//                         }
+                         else
+                         {
+                             [[UIPasteboard generalPasteboard] setString:userMessage.message];
+                         }
+
+                     }
+                     else if( [[arM objectAtIndex:buttonIndex] isEqualToString:@"신고하기"] )
+                     {
+                         //신고하기
+                         UIAlertView *alert = CREATE_ALERT(nil, @"해당 게시글을 신고하시겠습니까?", @"확인", @"취소");
+                         [alert showWithCompletion:^(UIAlertView *alertView, NSInteger buttonIndex) {
+                             
+                             if( buttonIndex == 0 )
+                             {
+
+                             }
+                         }];
+                     }
+                 }];
+            }
         }
     }
 }
@@ -5581,97 +5837,6 @@ typedef enum {
     }
 }
 
-- (void)deleteQna:(NSInteger)nTag
-{
-    //    __block NSDictionary *dic = self.arM_List[nTag];
-    
-    __block SBDUserMessage *message = self.messages[nTag];
-    //    SBDUser *user = (SBDUser *)message.sender;
-    NSData *data = [message.data dataUsingEncoding:NSUTF8StringEncoding];
-    __block NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-    
-    NSMutableArray *arM = [NSMutableArray array];
-    [arM addObject:@"삭제하기"];
-    
-    [OHActionSheet showSheetInView:self.view
-                             title:nil
-                 cancelButtonTitle:@"취소"
-            destructiveButtonTitle:nil
-                 otherButtonTitles:arM
-                        completion:^(OHActionSheet* sheet, NSInteger buttonIndex)
-     {
-         if( buttonIndex == 0 )
-         {
-             UIAlertView *alert = CREATE_ALERT(nil, @"해당 게시글을 삭제하시겠습니까?", @"확인", @"취소");
-             [alert showWithCompletion:^(UIAlertView *alertView, NSInteger buttonIndex) {
-                 
-                 if( buttonIndex == 0 )
-                 {
-                     //v3 메세지 삭제
-                     [self.channel deleteMessage:message completionHandler:^(SBDError * _Nullable error) {
-                         
-                     }];
-                     /***********************************/
-                     
-                     
-                     __block NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                                                 [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
-                                                                 [Util getUUID], @"uuid",
-                                                                 [self.dic_Info objectForKey:@"questionId"], @"questionId",
-                                                                 [NSString stringWithFormat:@"%@", [dic objectForKey:@"eId"]], @"eId",
-                                                                 nil];
-                     
-                     //                     if( [[dic objectForKey:@"temp"] isEqualToString:@"YES"] )
-                     //                     {
-                     //                         //템프일 경우
-                     //                         NSDictionary *dic_Tmp = [self.dicM_TempMyContents objectForKey:[NSString stringWithFormat:@"%ld", nTag]];
-                     //                         [dicM_Params setObject:[dic_Tmp objectForKey:@"eId"] forKey:@"eId"];
-                     //
-                     //                         [self.arM_List removeObjectAtIndex:nTag];
-                     //                         [self setMiddleDate];
-                     //                         [self.tbv_List reloadData];
-                     //
-                     //                     }
-                     
-                     
-                     __weak __typeof(&*self)weakSelf = self;
-                     
-                     [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/set/question/explain/delete"
-                                                         param:dicM_Params
-                                                    withMethod:@"POST"
-                                                     withBlock:^(id resulte, NSError *error) {
-                                                         
-                                                         [MBProgressHUD hide];
-                                                         
-                                                         if( resulte )
-                                                         {
-                                                             NSLog(@"resulte : %@", resulte);
-                                                             
-                                                             NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
-                                                             if( nCode == 200 )
-                                                             {
-                                                                 //                                                                 NSInteger nGroupId = [[dic objectForKey:@"groupId"] integerValue];
-                                                                 //                                                                 NSData *jsonData = [NSJSONSerialization dataWithJSONObject:@{@"eId":[NSString stringWithFormat:@"%@", [dicM_Params objectForKey:@"eId"]],
-                                                                 //                                                                                                                              @"channelUrl":self.str_ChannelUrl}
-                                                                 //                                                                                                                    options:NSJSONWritingPrettyPrinted
-                                                                 //                                                                                                                      error:&error];
-                                                                 //                                                                 NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-                                                                 
-                                                                 //                                                                 [SendBird sendMessage:@"delete-qna" withData:jsonString];
-                                                             }
-                                                             else
-                                                             {
-                                                                 [weakSelf.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
-                                                             }
-                                                         }
-                                                     }];
-                 }
-             }];
-             
-         }
-     }];
-}
-
 - (void)onMoveToPdf:(UIButton *)btn
 {
     id message = self.messages[btn.tag];
@@ -5690,17 +5855,20 @@ typedef enum {
         return;
     }
     
+    __block NSDictionary *dic_BotData = [dic objectForKey:@"bot_data"];
+//    __block NSString *str_ExamId = [NSString stringWithFormat:@"%@", [dic_BotData objectForKey:@"examId"]];
+    __block NSString *str_ExamId = [NSString stringWithFormat:@"%@", [dic_BotData objectForKey:@"orgExamId"]];
     __block BOOL isPdf = YES;
-    //    NSDictionary *dic_Tmp = [dic objectForKey:@"dataMap"];
-    NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
-    NSDictionary *dic_Tmp = [ar_Body firstObject];
-    if( [[dic_Tmp objectForKey_YM:@"qnaType"] isEqualToString:@"normalQuestion"] )
-    {
-        isPdf = NO;
-        //        NSString *str_Tmp = [dic_Tmp objectForKey:@"qnaBody"];
-        //        NSData *data2 = [str_Tmp dataUsingEncoding:NSUTF8StringEncoding];
-        //        dic = [NSJSONSerialization JSONObjectWithData:data2 options:0 error:nil];
-    }
+//    //    NSDictionary *dic_Tmp = [dic objectForKey:@"dataMap"];
+//    NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
+//    NSDictionary *dic_Tmp = [ar_Body firstObject];
+//    if( [[dic_Tmp objectForKey_YM:@"qnaType"] isEqualToString:@"normalQuestion"] )
+//    {
+//        isPdf = NO;
+//        //        NSString *str_Tmp = [dic_Tmp objectForKey:@"qnaBody"];
+//        //        NSData *data2 = [str_Tmp dataUsingEncoding:NSUTF8StringEncoding];
+//        //        dic = [NSJSONSerialization JSONObjectWithData:data2 options:0 error:nil];
+//    }
     
     UIStoryboard *storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
     
@@ -5709,7 +5877,6 @@ typedef enum {
     //    NSString *str_MsgType = [dic_ActionMap objectForKey:@"msgType"];
     
     //    NSMutableDictionary *dic = [NSMutableDictionary dictionaryWithDictionary:[dic_Main objectForKey:@"actionMap"]];
-    NSString *str_ExamId = [NSString stringWithFormat:@"%@", [dic objectForKey:@"examId"]];
     NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
                                         [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
                                         [Util getUUID], @"uuid",
@@ -5735,9 +5902,9 @@ typedef enum {
                                                 {
                                                     QuestionViewController *vc = [kQuestionBoard instantiateViewControllerWithIdentifier:@"QuestionViewController"];
                                                     vc.hidesBottomBarWhenPushed = YES;
-                                                    vc.str_Title = [dic objectForKey:@"examTitle"];
-                                                    vc.str_Idx = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examId"] integerValue]];
-                                                    vc.str_StartIdx = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examNo"] integerValue] - 1];
+                                                    vc.str_Title = [dic_BotData objectForKey:@"examTitle"];
+                                                    vc.str_Idx = [NSString stringWithFormat:@"%ld", [[dic_BotData objectForKey:@"orgExamId"] integerValue]];
+                                                    vc.str_StartIdx = [NSString stringWithFormat:@"%ld", [[dic_BotData objectForKey:@"examNo"] integerValue] - 1];
                                                     vc.str_SortType = @"all";
                                                     vc.isPdf = isPdf;
                                                     vc.str_ChannelId = str_ChannelId;
@@ -5750,18 +5917,18 @@ typedef enum {
                                                 {
                                                     QuestionContainerViewController *vc = [storyboard instantiateViewControllerWithIdentifier:@"QuestionContainerViewController"];
                                                     vc.hidesBottomBarWhenPushed = YES;
-                                                    vc.str_Idx = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examId"] integerValue]];
-                                                    vc.str_StartIdx = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examNo"] integerValue] - 1];
+                                                    vc.str_Idx = [NSString stringWithFormat:@"%ld", [[dic_BotData objectForKey:@"orgExamId"] integerValue]];
+                                                    vc.str_StartIdx = [NSString stringWithFormat:@"%ld", [[dic_BotData objectForKey:@"examNo"] integerValue] - 1];
                                                     vc.str_SortType = @"all";
                                                     vc.isPdf = isPdf;
                                                     vc.str_ChannelId = str_ChannelId;
-                                                    if( [[dic objectForKey:@"pdfPage"] integerValue] > 0 )
+                                                    if( [[dic_BotData objectForKey:@"pdfPage"] integerValue] > 0 )
                                                     {
-                                                        vc.str_PdfPage = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"pdfPage"] integerValue]];
+                                                        vc.str_PdfPage = [NSString stringWithFormat:@"%ld", [[dic_BotData objectForKey:@"pdfPage"] integerValue]];
                                                     }
-                                                    if( [[dic objectForKey:@"examNo"] integerValue] > 0 )
+                                                    if( [[dic_BotData objectForKey:@"examNo"] integerValue] > 0 )
                                                     {
-                                                        vc.str_PdfNo = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examNo"] integerValue]];
+                                                        vc.str_PdfNo = [NSString stringWithFormat:@"%ld", [[dic_BotData objectForKey:@"examNo"] integerValue]];
                                                     }
                                                     
                                                     [self.navigationController pushViewController:vc animated:YES];
@@ -5770,15 +5937,14 @@ typedef enum {
                                             else
                                             {
                                                 QuestionDetailViewController *vc = [storyboard instantiateViewControllerWithIdentifier:@"QuestionDetailViewController"];
-                                                vc.str_Idx = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examId"] integerValue]];
-                                                NSString *str_Title = [dic objectForKey_YM:@"examTitle"];
-                                                vc.str_Title = [dic objectForKey_YM:@"examTitle"];
+                                                vc.str_Idx = [NSString stringWithFormat:@"%ld", [[dic_BotData objectForKey:@"orgExamId"] integerValue]];
+                                                vc.str_Title = [dic_BotData objectForKey_YM:@"examTitle"];
                                                 [vc setCompletionPriceBlock:^(id completeResult) {
                                                     
                                                     QuestionContainerViewController *vc = [storyboard instantiateViewControllerWithIdentifier:@"QuestionContainerViewController"];
                                                     vc.hidesBottomBarWhenPushed = YES;
-                                                    vc.str_Idx = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examId"] integerValue]];
-                                                    vc.str_StartIdx = [NSString stringWithFormat:@"%ld", [[dic objectForKey:@"examNo"] integerValue] - 1];
+                                                    vc.str_Idx = [NSString stringWithFormat:@"%ld", [[dic_BotData objectForKey:@"orgExamId"] integerValue]];
+                                                    vc.str_StartIdx = [NSString stringWithFormat:@"%ld", [[dic_BotData objectForKey:@"examNo"] integerValue] - 1];
                                                     vc.str_SortType = @"all";
                                                     //                                                    vc.isPdf = [[dic objectForKey:@"examType"] isEqualToString:@"pdf"];
                                                     vc.isPdf = vc.isPdf;
@@ -6571,14 +6737,13 @@ typedef enum {
 
 - (void)myImageCell:(MyImageCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath withVideo:(BOOL)isVideo
 {
-    //    NSDictionary *dic = self.arM_List[indexPath.row];
-    
     id message = self.messages[indexPath.row];
     
+    SBDBaseMessage *baseMessage = nil;
     NSDictionary *dic = nil;
     if( [message isKindOfClass:[SBDBaseMessage class]] )
     {
-        SBDBaseMessage *baseMessage = self.messages[indexPath.row];
+        baseMessage = self.messages[indexPath.row];
         SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
         NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
         dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
@@ -6589,106 +6754,219 @@ typedef enum {
     }
     
     
-    [self hidenDateIfNeed:cell indexPath:indexPath];
+//    [self hidenDateIfNeed:cell indexPath:indexPath];
     
     NSString *str_IsDone = [dic objectForKey_YM:@"isDone"];
     cell.btn_Read.selected = ![str_IsDone isEqualToString:@"N"];
     
-    NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
-    if( ar_Body.count > 0 )
+    CGFloat fImageWidth = self.view.frame.size.width;
+    CGFloat fImageHeight = self.view.frame.size.height;
+
+    if( isVideo == NO )
     {
-        CGFloat fImageWidth = self.view.frame.size.width;
-        CGFloat fImageHeight = self.view.frame.size.height;
-
-        NSDictionary *dic_Body = [ar_Body firstObject];
-        if( isVideo == NO )
+        NSDictionary *dic_ImageSize = [dic objectForKey:@"imageSize"];
+        if( dic_ImageSize == nil )
         {
-            fImageWidth = [[dic_Body objectForKey_YM:@"width"] floatValue];
-            fImageHeight = [[dic_Body objectForKey_YM:@"height"] floatValue];
-
-            cell.v_Video.hidden = YES;
-            
-            [cell.btn_Origin removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
-            
-            if( [[dic_Body objectForKey:@"qnaType"] isEqualToString:@"pdfQuestion"] )
-            {
-                cell.btn_Origin.tag = indexPath.row;
-                cell.btn_Read.hidden = YES;
-                cell.lb_Date.hidden = YES;
-                
-                cell.btn_Origin.hidden = NO;
-                [cell.btn_Origin setTitle:[NSString stringWithFormat:@"출처:%@", [dic objectForKey_YM:@"examTitle"]] forState:UIControlStateNormal];
-                [cell.btn_Origin addTarget:self action:@selector(onMoveToPdf:) forControlEvents:UIControlEventTouchUpInside];
-                
-                NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
-                NSArray *ar_Tmp = [str_Contents componentsSeparatedByString:@"|"];
-                if( ar_Tmp && ar_Tmp.count > 0 )
-                {
-                    NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:[ar_Tmp firstObject]];
-                    //                    NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@/%@", str_ImagePreFix, [ar_Tmp firstObject]]];
-                    [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
-                }
-            }
-            else
-            {
-                NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
-                NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:str_Contents];
-                [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
-                
-                cell.iv_Contents.userInteractionEnabled = YES;
-                cell.iv_Contents.tag = indexPath.row;
-                UIPinchGestureRecognizer *pinchZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinch:)];
-                pinchZoom.delegate = self;
-                [cell.iv_Contents addGestureRecognizer:pinchZoom];
-            }
-        }
-        else if( isVideo )
-        {
-            fImageWidth = [[dic_Body objectForKey_YM:@"videoCoverWidth"] floatValue];
-            fImageHeight = [[dic_Body objectForKey_YM:@"videoCoverHeight"] floatValue];
-
-            cell.v_Video.hidden = NO;
-            NSString *str_Contents = [dic_Body objectForKey:@"videoCoverPath"];
-            NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:str_Contents];
-            [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
+            dic_ImageSize = [dic objectForKey:@"file_data"];
         }
         
-        if( isnan(fImageHeight) || fImageHeight <= 0 )
-        {
-            fImageHeight = self.view.frame.size.height - kImageMargin;
-        }
+        fImageWidth = [[dic_ImageSize objectForKey_YM:@"width"] floatValue];
+        fImageHeight = [[dic_ImageSize objectForKey_YM:@"height"] floatValue];
         
-        if( isnan(fImageWidth) || fImageWidth <= 0 )
-        {
-            fImageWidth = self.view.frame.size.width - kImageMargin;
-        }
+        cell.v_Video.hidden = YES;
+        
+        [cell.btn_Origin removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
+        
+//        if( [[dic objectForKey:@"type"] isEqualToString:@"pdfQuestion"] )
+//        {
+//            cell.btn_Origin.tag = indexPath.row;
+//            cell.btn_Read.hidden = YES;
+//            cell.lb_Date.hidden = YES;
+//
+//            cell.btn_Origin.hidden = NO;
+//            [cell.btn_Origin setTitle:[NSString stringWithFormat:@"출처:%@", [dic objectForKey_YM:@"examTitle"]] forState:UIControlStateNormal];
+//            [cell.btn_Origin addTarget:self action:@selector(onMoveToPdf:) forControlEvents:UIControlEventTouchUpInside];
+//
+//            NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
+//            NSArray *ar_Tmp = [str_Contents componentsSeparatedByString:@"|"];
+//            if( ar_Tmp && ar_Tmp.count > 0 )
+//            {
+//                NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:[ar_Tmp firstObject]];
+//                //                    NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@/%@", str_ImagePreFix, [ar_Tmp firstObject]]];
+//                [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
+//            }
+//        }
 
-        if( fImageWidth > fImageHeight )
+        if( [[dic objectForKey:@"temp"] isEqualToString:@"YES"] )
         {
-            //가로형
-            //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
-            CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
-            //            fImageHeight = fScale * fImageHeight;
+            //템프면
+            NSData *data = [dic objectForKey:@"obj"];
+            UIImage *image = [UIImage imageWithData:data];
+            cell.iv_Contents.image = image;
             
-            cell.lc_ImageWidth.constant = self.view.bounds.size.width - kImageMargin;
-            cell.lc_ImageHeight.constant = fScale * fImageHeight;
+            NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:str_Date forState:0];
         }
         else
         {
-            CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageHeight;
-            fImageWidth = fScale * fImageWidth;
+            NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:[dic objectForKey_YM:@"data_prefix"]];
+            [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
             
-            cell.lc_ImageWidth.constant = fImageWidth;
-            cell.lc_ImageHeight.constant = self.view.bounds.size.width - kImageMargin;
+            cell.iv_Contents.userInteractionEnabled = YES;
+            cell.iv_Contents.tag = indexPath.row;
+            UIPinchGestureRecognizer *pinchZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinch:)];
+            pinchZoom.delegate = self;
+            [cell.iv_Contents addGestureRecognizer:pinchZoom];
+
+            long long llCreateAt = baseMessage.createdAt;
+            NSString *str_Date = [self getDateNumber:llCreateAt];
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:[Util getDetailDate:[NSString stringWithFormat:@"%@", str_Date]] forState:0];
         }
+    }
+    else if( isVideo )
+    {
+        if( [[dic objectForKey:@"temp"] isEqualToString:@"YES"] )
+        {
+            //템프면
+            NSData *data = [dic objectForKey:@"obj"];
+            UIImage *image = [UIImage imageWithData:data];
+            cell.iv_Contents.image = image;
+            
+            NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:str_Date forState:0];
+        }
+        else
+        {
+            NSURL *url = [Util createImageUrl:str_ImagePreFix withFooter:[dic objectForKey_YM:@"data_prefix"]];
+            [cell.iv_Contents sd_setImageWithURL:url placeholderImage:BundleImage(@"no_thum_error.png")];
+            
+            cell.iv_Contents.userInteractionEnabled = YES;
+            cell.iv_Contents.tag = indexPath.row;
+            UIPinchGestureRecognizer *pinchZoom = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinch:)];
+            pinchZoom.delegate = self;
+            [cell.iv_Contents addGestureRecognizer:pinchZoom];
+            
+            long long llCreateAt = baseMessage.createdAt;
+            NSString *str_Date = [self getDateNumber:llCreateAt];
+            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
+            [btn_Date setTitle:[Util getDetailDate:[NSString stringWithFormat:@"%@", str_Date]] forState:0];
+        }
+    }
 
-//        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-        cell.lb_Date.text = @"";
+    if( isnan(fImageHeight) || fImageHeight <= 0 )
+    {
+        fImageHeight = self.view.frame.size.height - kImageMargin;
+    }
+    
+    if( isnan(fImageWidth) || fImageWidth <= 0 )
+    {
+        fImageWidth = self.view.frame.size.width - kImageMargin;
+    }
+    
+    if( fImageWidth > fImageHeight )
+    {
+        //가로형
+        //가로형이면 가로 기준에 맞춰서 세로 길이 늘리기
+        CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageWidth;
+        //            fImageHeight = fScale * fImageHeight;
         
-        UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
-        [btn_Date setTitle:str_Date forState:0];
+        cell.lc_ImageWidth.constant = self.view.bounds.size.width - kImageMargin;
+        cell.lc_ImageHeight.constant = fScale * fImageHeight;
+    }
+    else
+    {
+        CGFloat fScale = (self.view.bounds.size.width - kImageMargin)/fImageHeight;
+        fImageWidth = fScale * fImageWidth;
+        
+        cell.lc_ImageWidth.constant = fImageWidth;
+        cell.lc_ImageHeight.constant = self.view.bounds.size.width - kImageMargin;
+    }
+    
+    //        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
 
+}
+
+- (void)videoTap:(UIGestureRecognizer *)gesture
+{
+    UIView *view = gesture.view;
+    SBDUserMessage *message = self.messages[view.tag];
+
+    NSURL *url = [NSURL URLWithString:message.message];
+    self.vc_Movie = [[MPMoviePlayerViewController alloc]initWithContentURL:url];
+    self.vc_Movie.view.frame = self.view.bounds;
+    self.vc_Movie.moviePlayer.repeatMode = MPMovieRepeatModeOne;
+    self.vc_Movie.moviePlayer.movieSourceType = MPMovieSourceTypeStreaming;
+    self.vc_Movie.moviePlayer.controlStyle = MPMovieControlStyleFullscreen;
+    self.vc_Movie.moviePlayer.shouldAutoplay = YES;
+    self.vc_Movie.moviePlayer.repeatMode = NO;
+    [self.vc_Movie.moviePlayer prepareToPlay];
+    
+    [self presentViewController:self.vc_Movie animated:YES completion:nil];
+}
+
+- (void)imageTap:(UIGestureRecognizer *)gesture
+{
+    UIView *view = gesture.view;
+    //    NSDictionary *dic = self.arM_List[view.tag];
+    SBDUserMessage *message = self.messages[view.tag];
+    
+    if( [message.customType isEqualToString:@"video"] )
+    {
+        NSURL *url = [NSURL URLWithString:message.message];
+        self.vc_Movie = [[MPMoviePlayerViewController alloc]initWithContentURL:url];
+        self.vc_Movie.view.frame = self.view.bounds;
+        self.vc_Movie.moviePlayer.repeatMode = MPMovieRepeatModeOne;
+        self.vc_Movie.moviePlayer.movieSourceType = MPMovieSourceTypeStreaming;
+        self.vc_Movie.moviePlayer.controlStyle = MPMovieControlStyleFullscreen;
+        self.vc_Movie.moviePlayer.shouldAutoplay = YES;
+        self.vc_Movie.moviePlayer.repeatMode = NO;
+        [self.vc_Movie.moviePlayer prepareToPlay];
+        
+        [self presentViewController:self.vc_Movie animated:YES completion:nil];
+    }
+    else
+    {
+        self.ar_Photo = [NSMutableArray array];
+        self.thumbs = [NSMutableArray array];
+        
+        NSURL *url = [NSURL URLWithString:message.message];
+        [self.thumbs addObject:[MWPhoto photoWithURL:url]];
+        [self.ar_Photo addObject:[MWPhoto photoWithURL:url]];
+        
+        BOOL displayActionButton = NO;
+        BOOL displaySelectionButtons = NO;
+        BOOL displayNavArrows = YES;
+        BOOL enableGrid = NO;
+        BOOL startOnGrid = NO;
+        
+        browser = [[MWPhotoBrowser alloc] initWithDelegate:self];
+        browser.displayActionButton = displayActionButton;
+        browser.displayNavArrows = displayNavArrows;
+        browser.displaySelectionButtons = displaySelectionButtons;
+        browser.alwaysShowControls = displaySelectionButtons;
+        browser.zoomPhotosToFill = YES;
+#if __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_7_0
+        browser.wantsFullScreenLayout = YES;
+#endif
+        browser.enableGrid = enableGrid;
+        browser.startOnGrid = startOnGrid;
+        browser.enableSwipeToDismiss = YES;
+        [browser setCurrentPhotoIndex:0];
+        
+        UINavigationController *nc = [[UINavigationController alloc] initWithRootViewController:browser];
+        nc.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
+        [self presentViewController:nc animated:YES completion:nil];
+        
+        // Release
+        
+        // Test reloading of data after delay
+        double delayInSeconds = 3;
+        dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+        dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+        });
     }
 }
 
@@ -6766,7 +7044,7 @@ typedef enum {
     NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
     NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
     
-    [self didSelectedItem:dic];
+    [self didSelectedItem:dic withMessage:baseMessage];
     
 }
 
@@ -6803,64 +7081,67 @@ typedef enum {
     {
         //이전 메세지
         id message = self.messages[indexPath.row - 1];
-        NSDictionary *dic_Prev = nil;
-        if( [message isKindOfClass:[SBDBaseMessage class]] )
+        if( [message isKindOfClass:[SBDAdminMessage class]] == NO && [message isKindOfClass:[NSString class]] == NO )
         {
-            SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
-            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-            if( [userMessage.customType isEqualToString:@"audio"] )
+            id message = self.messages[indexPath.row - 1];
+            NSDictionary *dic_Prev = nil;
+            if( [message isKindOfClass:[SBDBaseMessage class]] )
             {
-                //                                isAudioMsg = YES;
-            }
-            
-            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-            dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        }
-        else
-        {
-            //                            isAudioMsg = YES;
-            dic_Prev = message;
-        }
-        
-        NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
-        NSInteger nNextUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
-        
-        NSInteger nTime = 0;
-        NSInteger nPrevTime = 0;
-        NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
-        NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
-        if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
-        {
-            nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
-            nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
-        }
-        
-        if( nUserId == nNextUserId )
-        {
-            //이전 메세지가 내 메세지면
-            if( nTime == nPrevTime )
-            {
-                //1분 이내의 메세지
-                cell.iv_User.hidden = YES;
-                cell.lc_Top.constant = 0.f;
+                SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
+                SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+                if( [userMessage.customType isEqualToString:@"audio"] )
+                {
+                    //                                isAudioMsg = YES;
+                }
+                
+                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+                dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
             }
             else
             {
-                //1분이 지난 메세지
+                //                            isAudioMsg = YES;
+                dic_Prev = message;
+            }
+            
+            NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
+            NSInteger nNextUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
+            
+            NSInteger nTime = 0;
+            NSInteger nPrevTime = 0;
+            NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
+            NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
+            if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
+            {
+                nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+                nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
+            }
+            
+            if( nUserId == nNextUserId )
+            {
+                //이전 메세지가 내 메세지면
+                if( nTime == nPrevTime )
+                {
+                    //1분 이내의 메세지
+                    cell.iv_User.hidden = YES;
+                    cell.lc_Top.constant = 0.f;
+                }
+                else
+                {
+                    //1분이 지난 메세지
+                    cell.lc_NameHeight.constant = 15.f;
+                    cell.iv_User.hidden = NO;
+                    cell.lc_Top.constant = 15.f;
+                }
+            }
+            else
+            {
+                //이전 메세지가 내 메세지가 아니면
                 cell.lc_NameHeight.constant = 15.f;
                 cell.iv_User.hidden = NO;
                 cell.lc_Top.constant = 15.f;
             }
         }
-        else
-        {
-            //이전 메세지가 내 메세지가 아니면
-            cell.lc_NameHeight.constant = 15.f;
-            cell.iv_User.hidden = NO;
-            cell.lc_Top.constant = 15.f;
-        }
     }
-
     
     
     
@@ -6990,7 +7271,7 @@ typedef enum {
         }
 
 //        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+        NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
         cell.lb_Date.text = @"";
         
         UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -7168,7 +7449,7 @@ typedef enum {
             cell.lb_Msg.text = str_Contents;
             //            cell.lb_Contents.text = str_Contents;
 //            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
             cell.lb_Date.text = @"";
             
             UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -7231,7 +7512,7 @@ typedef enum {
             NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
             cell.lb_Contents.text = str_Contents;
 //            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
             cell.lb_Date.text = @"";
             
             UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -7547,118 +7828,6 @@ typedef enum {
     
 }
 
-- (void)myTextCell:(MyChatBasicCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    id message = self.messages[indexPath.row];
-    
-    NSDictionary *dic = nil;
-    if( [message isKindOfClass:[SBDBaseMessage class]] )
-    {
-        SBDBaseMessage *baseMessage = self.messages[indexPath.row];
-        SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-        NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-        dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-    }
-    else
-    {
-        dic = message;
-    }
-    
-    
-    
-    
-    
-    
-    
-    
-    cell.lc_Top.constant = 5.f;
-    
-    
-    if( indexPath.row > 0 )
-    {
-        //이전 메세지
-        id message = self.messages[indexPath.row - 1];
-        NSDictionary *dic_Prev = nil;
-        if( [message isKindOfClass:[SBDBaseMessage class]] )
-        {
-            SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
-            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-            dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        }
-        else
-        {
-            dic_Prev = message;
-        }
-        
-        NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
-        NSInteger nNextUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
-        
-        NSInteger nTime = 0;
-        NSInteger nPrevTime = 0;
-        NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
-        NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
-        if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
-        {
-            nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
-            nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
-        }
-        
-        if( nUserId == nNextUserId )
-        {
-            //이전 메세지가 내 메세지면
-            if( nTime == nPrevTime )
-            {
-                //1분 이내의 메세지
-                cell.lc_Top.constant = 0.f;
-            }
-            else
-            {
-                //1분이 지난 메세지
-//                cell.lc_Top.constant = 15.f;
-            }
-        }
-        else
-        {
-            //이전 메세지가 내 메세지가 아니면
-            cell.lc_Top.constant = 15.f;
-        }
-    }
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    [self hidenDateIfNeed:cell indexPath:indexPath];
-    
-    NSString *str_IsDone = [dic objectForKey_YM:@"isDone"];
-    cell.btn_Read.selected = ![str_IsDone isEqualToString:@"N"];
-    
-    NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
-    if( ar_Body.count > 0 )
-    {
-        NSDictionary *dic_Body = [ar_Body firstObject];
-        NSString *str_QnaType = [dic_Body objectForKey:@"qnaType"];
-        if( [str_QnaType isEqualToString:@"text"] )
-        {
-//            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-            cell.lb_Date.text = @"";
-            
-            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
-            [btn_Date setTitle:str_Date forState:0];
-
-            
-            [self addContent:cell withString:[dic_Body objectForKey:@"qnaBody"]];
-        }
-    }
-}
 
 - (void)addContent:(OtherChatBasicCell *)cell withString:(NSString *)aContents
 {
@@ -7734,7 +7903,7 @@ typedef enum {
             //            NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
             cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
 //            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
             cell.lb_Date.text = @"";
             
             UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -7752,7 +7921,7 @@ typedef enum {
         NSDictionary *dic_Action = [dic objectForKey:@"actionMap"];
         cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
 //        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
-        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
         cell.lb_Date.text = @"";
         
         UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -7799,7 +7968,7 @@ typedef enum {
             //            NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
             cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
             cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
-            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            cell.lb_Date.text = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
             if( [[dic_Action objectForKey_YM:@"msgType"] isEqualToString:@"shareQuestion"] )
             {
                 cell.lb_Msg.text = [dic_Action objectForKey_YM:@"shareMsg"];
@@ -7821,7 +7990,7 @@ typedef enum {
         cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
         cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
 //        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"createDate"]]];
-        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
         cell.lb_Date.text = @"";
         
         UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -7960,7 +8129,7 @@ typedef enum {
     }
     
 //    cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
-    NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+    NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
     cell.lb_Date.text = @"";
     
     UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -7978,12 +8147,13 @@ typedef enum {
     //    NSDictionary *dic = self.arM_List[indexPath.row];
     
     id message = self.messages[indexPath.row];
-    
+    SBDBaseMessage *baseMessage = nil;
+    SBDUserMessage *userMessage = nil;
     NSDictionary *dic = nil;
     if( [message isKindOfClass:[SBDBaseMessage class]] )
     {
-        SBDBaseMessage *baseMessage = self.messages[indexPath.row];
-        SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+        baseMessage = self.messages[indexPath.row];
+        userMessage = (SBDUserMessage *)baseMessage;
         NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
         dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
     }
@@ -7992,14 +8162,14 @@ typedef enum {
         dic = message;
     }
     
-    [self hidenDateIfNeed:cell indexPath:indexPath];
+//    [self hidenDateIfNeed:cell indexPath:indexPath];
     
-    if( [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_JOIN"] || [[dic objectForKey_YM:@"type"] isEqualToString:@"USER_LEFT"] )
+    if( [userMessage.customType isEqualToString:@"USER_JOIN"] || [userMessage.customType isEqualToString:@"USER_LEFT"] )
     {
         //초대, 나감
         cell.lb_Cmd.text = [dic objectForKey:@"message"];
     }
-    else if( [[dic objectForKey:@"type"] isEqualToString:@"USER_ENTER"] )
+    else if( [userMessage.customType isEqualToString:@"USER_ENTER"] )
     {
         //입장
         //        [self.navigationController.view makeToast:[dic objectForKey:@"message"] withPosition:kPositionCenter];
@@ -8019,312 +8189,6 @@ typedef enum {
     //    }
 }
 
-- (void)otherTextCell:(OtherChatBasicCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    //    NSDictionary *dic = self.arM_List[indexPath.row];
-    
-//    BOOL isUserIconHidden = NO;
-    
-    if( self.channel.memberCount == 2 )
-    {
-        //1:1챗이면
-        cell.lc_NameHeight.constant = 0.f;
-    }
-    
-    id message = self.messages[indexPath.row];
-    
-    NSDictionary *dic = nil;
-    if( [message isKindOfClass:[SBDBaseMessage class]] )
-    {
-        SBDBaseMessage *baseMessage = self.messages[indexPath.row];
-        SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-        NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-        dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-    }
-    else
-    {
-        dic = message;
-    }
-
-    
-    if( indexPath.row > 0 )
-    {
-        //이전 메세지
-        id message = self.messages[indexPath.row - 1];
-        NSDictionary *dic_Prev = nil;
-        if( [message isKindOfClass:[SBDBaseMessage class]] )
-        {
-            SBDBaseMessage *baseMessage = self.messages[indexPath.row - 1];
-            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-            if( [userMessage.customType isEqualToString:@"audio"] )
-            {
-                //                                isAudioMsg = YES;
-            }
-            
-            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-            dic_Prev = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        }
-        else
-        {
-            //                            isAudioMsg = YES;
-            dic_Prev = message;
-        }
-
-        NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
-        NSInteger nNextUserId = [[dic_Prev objectForKey_YM:@"userId"] integerValue];
-        
-        NSInteger nTime = 0;
-        NSInteger nPrevTime = 0;
-        NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
-        NSString *str_PrevTimeTmp = [dic_Prev objectForKey:@"createDate"];
-        if( str_TimeTmp.length >= 12 && str_PrevTimeTmp.length >= 12 )
-        {
-            nTime = [[str_TimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
-            nPrevTime = [[str_PrevTimeTmp substringWithRange:NSMakeRange(0, 12)] integerValue];
-        }
-
-        if( nUserId == nNextUserId )
-        {
-            //이전 메세지가 내 메세지면
-            if( nTime == nPrevTime )
-            {
-                //1분 이내의 메세지
-                cell.iv_User.hidden = YES;
-                cell.lc_Top.constant = 0.f;
-            }
-            else
-            {
-                //1분이 지난 메세지
-                cell.lc_NameHeight.constant = 15.f;
-                cell.iv_User.hidden = NO;
-                cell.lc_Top.constant = 15.f;
-            }
-        }
-        else
-        {
-            //이전 메세지가 내 메세지가 아니면
-            cell.lc_NameHeight.constant = 15.f;
-            cell.iv_User.hidden = NO;
-            cell.lc_Top.constant = 15.f;
-        }
-    }
-    
-    
-
-    
-    
-//    if( self.messages.count > indexPath.row + 1 )
-//    {
-//        //다음 메세지
-//        //                        BOOL isAudioMsg = NO;
-//        id message = self.messages[indexPath.row + 1];
-//        NSDictionary *dic_Next = nil;
-//        if( [message isKindOfClass:[SBDBaseMessage class]] )
-//        {
-//            SBDBaseMessage *baseMessage = self.messages[indexPath.row + 1];
-//            SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
-//            if( [userMessage.customType isEqualToString:@"audio"] )
-//            {
-//                //                                isAudioMsg = YES;
-//            }
-//            
-//            NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
-//            dic_Next = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-//        }
-//        else
-//        {
-//            //                            isAudioMsg = YES;
-//            dic_Next = message;
-//        }
-//        
-//        NSInteger nUserId = [[dic objectForKey_YM:@"userId"] integerValue];
-//        NSInteger nNextUserId = [[dic_Next objectForKey_YM:@"userId"] integerValue];
-//        //                        if( nUserId == nNextUserId && isAudioMsg == NO )
-//        
-//        NSInteger nTime = 0;
-//        NSInteger nNextTime = 0;
-//        NSString *str_TimeTmp = [dic objectForKey_YM:@"createDate"];
-//        NSString *str_NextTimeTmp = [dic_Next objectForKey:@"createDate"];
-//        if( str_TimeTmp.length >= 12 && str_NextTimeTmp.length >= 12 )
-//        {
-//            nTime = [[str_TimeTmp substringWithRange:NSMakeRange(10, 2)] integerValue];
-//            nNextTime = [[str_NextTimeTmp substringWithRange:NSMakeRange(10, 2)] integerValue];
-//        }
-//
-//        if( nUserId == nNextUserId )
-//        {
-//            if( nTime < nNextTime )
-//            {
-//                //1분이 지난 메세지
-////                cell.iv_User.hidden = NO;
-////                cell.lc_BottomHeight.constant = 15.f;
-//            }
-//            else
-//            {
-//                //1분 안의 메세지
-////                cell.iv_User.hidden = YES;
-////                cell.lc_BottomHeight.constant = 0.f;
-//            }
-//        }
-//        else
-//        {
-////            cell.iv_User.hidden = NO;
-////            cell.lc_BottomHeight.constant = 10.f;
-//        }
-//    }
-//    else if( self.messages.count == indexPath.row + 1 )
-//    {
-//        //마지막 메세지
-////        cell.iv_User.hidden = NO;
-////        cell.lc_BottomHeight.constant = 15.f;
-//
-//    }
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    [self hidenDateIfNeed:cell indexPath:indexPath];
-    
-//    if( self.dic_BotInfo )
-    if( 1 ) //20170901 챗봇처럼 상대방 메세지를 하얗게 표시해 달라고 피터님이 요청함
-    {
-        cell.lb_Contents.textColor = [UIColor blackColor];
-        cell.v_ContentsBg.backgroundColor = [UIColor whiteColor];
-        cell.v_ContentsBg.layer.borderColor = [UIColor colorWithRed:220.f/255.f green:220.f/255.f blue:220.f/255.f alpha:1].CGColor;
-        cell.v_ContentsBg.layer.borderWidth = 1.f;
-    }
-    else
-    {
-//        cell.lb_Contents.textColor = [UIColor whiteColor];
-//        cell.v_ContentsBg.backgroundColor = [UIColor colorWithHexString:@"4FB826"];
-//        cell.v_ContentsBg.layer.borderColor = [UIColor clearColor].CGColor;
-//        cell.v_ContentsBg.layer.borderWidth = 1.f;
-    }
-    
-    cell.nUserId = [[dic objectForKey_YM:@"botUserId"] integerValue];
-    
-    NSArray *ar_Body = [dic objectForKey:@"qnaBody"];
-    if( ar_Body.count > 0 )
-    {
-        NSDictionary *dic_Body = [ar_Body firstObject];
-        NSString *str_QnaType = [dic_Body objectForKey:@"qnaType"];
-        if( [str_QnaType isEqualToString:@"text"] )
-        {
-            NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
-            [self addContent:cell withString:str_Contents];
-            //            cell.lb_Contents.text = str_Contents;
-            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-            cell.lb_Date.text = @"";
-            
-            UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
-            [btn_Date setTitle:str_Date forState:0];
-
-            NSURL *url = [Util createImageUrl:str_ImagePrefix withFooter:[dic objectForKey_YM:@"userThumbnail"]];
-            [cell.iv_User sd_setImageWithURL:url placeholderImage:BundleImage(@"no_image.png")];
-            
-            cell.iv_User.tag = indexPath.row;
-            cell.iv_User.userInteractionEnabled = YES;
-            UITapGestureRecognizer *imageTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(userImageTap:)];
-            [imageTap setNumberOfTapsRequired:1];
-            [cell.iv_User addGestureRecognizer:imageTap];
-            
-            if( [str_ChatType isEqualToString:@"group"] )
-            {
-//                cell.lb_Name.hidden = NO;
-            }
-            else if( [str_ChatType isEqualToString:@"channel"] )
-            {
-//                cell.lb_Name.hidden = NO;
-            }
-            else if( [str_ChatType isEqualToString:@"user"] )
-            {
-//                cell.lb_Name.hidden = YES;
-            }
-            
-            if( [[dic_Body objectForKey_YM:@"msgType"] isEqualToString:@"solveExam"] )
-            {
-                cell.lb_Name.text = [NSString stringWithFormat:@"%@: #%@, %@",
-                                     [dic objectForKey_YM:@"name"], [dic objectForKey_YM:@"subjectName"], [dic objectForKey_YM:@"examTitle"]];
-            }
-            else
-            {
-                cell.lb_Name.text = [dic objectForKey_YM:@"name"];
-            }
-            
-            if( cell.lb_Name.text.length <= 0 )
-            {
-                cell.lc_NameHeight.constant = 0.f;
-            }
-        }
-        else if( [str_QnaType isEqualToString:@""] )
-        {
-            
-        }
-    }
-    
-//    [cell.v_ContentsBg.layer removeFromSuperlayer];
-    
-//    cell.v_ContentsBg.layer. sublayers = nil;
-    
-//    cell.v_ContentsBg.layer.mask = nil;
-//    
-//    CAShapeLayer *borderLayer = [[CAShapeLayer alloc] init];
-//    borderLayer.path = [UIBezierPath bezierPathWithRoundedRect: cell.v_ContentsBg.bounds byRoundingCorners: UIRectCornerTopLeft | UIRectCornerTopRight cornerRadii: (CGSize){20.f, 20.f}].CGPath;
-//    borderLayer.frame = cell.v_ContentsBg.bounds;
-//    borderLayer.lineWidth   = 1.0f;
-//    borderLayer.strokeColor = [UIColor lightGrayColor].CGColor;
-//    borderLayer.fillColor   = [UIColor whiteColor].CGColor;
-//    
-//    cell.v_ContentsBg.layer.mask = borderLayer;
-
-    
-    
-//    for (CALayer *layer in cell.v_ContentsBg.layer.sublayers)
-//    {
-//        [layer removeFromSuperlayer];
-//    }
-
-    
-//    cell.v_ContentsBg.layer.mask = nil;
-//
-//    UIBezierPath *PathToMask;
-//    PathToMask = [UIBezierPath bezierPathWithRoundedRect:cell.v_ContentsBg.bounds
-//                                       byRoundingCorners:(UIRectCornerTopLeft | UIRectCornerBottomLeft | UIRectCornerTopRight)
-//                                             cornerRadii:CGSizeMake(10.0, 10.0)];
-//    
-//    CAShapeLayer *maskLayer = [[CAShapeLayer alloc] init];
-//    maskLayer.frame = cell.v_ContentsBg.bounds;
-//    maskLayer.path = PathToMask.CGPath;
-//
-//    cell.v_ContentsBg.layer.mask = maskLayer;
-
-//    [rootLayer setValue:[NSNumber numberWithInt:101] forKey:@"PFtag"];
-
-    
-    
-    //    [cell.v_ContentsBg.layer addSublayer:borderLayer];
-    
-    //        cell.lb_Contents.textColor = [UIColor blackColor];
-    //        cell.v_ContentsBg.backgroundColor = [UIColor whiteColor];
-    //
-    //        CAShapeLayer * maskLayer = [CAShapeLayer layer];
-    //        maskLayer.path = [UIBezierPath bezierPathWithRoundedRect: cell.bounds byRoundingCorners: UIRectCornerTopLeft | UIRectCornerTopRight cornerRadii: (CGSize){20.f, 20.f}].CGPath;
-    //
-    //        maskLayer.borderColor = [UIColor redColor].CGColor;
-    //        maskLayer.lineWidth = 1.f;
-    //        maskLayer.strokeColor = [UIColor blueColor].CGColor;
-    //        maskLayer.lineCap = kCALineCapRound;
-    //        maskLayer.lineJoin = kCALineJoinRound;
-    
-//    cell.v_ContentsBg.layer.mask = maskLayer;
-
-}
 
 - (void)otherDirectCell:(OtherDirectChatCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath
 {
@@ -8360,7 +8224,7 @@ typedef enum {
             //            NSString *str_Contents = [dic_Body objectForKey:@"qnaBody"];
             cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
 //            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
             cell.lb_Date.text = @"";
             
             UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -8411,7 +8275,7 @@ typedef enum {
         
         cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
 //        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
-        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
         cell.lb_Date.text = @"";
         
         UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -8486,7 +8350,7 @@ typedef enum {
             cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
             cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
 //            cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
-            NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
+            NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic_Body objectForKey:@"createDate"]]];
             cell.lb_Date.text = @"";
             
             UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -8545,7 +8409,7 @@ typedef enum {
         cell.lb_Contents.text = [dic_Action objectForKey_YM:@"examTitle"];
         cell.lb_QNum.text = [NSString stringWithFormat:@"(%ld)번 문제", [[dic_Action objectForKey_YM:@"examNo"] integerValue]];
 //        cell.lb_Date.text = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
-        NSString *str_Date = [Util getThotingChatDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
+        NSString *str_Date = [Util getDetailDate:[NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]]];
         cell.lb_Date.text = @"";
         
         UIButton *btn_Date = [cell.rightUtilityButtons firstObject];
@@ -8686,7 +8550,6 @@ typedef enum {
     return nil;
 }
 
-
 - (IBAction)goChatRoomBack:(id)sender
 {
     [self.channel markAsRead];
@@ -8784,32 +8647,32 @@ typedef enum {
     [self.navigationController popToRootViewControllerAnimated:YES];
     [self dismissViewControllerAnimated:YES completion:nil];
     
-    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
-                                        [Util getUUID], @"uuid",
-                                        self.str_RId, @"rId",
-                                        nil];
-    
-    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/exit/chat/room"
-                                        param:dicM_Params
-                                   withMethod:@"POST"
-                                    withBlock:^(id resulte, NSError *error) {
-                                        
-                                        [MBProgressHUD hide];
-                                        
-                                        if( resulte )
-                                        {
-                                            NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
-                                            if( nCode == 200 )
-                                            {
-                                                
-                                            }
-                                            else
-                                            {
-                                                
-                                            }
-                                        }
-                                    }];
+//    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+//                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+//                                        [Util getUUID], @"uuid",
+//                                        self.str_RId, @"rId",
+//                                        nil];
+//
+//    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/exit/chat/room"
+//                                        param:dicM_Params
+//                                   withMethod:@"POST"
+//                                    withBlock:^(id resulte, NSError *error) {
+//
+//                                        [MBProgressHUD hide];
+//
+//                                        if( resulte )
+//                                        {
+//                                            NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+//                                            if( nCode == 200 )
+//                                            {
+//
+//                                            }
+//                                            else
+//                                            {
+//
+//                                            }
+//                                        }
+//                                    }];
 }
 
 - (IBAction)goGroupInfo:(id)sender
@@ -8976,146 +8839,6 @@ typedef enum {
                                                                                       }];
                                                                                   }];
                                                         }
-                                                        //정책 변경으로 방 나가면 모든 방에서 나가도록 변경
-                                                        //                                                        else
-                                                        //                                                        {
-                                                        //                                                            NSMutableArray *arM_ChannelId = [NSMutableArray arrayWithArray:tmp];
-                                                        //                                                            for( NSInteger i = 0; i < arM_ChannelId.count; i++ )
-                                                        //                                                            {
-                                                        //                                                                NSString *str_CurrnetChannelId = arM_ChannelId[i];
-                                                        //                                                                if( [weakSelf.str_ChannelIdTmp isEqualToString:str_CurrnetChannelId] )
-                                                        //                                                                {
-                                                        //                                                                    [arM_ChannelId removeObjectAtIndex:i];
-                                                        //                                                                    break;
-                                                        //                                                                }
-                                                        //                                                            }
-                                                        //
-                                                        //                                                            [dicM setObject:arM_ChannelId forKey:@"channelIds"];
-                                                        //
-                                                        //                                                            NSDictionary *dic_QnaRoomInfos = [NSDictionary dictionaryWithObject:dicM forKey:@"qnaRoomInfos"];
-                                                        //                                                            NSError * err;
-                                                        //                                                            NSData * jsonData = [NSJSONSerialization dataWithJSONObject:dic_QnaRoomInfos options:0 error:&err];
-                                                        //                                                            NSString *str_Dic = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-                                                        //                                                            [weakSelf.channel updateChannelWithName:weakSelf.channel.name
-                                                        //                                                                                     isDistinct:weakSelf.channel.isDistinct
-                                                        //                                                                                       coverUrl:weakSelf.channel.coverUrl
-                                                        //                                                                                           data:str_Dic
-                                                        //                                                                                     customType:weakSelf.channel.customType
-                                                        //                                                                              completionHandler:^(SBDGroupChannel * _Nullable channel, SBDError * _Nullable error) {
-                                                        //
-                                                        //                                                                                  [weakSelf.navigationController popToRootViewControllerAnimated:YES];
-                                                        //                                                                                  [weakSelf dismissViewControllerAnimated:YES completion:nil];
-                                                        //
-                                                        //                                                                              }];
-                                                        //                                                        }
-                                                        
-                                                        
-                                                        //                                                        [SBDGroupChannel getChannelWithUrl:self.channel.channelUrl
-                                                        //                                                                         completionHandler:^(SBDGroupChannel * _Nullable channel, SBDError * _Nullable error) {
-                                                        //
-                                                        //                                                                             [channel leaveChannelWithCompletionHandler:^(SBDError * _Nullable error) {
-                                                        //
-                                                        //                                                                             }];
-                                                        //                                                                         }];
-                                                        
-                                                        
-                                                        //                                                NSData *jsonData = [NSJSONSerialization dataWithJSONObject:@{@"userId":[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"],
-                                                        //                                                                                                             @"userName":[[NSUserDefaults standardUserDefaults] objectForKey:@"userName"]}
-                                                        //                                                                                                   options:NSJSONWritingPrettyPrinted
-                                                        //                                                                                                     error:nil];
-                                                        //                                                NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-                                                        
-                                                        //                                                NSString *str_UserName = [[NSUserDefaults standardUserDefaults] objectForKey:@"userName"];
-                                                        //                                                NSString *str_Msg = [NSString stringWithFormat:@"%@님이 나갔습니다.", str_UserName];
-                                                        //                                                [self sendMsgCmd:kLeaveChat withMsg:str_Msg];
-                                                        
-                                                        //                                                //대시보드 업데이트 할 데이터 만들기 (lastMsg와 lastChatDate)
-                                                        //                                                NSDate *date = [NSDate date];
-                                                        //                                                NSCalendar* calendar = [NSCalendar currentCalendar];
-                                                        //                                                NSDateComponents* components = [calendar components:NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay|NSCalendarUnitHour|NSCalendarUnitMinute|NSCalendarUnitSecond fromDate:date];
-                                                        //                                                NSInteger nYear = [components year];
-                                                        //                                                NSInteger nMonth = [components month];
-                                                        //                                                NSInteger nDay = [components day];
-                                                        //                                                NSInteger nHour = [components hour];
-                                                        //                                                NSInteger nMinute = [components minute];
-                                                        //                                                NSInteger nSecond = [components second];
-                                                        //                                                NSString *str_LastChatDate = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld", nYear, nMonth, nDay, nHour, nMinute, nSecond];
-                                                        //
-                                                        //                                                NSMutableDictionary *dicM = [NSMutableDictionary dictionary];
-                                                        //                                                [dicM setObject:str_Msg forKey:@"lastMsg"];
-                                                        //                                                [dicM setObject:str_LastChatDate forKey:@"lastChatDate"];
-                                                        //                                                [dicM setObject:@"text" forKey:@"msgType"];
-                                                        //
-                                                        //                                                [self sendDashboardUpdate:dicM];
-                                                        //                                                [[NSNotificationCenter defaultCenter] postNotificationName:@"RemoveDashboardItem" object:self.str_RId];
-                                                        
-                                                        
-                                                        
-                                                        //                                                        NSError * err;
-                                                        //                                                        NSData * jsonData = [NSJSONSerialization dataWithJSONObject:resulte options:0 error:&err];
-                                                        //                                                        NSString *str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-                                                        //                                                        NSDictionary *dic_DataMap = [resulte objectForKey:@"dataMap"];
-                                                        //                                                        __block NSString *str_Msg = [dic_DataMap objectForKey:@"qnaBody"];
-                                                        //
-                                                        //                                                        [self.channel sendUserMessage:str_Msg
-                                                        //                                                                            data:str_Data
-                                                        //                                                                      customType:@"command"
-                                                        //                                                               completionHandler:^(SBDUserMessage * _Nullable userMessage, SBDError * _Nullable error) {
-                                                        //
-                                                        //                                                                   if( error != nil )
-                                                        //                                                                   {
-                                                        //                                                                       //에러가 났을 경우
-                                                        //                                                                       return ;
-                                                        //                                                                   }
-                                                        //
-                                                        //                                                                   [self.messages addObject:userMessage];
-                                                        //
-                                                        //                                                                   dispatch_async(dispatch_get_main_queue(), ^{
-                                                        //                                                                       [self.tbv_List reloadData];
-                                                        //                                                                       [self.tbv_List layoutIfNeeded];
-                                                        //                                                                   });
-                                                        //                                                               }];
-                                                        
-                                                        //                                                        [SBDGroupChannel getChannelWithUrl:self.channel.channelUrl
-                                                        //                                                                         completionHandler:^(SBDGroupChannel * _Nullable channel, SBDError * _Nullable error) {
-                                                        //
-                                                        //                                                                             NSError * err;
-                                                        //                                                                             NSData * jsonData = [NSJSONSerialization dataWithJSONObject:resulte options:0 error:&err];
-                                                        //                                                                             NSString *str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-                                                        //                                                                             NSDictionary *dic_DataMap = [resulte objectForKey:@"dataMap"];
-                                                        //                                                                             __block NSString *str_Msg = [dic_DataMap objectForKey:@"qnaBody"];
-                                                        //
-                                                        //                                                                             [channel sendUserMessage:str_Msg
-                                                        //                                                                                                 data:str_Data
-                                                        //                                                                                           customType:@"command"
-                                                        //                                                                                    completionHandler:^(SBDUserMessage * _Nullable userMessage, SBDError * _Nullable error) {
-                                                        //
-                                                        //                                                                                        if( error != nil )
-                                                        //                                                                                        {
-                                                        //                                                                                            //에러가 났을 경우
-                                                        //                                                                                            return ;
-                                                        //                                                                                        }
-                                                        //
-                                                        //                                                                                        [self.messages addObject:userMessage];
-                                                        //
-                                                        //                                                                                        dispatch_async(dispatch_get_main_queue(), ^{
-                                                        //                                                                                            [self.tbv_List reloadData];
-                                                        //                                                                                            [self.tbv_List layoutIfNeeded];
-                                                        //                                                                                        });
-                                                        //                                                                                    }];
-                                                        //                                                                         }];
-                                                        
-                                                        
-                                                        
-                                                        //                                                NSData *jsonData = [NSJSONSerialization dataWithJSONObject:@{
-                                                        //                                                                                                             @"userId":[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"],
-                                                        //                                                                                                             @"channelUrl":str_ChannelUrl}
-                                                        //                                                                                                   options:NSJSONWritingPrettyPrinted
-                                                        //                                                                                                     error:&error];
-                                                        //                                                NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-                                                        //                                                [SendBird sendMessage:@"regist-leave" withData:jsonString];
-                                                        ////                                                [SendBird disconnect];
-                                                        
                                                     }
                                                     else
                                                     {
@@ -9125,8 +8848,6 @@ typedef enum {
                                             }];
         }
     }];
-    
-    
 }
 
 - (void)chatTap:(UIGestureRecognizer *)gestureRecognizer
@@ -9332,8 +9053,565 @@ typedef enum {
     });
 }
 
+- (void)updateRoom:(NSString *)aType withChatBotId:(NSString *)aChatBotId
+{
+    //봇을 초대한 경우
+    //1.제권님이 만들어준 api로 방 업데이트
+    //2.룸 상단 정보 가져오는 api로 화면 갱신
+    //3.해당 방 샌드버드 정보도 업데이트
+    
+    __weak __typeof(&*self)weakSelf = self;
+
+    NSDictionary *dic_Tmp = [NSJSONSerialization JSONObjectWithData:[self.channel.data dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+    NSMutableDictionary *dicM_ChatInfo = [NSMutableDictionary dictionaryWithDictionary:[dic_Tmp objectForKey:@"qnaRoomInfos"]];
+    NSString *str_OldRoomType = [dicM_ChatInfo objectForKey:@"roomType"];
+    if( [str_OldRoomType isEqualToString:aType] == NO )
+//    if( 1 )
+    {
+        //이전 룸 타입과 업데이트 된 룸 타입이 같지 않은 경우에만 업데이트
+        
+        [dicM_ChatInfo setObject:aType forKey:@"roomType"];
+        if( aChatBotId )
+        {
+            [dicM_ChatInfo setObject:aChatBotId forKey:@"botUserId"];
+        }
+        
+        NSError *err = nil;
+        NSData * jsonData = [NSJSONSerialization dataWithJSONObject:@{@"qnaRoomInfos":dicM_ChatInfo} options:0 error:&err];
+        NSString *str_Dic = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+        
+        [self.channel updateChannelWithName:self.channel.name coverUrl:self.channel.coverUrl data:str_Dic completionHandler:^(SBDGroupChannel * _Nullable channel, SBDError * _Nullable error) {
+            
+        }];
+
+        NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                            [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+                                            [Util getUUID], @"uuid",
+                                            self.str_RId, @"rId",
+                                            aType, @"roomType",//roomType: 채팅방 type [user, group, chatBot, 기본값-group], required=true
+                                            nil];
+        
+        [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/update/chat/room/type"
+                                            param:dicM_Params
+                                       withMethod:@"POST"
+                                        withBlock:^(id resulte, NSError *error) {
+                                            
+                                            [MBProgressHUD hide];
+                                            
+                                            if( resulte )
+                                            {
+                                                NSLog(@"resulte : %@", resulte);
+                                                
+                                                NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+                                                if( nCode == 200 )
+                                                {
+                                                    [weakSelf updateTopData];
+                                                }
+                                            }
+                                            
+                                            isSendPassible = YES;
+                                            weakSelf.dic_BotInfo = @{@"userId":aChatBotId};
+                                            [weakSelf sendBotWelcome];
+                                        }];
+    }
+}
+
+
 - (void)sendMsg:(NSString *)aMsg
 {
+//    SBDUser *user = [SBDMain getCurrentUser];
+//    NSString *str_Msg = [NSString stringWithFormat:@"%@님이 %@님을 이 그룹에 추가했습니다.", user.nickname, @"00님을"];
+//    NSMutableDictionary *dicM_Param = [NSMutableDictionary dictionary];
+//    [dicM_Param setObject:@"ADMM" forKey:@"message_type"];
+//    [dicM_Param setObject:@"154" forKey:@"user_id"];
+//    [dicM_Param setObject:str_Msg forKey:@"message"];
+//    [dicM_Param setObject:@"USER_JOIN" forKey:@"custom_type"];
+//    [dicM_Param setObject:@"true" forKey:@"is_silent"];
+//
+//    NSMutableDictionary *dicM_MessageData = [NSMutableDictionary dictionary];
+//    [dicM_MessageData setObject:str_Msg forKey:@"message"];
+//
+//    NSMutableDictionary *dicM_Sender = [NSMutableDictionary dictionary];
+//    [dicM_Sender setObject:user.nickname forKey:@"nickname"];
+//    [dicM_Sender setObject:user.userId forKey:@"user_id"];
+//    [dicM_MessageData setObject:dicM_Sender forKey:@"sender"];
+//
+//    NSError *error;
+//    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_MessageData
+//                                                       options:NSJSONWritingPrettyPrinted
+//                                                         error:&error];
+//    NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+//    [dicM_Param setObject:jsonString forKey:@"data"];
+//
+//    NSString *str_Path = [NSString stringWithFormat:@"v3/group_channels/%@/messages", self.channel.channelUrl];
+//    [[WebAPI sharedData] callAsyncSendBirdAPIBlock:str_Path
+//                                             param:dicM_Param
+//                                        withMethod:@"POST"
+//                                         withBlock:^(id resulte, NSError *error) {
+//
+//                                             if( resulte )
+//                                             {
+//
+//                                             }
+//                                         }];
+//
+//    return;
+    
+    
+    
+    
+    
+    //sendMsg
+    BOOL isMention = NO;
+    __block NSString *str_MentionId = @"";
+    __block NSString *str_MentionName = @"";
+    NSString *str_MentionMsg = @"";
+    if( [self.v_CommentKeyboardAccView.tv_Contents.text hasPrefix:@"@"] )
+    {
+        //멘션
+//        __weak __typeof(&*self)weakSelf = self;
+        
+//        NSString *str_MentionSelectedName = [NSString stringWithFormat:@"%@", [self.dic_SelectedMention objectForKey:@"userName"]];
+//
+//        NSDictionary *dic_InviteUser = nil;
+//        for( NSInteger i = 0; i < self.arM_AtListBackUp.count; i++ )
+//        {
+//            dic_InviteUser = [self.arM_AtListBackUp objectAtIndex:i];
+//            if( [str_MentionSelectedName isEqualToString:[NSString stringWithFormat:@"@%@", [dic_InviteUser objectForKey_YM:@"userName"]]] )
+//            {
+//                break;
+//            }
+//        }
+        
+        if( self.dic_SelectedMention != nil )
+        {
+            str_MentionId = [NSString stringWithFormat:@"%@", [self.dic_SelectedMention objectForKey_YM:@"userId"]];
+            str_MentionName = [NSString stringWithFormat:@"%@", [self.dic_SelectedMention objectForKey_YM:@"userName"]];
+            NSArray *ar = [aMsg componentsSeparatedByString:@":"];
+            if( ar.count > 1 )
+            {
+                str_MentionMsg = ar[1];
+                isMention = YES;
+            }
+        }
+        
+//        [self.channel inviteUserIds:@[str_InviteUserId] completionHandler:^(SBDError * _Nullable error) {
+//
+//            NSLog(@"%@", error);
+//        }];
+        
+//        __block BOOL isBot = [[dic_InviteUser objectForKey_YM:@"userType"] isEqualToString:@"bot"];
+//
+//        if( isBot )
+//        {
+//            //봇을 초대 했으면 검색 리스트에서 봇 빼주기
+//            str_BotId = str_InviteUserId;
+//            [self updateAtList:@"user"];
+//        }
+//
+//        NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+//                                            [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+//                                            [Util getUUID], @"uuid",
+//                                            self.str_RId, @"rId",
+//                                            str_InviteUserId, @"inviteUserIdStr",
+//                                            nil];
+//
+//        [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/get/chat/room/add/invite/user"
+//                                            param:dicM_Params
+//                                       withMethod:@"POST"
+//                                        withBlock:^(id resulte, NSError *error) {
+//
+//                                            [MBProgressHUD hide];
+//
+//                                            if( resulte )
+//                                            {
+//                                                NSLog(@"resulte : %@", resulte);
+//
+//                                                NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+//                                                if( nCode == 200 )
+//                                                {
+//                                                    NSDictionary *completeResult = @{@"userName":str_InviteUserName,
+//                                                                                     @"count":@1,
+//                                                                                     @"users":@[@{@"userId":str_InviteUserId, @"userName":str_InviteUserName}]};
+//                                                    NSArray *ar_Users = [NSArray arrayWithArray:[completeResult objectForKey:@"users"]];
+//                                                    for( NSInteger i = 0; i < ar_Users.count; i++ )
+//                                                    {
+//                                                        NSDictionary *dic_Tmp = ar_Users[i];
+//                                                        [weakSelf.arM_User addObject:[dic_Tmp objectForKey:@"userId"]];
+//                                                    }
+//
+//                                                    NSString *str_MyName = [[NSUserDefaults standardUserDefaults] objectForKey:@"userName"];
+//                                                    NSString *str_UserName = [completeResult objectForKey_YM:@"userName"];
+//                                                    NSInteger nCnt = [[completeResult objectForKey_YM:@"count"] integerValue];
+//                                                    NSString *str_Msg = @"";
+//                                                    if( nCnt == 1 )
+//                                                    {
+//                                                        str_Msg = [NSString stringWithFormat:@"%@님이 %@님을 이 그룹에 추가했습니다.", str_MyName, str_UserName];
+//                                                    }
+//                                                    else
+//                                                    {
+//                                                        str_Msg = [NSString stringWithFormat:@"%@님이 %@님 외 %ld명을 이 그룹에 추가했습니다.", str_MyName, str_UserName, nCnt - 1];
+//                                                    }
+//
+//                                                    [weakSelf sendMsgCmd:kInviteChat withMsg:str_Msg withUsers:ar_Users];
+//
+//                                                    //대시보드 업데이트 할 데이터 만들기 (lastMsg와 lastChatDate)
+//                                                    NSDate *date = [NSDate date];
+//                                                    NSCalendar* calendar = [NSCalendar currentCalendar];
+//                                                    NSDateComponents* components = [calendar components:NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay|NSCalendarUnitHour|NSCalendarUnitMinute|NSCalendarUnitSecond fromDate:date];
+//                                                    NSInteger nYear = [components year];
+//                                                    NSInteger nMonth = [components month];
+//                                                    NSInteger nDay = [components day];
+//                                                    NSInteger nHour = [components hour];
+//                                                    NSInteger nMinute = [components minute];
+//                                                    NSInteger nSecond = [components second];
+//                                                    NSString *str_LastChatDate = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld", nYear, nMonth, nDay, nHour, nMinute, nSecond];
+//
+//
+//                                                    NSMutableDictionary *dicM = [NSMutableDictionary dictionary];
+//                                                    [dicM setObject:str_Msg forKey:@"lastMsg"];
+//                                                    [dicM setObject:str_LastChatDate forKey:@"lastChatDate"];
+//                                                    [dicM setObject:@"text" forKey:@"msgType"];
+//
+//                                                    [weakSelf sendDashboardUpdate:dicM];
+//
+//                                                    if( isBot )
+//                                                    {
+//                                                        weakSelf.dic_BotInfo = @{@"userId":str_InviteUserId};
+//                                                        [weakSelf updateRoom:@"chatBot" withChatBotId:str_InviteUserId];
+//                                                    }
+//                                                    else if( self.dic_BotInfo == nil )
+//                                                    {
+//                                                        [weakSelf updateRoom:@"group" withChatBotId:nil];
+//                                                    }
+//                                                }
+//                                            }
+//                                        }];
+        
+    }
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    __weak __typeof(&*self)weakSelf = self;
+
+    NSMutableDictionary *dicM = [NSMutableDictionary dictionary];
+    [dicM setObject:@"chat" forKey:@"itemType"];
+//    [dicM setObject:@"text" forKey:@"message_type"];
+    [dicM setObject:@"" forKey:@"file_ext"];
+    [dicM setObject:@"" forKey:@"data_prefix"];
+    if( str_UserImagePrefix && str_UserImagePrefix.length > 0 )
+    {
+        [dicM setObject:str_UserImagePrefix forKey:@"userImg_prefix"];
+    }
+    else
+    {
+        [dicM setObject:[[NSUserDefaults standardUserDefaults] objectForKey:@"userImg_prefix"] forKey:@"userImg_prefix"];
+    }
+    [dicM setObject:@"user" forKey:@"userType"];
+
+
+    
+
+    NSDictionary *dic_SelectedAutoAnswer = nil;
+    NSInteger nSelectedNum = 0;
+    for( NSInteger i = 0; i < self.arM_AutoAnswer.count; i++ )
+    {
+        NSDictionary *dic_Tmp = self.arM_AutoAnswer[i];
+        NSString *str_CurrentMsg = @"";
+        if( self.autoChatMode == kPrintExam )
+        {
+            str_CurrentMsg = [dic_Tmp objectForKey:@"btnLabel"];
+        }
+        else if( self.autoChatMode == kPrintItem )
+        {
+            str_CurrentMsg = [NSString stringWithFormat:@"%@. %@",
+                              [dic_Tmp objectForKey:@"returnValue"], [dic_Tmp objectForKey:@"btnLabel"]];
+        }
+        else if( self.autoChatMode == kPrintAnswer || self.autoChatMode == kNextExam || self.autoChatMode == kPrintContinue )
+        {
+            //답 입력
+            str_CurrentMsg = [dic_Tmp objectForKey:@"btnLabel"];
+        }
+        else
+        {
+            str_CurrentMsg = [dic_Tmp objectForKey:@"btnLabel"];
+        }
+        
+        str_CurrentMsg = [str_CurrentMsg stringByReplacingOccurrencesOfString:@"%" withString:@"%25"];
+        str_CurrentMsg = [str_CurrentMsg stringByReplacingOccurrencesOfString:@"-" withString:@"%2D"];
+        str_CurrentMsg = [str_CurrentMsg stringByReplacingOccurrencesOfString:@"," withString:@"%2C"];
+        str_CurrentMsg = [str_CurrentMsg stringByReplacingOccurrencesOfString:@"+" withString:@"%2B"];
+        
+        NSString *str_TmpMsg = aMsg;
+        str_TmpMsg = [str_TmpMsg stringByReplacingOccurrencesOfString:@"%" withString:@"%25"];
+        str_TmpMsg = [str_TmpMsg stringByReplacingOccurrencesOfString:@"-" withString:@"%2D"];
+        str_TmpMsg = [str_TmpMsg stringByReplacingOccurrencesOfString:@"," withString:@"%2C"];
+        str_TmpMsg = [str_TmpMsg stringByReplacingOccurrencesOfString:@"+" withString:@"%2B"];
+
+        if( [str_TmpMsg isEqualToString:str_CurrentMsg] )
+        {
+            dic_SelectedAutoAnswer = dic_Tmp;
+            nSelectedNum = i + 1;
+            break;
+        }
+    }
+    
+    NSString *str_CustomType = @"text";
+    if( dic_SelectedAutoAnswer )
+    {
+        self.v_CommentKeyboardAccView.tv_Contents.text = @"";
+        
+        //제대로 입력 했으면
+        NSMutableDictionary *dicM_BotData = [NSMutableDictionary dictionaryWithDictionary:dic_SelectedAutoAnswer];
+        NSString *str_MsgAction = [NSString stringWithFormat:@"%@", [dic_SelectedAutoAnswer objectForKey:@"mesgAction"]];
+        if( [str_MsgAction isEqualToString:@"apiBotMessage"] && [aMsg isEqualToString:@"다음"] )
+        {
+//            str_CustomType = @"cmd";
+        }
+        
+        NSString *str_ReturnName = [NSString stringWithFormat:@"%@", [dic_SelectedAutoAnswer objectForKey:@"returnName"]];
+        if( str_ReturnName.length > 0 )
+        {
+            [dicM_BotData setObject:[dic_SelectedAutoAnswer objectForKey:@"returnValue"] forKey:str_ReturnName];
+        }
+        
+        NSString *str_BotUserId = [self.dic_BotInfo objectForKey:@"userId"];
+        if( str_BotUserId && str_BotUserId.length > 0 )
+        {
+            [dicM_BotData setObject:str_BotUserId forKey:@"botUserId"];
+        }
+        [dicM_BotData setObject:@"chatBot" forKey:@"roomType"];
+        
+        if( str_MsgQuestionId && str_MsgQuestionId.length > 0 )
+        {
+            [dicM_BotData setObject:str_MsgQuestionId forKey:@"printQuestionId"];
+        }
+
+        if( str_MsgTesterId && str_MsgTesterId.length > 0 )
+        {
+            [dicM_BotData setObject:str_MsgTesterId forKey:@"testerId"];
+        }
+        
+        if( str_MsgExamId && str_MsgExamId.length > 0 )
+        {
+            [dicM_BotData setObject:str_MsgExamId forKey:@"examId"];
+        }
+
+        if( str_MsgCorrectAnswer && str_MsgCorrectAnswer.length > 0 )
+        {
+            [dicM_BotData setObject:str_MsgCorrectAnswer forKey:@"correctAnswer"];
+        }
+
+        [dicM setObject:dicM_BotData forKey:@"bot_data"];
+    }
+    else if( isMention )
+    {
+        self.v_CommentKeyboardAccView.tv_Contents.text = @"";
+        
+        //멘션
+        NSMutableDictionary *dicM_BotData = [NSMutableDictionary dictionaryWithDictionary:dic_SelectedAutoAnswer];
+        [dicM_BotData setObject:str_MentionId forKey:@"toUserId"];
+        [dicM_BotData setObject:@"user" forKey:@"toUserType"];
+        [dicM_BotData setObject:str_MentionMsg forKey:@"toMessage"];
+        [dicM_BotData setObject:@"toMesaage" forKey:@"mesgAction"];
+        [dicM setObject:dicM_BotData forKey:@"bot_data"];
+    }
+
+    NSError * err;
+    NSData * jsonData = [NSJSONSerialization dataWithJSONObject:dicM options:0 error:&err];
+    NSString *str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+
+    
+    [self.channel sendUserMessage:aMsg
+                             data:str_Data
+                       customType:str_CustomType
+                completionHandler:^(SBDUserMessage * _Nullable userMessage, SBDError * _Nullable error) {
+
+//                    [self.messages replaceObjectAtIndex:[str_FindKey integerValue] withObject:userMessage];
+
+                    if( dic_SelectedAutoAnswer )
+                    {
+                        //정답이나 해설을 눌렀을때
+                        if( [aMsg rangeOfString:@"정답을"].location != NSNotFound )
+                        {
+                            [weakSelf.arM_AutoAnswer removeObject:dic_SelectedAutoAnswer];
+                            nAutoAnswerIdx = -1;
+                        }
+                        else if( [aMsg rangeOfString:@"해설을"].location != NSNotFound )
+                        {
+                            [weakSelf.arM_AutoAnswer removeObject:dic_SelectedAutoAnswer];
+                            nAutoAnswerIdx = -1;
+                        }
+//                        else if( [aMsg rangeOfString:@"다음"].location != NSNotFound )
+//                        {
+//                            [weakSelf.arM_AutoAnswer removeObject:dic_SelectedAutoAnswer];
+//                            nAutoAnswerIdx = -1;
+//                        }
+//                        else if( [str_CustomType isEqualToString:@"cmd"] )
+//                        {
+//                            [weakSelf.arM_AutoAnswer removeObject:dic_SelectedAutoAnswer];
+//                            nAutoAnswerIdx = -1;
+//
+//                            weakSelf.v_CommentKeyboardAccView.tv_Contents.text = @"";
+//                            weakSelf.v_CommentKeyboardAccView.lc_TfWidth.constant = 45.f;
+//
+//                            dispatch_async(dispatch_get_main_queue(), ^{
+//
+//                                [weakSelf.tbv_List reloadData];
+//                                [weakSelf.tbv_List layoutIfNeeded];
+//                                dispatch_async(dispatch_get_main_queue(), ^{
+//
+//                                    [weakSelf scrollToTheBottom:YES];
+//                                    //                            [weakSelf.tbv_List reloadData];
+//                                });
+//                            });
+//
+//                            return ;
+//                        }
+                    }
+
+                    [weakSelf.messages addObject:userMessage];
+
+                    weakSelf.v_CommentKeyboardAccView.tv_Contents.text = @"";
+                    weakSelf.v_CommentKeyboardAccView.lc_TfWidth.constant = 45.f;
+
+                    dispatch_async(dispatch_get_main_queue(), ^{
+
+                        [weakSelf.tbv_List reloadData];
+                        [weakSelf.tbv_List layoutIfNeeded];
+                        dispatch_async(dispatch_get_main_queue(), ^{
+
+                            [weakSelf scrollToTheBottom:YES];
+//                            [weakSelf.tbv_List reloadData];
+                        });
+                    });
+                }];
+
+    return;
+    
+    NSString *str_BotId = nil;
+//    if( [self.v_CommentKeyboardAccView.tv_Contents.text hasPrefix:@"@"] )
+//    {
+//        //유저 초대
+//        __weak __typeof(&*self)weakSelf = self;
+//
+//        NSDictionary *dic_InviteUser = nil;
+//        for( NSInteger i = 0; i < self.arM_AtList.count; i++ )
+//        {
+//            dic_InviteUser = [self.arM_AtList objectAtIndex:i];
+//            if( [aMsg isEqualToString:[NSString stringWithFormat:@"@%@", [dic_InviteUser objectForKey_YM:@"userName"]]] )
+//            {
+//                break;
+//            }
+//        }
+//
+//        if( dic_InviteUser == nil )  return;
+//
+//        __block NSString *str_InviteUserId = [NSString stringWithFormat:@"%@", [dic_InviteUser objectForKey_YM:@"userId"]];
+//        NSString *str_InviteUserName = [NSString stringWithFormat:@"%@", [dic_InviteUser objectForKey_YM:@"userName"]];
+//
+//        [self.channel inviteUserIds:@[str_InviteUserId] completionHandler:^(SBDError * _Nullable error) {
+//
+//            NSLog(@"%@", error);
+//        }];
+//
+//        __block BOOL isBot = [[dic_InviteUser objectForKey_YM:@"userType"] isEqualToString:@"bot"];
+//
+//        if( isBot )
+//        {
+//            //봇을 초대 했으면 검색 리스트에서 봇 빼주기
+//            str_BotId = str_InviteUserId;
+//            [self updateAtList:@"user"];
+//        }
+//
+//        NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+//                                            [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+//                                            [Util getUUID], @"uuid",
+//                                            self.str_RId, @"rId",
+//                                            str_InviteUserId, @"inviteUserIdStr",
+//                                            nil];
+//
+//        [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/get/chat/room/add/invite/user"
+//                                            param:dicM_Params
+//                                       withMethod:@"POST"
+//                                        withBlock:^(id resulte, NSError *error) {
+//
+//                                            [MBProgressHUD hide];
+//
+//                                            if( resulte )
+//                                            {
+//                                                NSLog(@"resulte : %@", resulte);
+//
+//                                                NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+//                                                if( nCode == 200 )
+//                                                {
+//                                                    NSDictionary *completeResult = @{@"userName":str_InviteUserName,
+//                                                                                     @"count":@1,
+//                                                                                     @"users":@[@{@"userId":str_InviteUserId, @"userName":str_InviteUserName}]};
+//                                                    NSArray *ar_Users = [NSArray arrayWithArray:[completeResult objectForKey:@"users"]];
+//                                                    for( NSInteger i = 0; i < ar_Users.count; i++ )
+//                                                    {
+//                                                        NSDictionary *dic_Tmp = ar_Users[i];
+//                                                        [weakSelf.arM_User addObject:[dic_Tmp objectForKey:@"userId"]];
+//                                                    }
+//
+//                                                    NSString *str_MyName = [[NSUserDefaults standardUserDefaults] objectForKey:@"userName"];
+//                                                    NSString *str_UserName = [completeResult objectForKey_YM:@"userName"];
+//                                                    NSInteger nCnt = [[completeResult objectForKey_YM:@"count"] integerValue];
+//                                                    NSString *str_Msg = @"";
+//                                                    if( nCnt == 1 )
+//                                                    {
+//                                                        str_Msg = [NSString stringWithFormat:@"%@님이 %@님을 이 그룹에 추가했습니다.", str_MyName, str_UserName];
+//                                                    }
+//                                                    else
+//                                                    {
+//                                                        str_Msg = [NSString stringWithFormat:@"%@님이 %@님 외 %ld명을 이 그룹에 추가했습니다.", str_MyName, str_UserName, nCnt - 1];
+//                                                    }
+//
+//                                                    [weakSelf sendMsgCmd:kInviteChat withMsg:str_Msg withUsers:ar_Users];
+//
+//                                                    //대시보드 업데이트 할 데이터 만들기 (lastMsg와 lastChatDate)
+//                                                    NSDate *date = [NSDate date];
+//                                                    NSCalendar* calendar = [NSCalendar currentCalendar];
+//                                                    NSDateComponents* components = [calendar components:NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay|NSCalendarUnitHour|NSCalendarUnitMinute|NSCalendarUnitSecond fromDate:date];
+//                                                    NSInteger nYear = [components year];
+//                                                    NSInteger nMonth = [components month];
+//                                                    NSInteger nDay = [components day];
+//                                                    NSInteger nHour = [components hour];
+//                                                    NSInteger nMinute = [components minute];
+//                                                    NSInteger nSecond = [components second];
+//                                                    NSString *str_LastChatDate = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld", nYear, nMonth, nDay, nHour, nMinute, nSecond];
+//
+//
+//                                                    NSMutableDictionary *dicM = [NSMutableDictionary dictionary];
+//                                                    [dicM setObject:str_Msg forKey:@"lastMsg"];
+//                                                    [dicM setObject:str_LastChatDate forKey:@"lastChatDate"];
+//                                                    [dicM setObject:@"text" forKey:@"msgType"];
+//
+//                                                    [weakSelf sendDashboardUpdate:dicM];
+//
+//                                                    if( isBot )
+//                                                    {
+//                                                        weakSelf.dic_BotInfo = @{@"userId":str_InviteUserId};
+//                                                        [weakSelf updateRoom:@"chatBot" withChatBotId:str_InviteUserId];
+//                                                    }
+//                                                    else if( self.dic_BotInfo == nil )
+//                                                    {
+//                                                        [weakSelf updateRoom:@"group" withChatBotId:nil];
+//                                                    }
+//                                                }
+//                                            }
+//                                        }];
+//
+//    }
+    
     if( self.isAskMode && self.isPdfMode )
     {
         if( self.str_PdfImageUrl )
@@ -9401,7 +9679,7 @@ typedef enum {
                                         @"0", @"replyId",     // [질문일 경우 0, 답변일 경우 해당 질문의 qnaId]
                                         nil];
     
-    __weak __typeof(&*self)weakSelf = self;
+//    __weak __typeof(&*self)weakSelf = self;
     
     [self.v_CommentKeyboardAccView removeContents];
     
@@ -9426,7 +9704,7 @@ typedef enum {
                                        };
     
     
-    [self.dicM_TempMyContents setObject:dic_Temp forKey:[NSString stringWithFormat:@"%ld", self.messages.count]];
+//    [self.dicM_TempMyContents setObject:dic_Temp forKey:[NSString stringWithFormat:@"%ld", self.messages.count]];
     [self.messages addObject:dic_Temp];
     
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -9457,6 +9735,12 @@ typedef enum {
     [dicM_Params setObject:str_CreateTime forKey:@"createDate"];
     [dicM_Params setObject:[NSString stringWithFormat:@"%ld", self.arM_List.count] forKey:@"tempIdx"];
     
+    if( str_BotId && str_BotId.length > 0 )
+    {
+        [dicM_Params setObject:str_BotId forKey:@"botId"];
+    }
+    
+
     dispatch_queue_t dumpLoadQueue = dispatch_queue_create("com.sendbird.dumploadqueue", DISPATCH_QUEUE_CONCURRENT);
     dispatch_async(dumpLoadQueue, ^{
         
@@ -9604,6 +9888,25 @@ typedef enum {
     
     //    NSString *str_Dump = self.v_CommentKeyboardAccView.tv_Contents.text;
     
+    //봇 모드이고 숫자를 입력 했을때
+    
+    BOOL isBotNumberSelect = NO;
+//    for( NSInteger i = 0; i < self.arM_AutoAnswer.count; i++ )
+//    {
+//        NSDictionary *dic = self.arM_AutoAnswer[i];
+//        NSString *str_Number = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"itemNo"]];
+//        str_Number = [str_Number stringByReplacingOccurrencesOfString:@" " withString:@""];
+//        NSString *str_UserMsg = [NSString stringWithFormat:@"%@", [dicM_Params objectForKey:@"msg"]];
+//        str_UserMsg = [str_UserMsg stringByReplacingOccurrencesOfString:@" " withString:@""];
+//        
+//        if( [str_Number isEqualToString:str_UserMsg] )
+//        {
+//            isBotNumberSelect = YES;
+//            break;
+//        }
+//    }
+    
+    
     NSString *str_Key = [NSString stringWithFormat:@"DefaultChannelId_%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
     NSString *str_DefaultChannelId = [[NSUserDefaults standardUserDefaults] objectForKey:str_Key];
     if( str_DefaultChannelId && str_DefaultChannelId.length > 0 )
@@ -9620,6 +9923,52 @@ typedef enum {
     }
     
     [dicM_Params removeObjectForKey:@"normalQuestion"];
+    
+    if( isBotNumberSelect )
+    {
+        NSString *str_Msg = [NSString stringWithFormat:@"%@", [dicM_Params objectForKey:@"msg"]];
+
+        NSArray *ar_Tmp = [self.dicM_TempMyContents allKeys];
+        NSString *str_FindKey = nil;
+        for( NSInteger i = 0; i < ar_Tmp.count; i++ )
+        {
+            NSString *str_Key = ar_Tmp[i];
+            id tmp = [self.dicM_TempMyContents objectForKey:str_Key];
+            if( [tmp isKindOfClass:[NSDictionary class]] )
+            {
+                NSDictionary *dic_Tmp = (NSDictionary *)tmp;
+                NSString *str_TmpContents = [dic_Tmp objectForKey:@"contents"];
+                NSString *str_IsTmp = [dic_Tmp objectForKey:@"temp"];
+                if( [str_TmpContents isEqualToString:str_Msg] && [str_IsTmp isEqualToString:@"YES"] )
+                {
+                    //                                                                                 findMessage = tmpMessage;
+                    str_FindKey = str_Key;
+                    [self.dicM_TempMyContents removeObjectForKey:str_Key];
+                    break;
+                }
+            }
+        }
+        
+        [self.channel sendUserMessage:str_Msg
+                                 data:@""
+                           customType:@"text"
+                    completionHandler:^(SBDUserMessage * _Nullable userMessage, SBDError * _Nullable error) {
+                        
+                        [self.messages replaceObjectAtIndex:[str_FindKey integerValue] withObject:userMessage];
+                        
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            
+                            [self.tbv_List reloadData];
+                            [self.tbv_List layoutIfNeeded];
+                            dispatch_async(dispatch_get_main_queue(), ^{
+                                
+                                [self.tbv_List reloadData];
+                            });
+                        });
+                    }];
+
+        return;
+    }
     
     [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/add/reply/question/and/view"
                                         param:dicM_Params
@@ -9645,6 +9994,18 @@ typedef enum {
                                             NSData * jsonData = [NSJSONSerialization dataWithJSONObject:resulte options:0 error:&err];
                                             NSString *str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
                                             __block NSString *str_Msg = [dic_DataMap objectForKey:@"qnaBody"];
+                                            
+                                            NSString *str_BotId = [NSString stringWithFormat:@"%@", [dicM_Params objectForKey_YM:@"botId"]];
+                                            if( str_BotId.length > 0 )
+                                            {
+                                                NSData *jsonData = [str_Data dataUsingEncoding:NSUTF8StringEncoding];
+                                                id obj = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil];
+                                                NSMutableDictionary *dicM_Tmp = [NSMutableDictionary dictionaryWithDictionary:obj];
+                                                [dicM_Tmp setObject:str_BotId forKey:@"botUserId"];
+                                                
+                                                jsonData = [NSJSONSerialization dataWithJSONObject:dicM_Tmp options:0 error:&err];
+                                                str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+                                            }
                                             
                                             if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"normalQuestion"] == NO )
                                             {
@@ -9743,6 +10104,10 @@ typedef enum {
                                                             else if( self.autoChatMode == kPrintAnswer || self.autoChatMode == kNextExam || self.autoChatMode == kPrintContinue )
                                                             {
                                                                 //답 입력
+                                                                str_CurrentMsg = [dic_Tmp objectForKey:@"title"];
+                                                            }
+                                                            else
+                                                            {
                                                                 str_CurrentMsg = [dic_Tmp objectForKey:@"title"];
                                                             }
                                                             
@@ -9896,6 +10261,27 @@ typedef enum {
 //                                                                UIView *view = [window viewWithTag:1982];
 //                                                                UITableView *tbv = [view viewWithTag:1983];
 //                                                                [tbv reloadData];
+                                                            }
+                                                            else
+                                                            {
+                                                                for( NSInteger i = 0; i < self.ar_AutoAnswerBtnInfo.count; i++ )
+                                                                {
+                                                                    NSDictionary *dic_BtnInfo = self.ar_AutoAnswerBtnInfo[i];
+                                                                    NSString *str_TmpTitle = [dic_BtnInfo objectForKey:@"btnLabel"];
+                                                                    NSString *str_CurrentTitle = [dic_SelectedAutoAnswer objectForKey:@"title"];
+                                                                    if( [str_TmpTitle isEqualToString:str_CurrentTitle] )
+                                                                    {
+                                                                        [dicM_Tmp setObject:[dic_BtnInfo objectForKey_YM:@"mesgAction"] forKey:@"mesgAction"];
+                                                                        [dicM_Tmp setObject:[dic_BtnInfo objectForKey_YM:@"returnValue"] forKey:[dic_BtnInfo objectForKey_YM:@"returnName"]];
+                                                                        [dicM_Tmp setObject:[dic_BtnInfo objectForKey_YM:@"chatScreen"] forKey:@"chatScreen"];
+
+                                                                        nAutoAnswerIdx = -1;
+                                                                        [weakSelf.tbv_TempleteList reloadData];
+                                                                        [weakSelf onKeyboardDownInterval];
+
+                                                                        break;
+                                                                    }
+                                                                }
                                                             }
                                                             
                                                             NSInteger nMyId = [[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"] integerValue];
@@ -10237,95 +10623,69 @@ typedef enum {
     if( type == kInviteChat )
     {
         //초대
-        NSMutableDictionary *dicM_Param = [NSMutableDictionary dictionary];
-        [dicM_Param setObject:@"ADMM" forKey:@"message_type"];
-        [dicM_Param setObject:aMsg forKey:@"message"];
-        [dicM_Param setObject:@"cmd" forKey:@"custom_type"];
-        
-        NSMutableDictionary *dicM_Data = [NSMutableDictionary dictionary];
-        [dicM_Data setObject:@"USER_JOIN" forKey:@"type"];
-        
-        NSMutableDictionary *dicM_Inviter = [NSMutableDictionary dictionary];
-        [dicM_Inviter setObject:str_UserId forKey:@"user_id"];
-        [dicM_Inviter setObject:str_UserName forKey:@"nickname"];
-        [dicM_Data setObject:dicM_Inviter forKey:@"sender"];
-        
-        
-        NSMutableArray *arM_Users = [NSMutableArray array];
-        NSArray *ar_Users = [NSArray arrayWithArray:data];
-        for( NSInteger i = 0; i < ar_Users.count; i++ )
-        {
-            NSDictionary *dic_User = ar_Users[i];
-            NSString *str_UserId = [NSString stringWithFormat:@"%@", [dic_User objectForKey:@"userId"]];
-            [arM_Users addObject:@{@"user_id":str_UserId, @"nickname":[dic_User objectForKey:@"userName"]}];
-        }
-        [dicM_Data setObject:arM_Users forKey:@"users"];
-        
-        [dicM_Data setObject:aMsg forKey:@"message"];
-        
-        NSError *error;
-        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_Data
-                                                           options:NSJSONWritingPrettyPrinted
-                                                             error:&error];
-        NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-        
-        [dicM_Param setObject:jsonString forKey:@"data"];
-        
-        //        [dicM_Param setObject:@"true" forKey:@"is_silent"];
-        [dicM_Param setObject:@"true" forKey:@"is_silent"];
-        
-        NSString *str_Path = [NSString stringWithFormat:@"v3/group_channels/%@/messages", self.channel.channelUrl];
-        [[WebAPI sharedData] callAsyncSendBirdAPIBlock:str_Path
-                                                 param:dicM_Param
-                                            withMethod:@"POST"
-                                             withBlock:^(id resulte, NSError *error) {
-                                                 
-                                                 if( resulte )
-                                                 {
-                                                     
-                                                 }
-                                             }];
+//        SBDUser *user = [SBDMain getCurrentUser];
+//        NSString *str_Msg = [NSString stringWithFormat:@"%@님이 나갔습니다", user.nickname];
+//        NSMutableDictionary *dicM_Param = [NSMutableDictionary dictionary];
+//        [dicM_Param setObject:@"ADMM" forKey:@"message_type"];
+//        [dicM_Param setObject:str_UserId forKey:@"user_id"];
+//        [dicM_Param setObject:str_Msg forKey:@"message"];
+//        [dicM_Param setObject:@"USER_JOIN" forKey:@"custom_type"];
+//        [dicM_Param setObject:@"true" forKey:@"is_silent"];
+//
+//        NSMutableDictionary *dicM_MessageData = [NSMutableDictionary dictionary];
+//        [dicM_MessageData setObject:str_Msg forKey:@"message"];
+//
+//        NSMutableDictionary *dicM_Sender = [NSMutableDictionary dictionary];
+//        [dicM_Sender setObject:user.nickname forKey:@"nickname"];
+//        [dicM_Sender setObject:user.userId forKey:@"user_id"];
+//        [dicM_MessageData setObject:dicM_Sender forKey:@"sender"];
+//
+//        NSError *error;
+//        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_MessageData
+//                                                           options:NSJSONWritingPrettyPrinted
+//                                                             error:&error];
+//        NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+//        [dicM_Param setObject:jsonString forKey:@"data"];
+//
+//        NSString *str_Path = [NSString stringWithFormat:@"v3/group_channels/%@/messages", self.channel.channelUrl];
+//        [[WebAPI sharedData] callAsyncSendBirdAPIBlock:str_Path
+//                                                 param:dicM_Param
+//                                            withMethod:@"POST"
+//                                             withBlock:^(id resulte, NSError *error) {
+//
+//                                                 if( resulte )
+//                                                 {
+//
+//                                                 }
+//                                             }];
     }
     else if( type == kLeaveChat )
     {
         //나감
+        SBDUser *user = [SBDMain getCurrentUser];
+        NSString *str_Msg = [NSString stringWithFormat:@"%@님이 나갔습니다", user.nickname];
         NSMutableDictionary *dicM_Param = [NSMutableDictionary dictionary];
         [dicM_Param setObject:@"ADMM" forKey:@"message_type"];
-        [dicM_Param setObject:aMsg forKey:@"message"];
-        [dicM_Param setObject:@"cmd" forKey:@"custom_type"];
+        [dicM_Param setObject:str_UserId forKey:@"user_id"];
+        [dicM_Param setObject:str_Msg forKey:@"message"];
+        [dicM_Param setObject:@"USER_LEFT" forKey:@"custom_type"];
+        [dicM_Param setObject:@"true" forKey:@"is_silent"];
         
-        NSMutableDictionary *dicM_Data = [NSMutableDictionary dictionary];
-        [dicM_Data setObject:@"USER_LEFT" forKey:@"type"];
+        NSMutableDictionary *dicM_MessageData = [NSMutableDictionary dictionary];
+        [dicM_MessageData setObject:str_Msg forKey:@"message"];
         
-        NSMutableDictionary *dicM_Inviter = [NSMutableDictionary dictionary];
-        [dicM_Inviter setObject:str_UserId forKey:@"user_id"];
-        [dicM_Inviter setObject:str_UserName forKey:@"nickname"];
-        [dicM_Data setObject:dicM_Inviter forKey:@"sender"];
-        
-        
-        NSMutableArray *arM_Users = [NSMutableArray array];
-        NSArray *ar_Users = [NSArray arrayWithArray:data];
-        for( NSInteger i = 0; i < ar_Users.count; i++ )
-        {
-            NSDictionary *dic_User = ar_Users[i];
-            NSString *str_UserId = [NSString stringWithFormat:@"%@", [dic_User objectForKey:@"userId"]];
-            [arM_Users addObject:@{@"user_id":str_UserId, @"nickname":[dic_User objectForKey:@"userName"]}];
-        }
-        [dicM_Data setObject:arM_Users forKey:@"users"];
-        
-        [dicM_Data setObject:aMsg forKey:@"message"];
+        NSMutableDictionary *dicM_Sender = [NSMutableDictionary dictionary];
+        [dicM_Sender setObject:user.nickname forKey:@"nickname"];
+        [dicM_Sender setObject:user.userId forKey:@"user_id"];
+        [dicM_MessageData setObject:dicM_Sender forKey:@"sender"];
         
         NSError *error;
-        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_Data
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_MessageData
                                                            options:NSJSONWritingPrettyPrinted
                                                              error:&error];
         NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-        
         [dicM_Param setObject:jsonString forKey:@"data"];
-        
-        //        [dicM_Param setObject:@"true" forKey:@"is_silent"];
-        [dicM_Param setObject:@"true" forKey:@"is_silent"];
-        
+
         NSString *str_Path = [NSString stringWithFormat:@"v3/group_channels/%@/messages", self.channel.channelUrl];
         [[WebAPI sharedData] callAsyncSendBirdAPIBlock:str_Path
                                                  param:dicM_Param
@@ -10341,43 +10701,30 @@ typedef enum {
     else if( type == kEnterChat )
     {
         //입장
+        SBDUser *user = [SBDMain getCurrentUser];
+        NSString *str_Msg = [NSString stringWithFormat:@"%@님이 입장하셨습니다", user.nickname];
         NSMutableDictionary *dicM_Param = [NSMutableDictionary dictionary];
         [dicM_Param setObject:@"ADMM" forKey:@"message_type"];
-        [dicM_Param setObject:aMsg forKey:@"message"];
-        [dicM_Param setObject:@"cmd" forKey:@"custom_type"];
+        [dicM_Param setObject:str_UserId forKey:@"user_id"];
+        [dicM_Param setObject:str_Msg forKey:@"message"];
+        [dicM_Param setObject:@"USER_ENTER" forKey:@"custom_type"];
+        [dicM_Param setObject:@"true" forKey:@"is_silent"];
+
+        NSMutableDictionary *dicM_MessageData = [NSMutableDictionary dictionary];
+        [dicM_MessageData setObject:str_Msg forKey:@"message"];
         
-        NSMutableDictionary *dicM_Data = [NSMutableDictionary dictionary];
-        [dicM_Data setObject:@"USER_ENTER" forKey:@"type"];
-        
-        NSMutableDictionary *dicM_Inviter = [NSMutableDictionary dictionary];
-        [dicM_Inviter setObject:str_UserId forKey:@"user_id"];
-        [dicM_Inviter setObject:str_UserName forKey:@"nickname"];
-        [dicM_Data setObject:dicM_Inviter forKey:@"sender"];
-        
-        
-        NSMutableArray *arM_Users = [NSMutableArray array];
-        NSArray *ar_Users = [NSArray arrayWithArray:data];
-        for( NSInteger i = 0; i < ar_Users.count; i++ )
-        {
-            NSDictionary *dic_User = ar_Users[i];
-            NSString *str_UserId = [NSString stringWithFormat:@"%@", [dic_User objectForKey:@"userId"]];
-            [arM_Users addObject:@{@"user_id":str_UserId, @"nickname":[dic_User objectForKey:@"userName"]}];
-        }
-        [dicM_Data setObject:arM_Users forKey:@"users"];
-        
-        [dicM_Data setObject:aMsg forKey:@"message"];
-        
+        NSMutableDictionary *dicM_Sender = [NSMutableDictionary dictionary];
+        [dicM_Sender setObject:user.nickname forKey:@"nickname"];
+        [dicM_Sender setObject:user.userId forKey:@"user_id"];
+        [dicM_MessageData setObject:dicM_Sender forKey:@"sender"];
+
         NSError *error;
-        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_Data
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dicM_MessageData
                                                            options:NSJSONWritingPrettyPrinted
                                                              error:&error];
         NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-        
         [dicM_Param setObject:jsonString forKey:@"data"];
-        
-        [dicM_Param setObject:@"true" forKey:@"is_silent"];
-        //        [dicM_Param setObject:@"false" forKey:@"is_silent"];
-        
+
         NSString *str_Path = [NSString stringWithFormat:@"v3/group_channels/%@/messages", self.channel.channelUrl];
         [[WebAPI sharedData] callAsyncSendBirdAPIBlock:str_Path
                                                  param:dicM_Param
@@ -10417,6 +10764,8 @@ typedef enum {
              imagePickerController.mediaTypes = [[NSArray alloc] initWithObjects:(NSString *)kUTTypeMovie, kUTTypeImage, nil];
              imagePickerController.delegate = self;
              imagePickerController.allowsEditing = NO;
+//             imagePickerController.showsCameraControls = NO;
+
              
              if(IS_IOS8_OR_ABOVE)
              {
@@ -10435,7 +10784,8 @@ typedef enum {
              imagePickerController.sourceType = UIImagePickerControllerSourceTypeCamera;
              imagePickerController.delegate = self;
              imagePickerController.allowsEditing = NO;
-             
+//             imagePickerController.showsCameraControls = NO;
+
              if(IS_IOS8_OR_ABOVE)
              {
                  [[NSOperationQueue mainQueue] addOperationWithBlock:^{
@@ -10630,16 +10980,41 @@ typedef enum {
     }];
 }
 
+//- (void)video:(NSString *)videoPath didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo
+//{
+//    if (error)
+//    {
+//        NSLog(@"error: %@", [error localizedDescription]);
+//    }
+//    else
+//    {
+//        NSLog(@"saved");
+//    }
+//}
+
+
 
 #pragma mark - ImagePickerDelegate
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info
 {
+    __weak __typeof__(self) weakSelf = self;
+
     NSString *mediaType = [info objectForKey: UIImagePickerControllerMediaType];
     
     if (CFStringCompare ((__bridge CFStringRef) mediaType, kUTTypeMovie, 0) == kCFCompareEqualTo)
     {
         NSURL *videoUrl=(NSURL*)[info objectForKey:UIImagePickerControllerMediaURL];
-        
+
+        // check if video is compatible with album
+//        BOOL compatible = UIVideoAtPathIsCompatibleWithSavedPhotosAlbum([videoUrl path]);
+//
+//        // save
+//        if (compatible)
+//        {
+//            UISaveVideoAtPathToSavedPhotosAlbum([videoUrl path], self, @selector(video:didFinishSavingWithError:contextInfo:), NULL);
+//            NSLog(@"saved!!!! %@",[videoUrl path]);
+//        }
+
         AVURLAsset *asset = [[AVURLAsset alloc] initWithURL:videoUrl options:nil];
         AVAssetImageGenerator *gen = [[AVAssetImageGenerator alloc] initWithAsset:asset];
         gen.appliesPreferredTrackTransform = YES;
@@ -10654,24 +11029,93 @@ typedef enum {
         
         NSData *videoData = [NSData dataWithContentsOfURL:videoUrl];
         [self uploadData:@{@"type":@"video", @"obj":videoData, @"thumb":UIImageJPEGRepresentation(resizeImage, 0.3f), @"videoUrl":[videoUrl absoluteString],
-                           @"imageSize":@{@"width":[NSString stringWithFormat:@"%f", resizeImage.size.width], @"height":[NSString stringWithFormat:@"%f", resizeImage.size.height]}}];
+                           @"file_data":@{@"width":[NSString stringWithFormat:@"%f", resizeImage.size.width], @"height":[NSString stringWithFormat:@"%f", resizeImage.size.height]}}];
+        
+        [self dismissViewControllerAnimated:YES completion:nil];
+        
+        [UIView animateWithDuration:0.3f animations:^{
+            
+            [self.tbv_List scrollRectToVisible:CGRectMake(self.tbv_List.contentSize.width - 1, self.tbv_List.contentSize.height - 1, 1, 1) animated:YES];
+        }];
     }
-    else
+    else 
     {
-        UIImage* outputImage = [info objectForKey:UIImagePickerControllerEditedImage] ? [info objectForKey:UIImagePickerControllerEditedImage] : [info objectForKey:UIImagePickerControllerOriginalImage];
+//        [self dismissViewControllerAnimated:NO completion:^{
+//
+//            UIImage *image = [info objectForKey:UIImagePickerControllerOriginalImage];
+//            DZImageEditingController *editingViewController = [DZImageEditingController new];
+//            editingViewController.image = image;
+//            editingViewController.overlayView = self.overlayImageView;
+//            editingViewController.cropRect = self.frameRect;
+//            editingViewController.delegate = self;
+//
+//            [self presentViewController:editingViewController
+//                               animated:YES
+//                             completion:nil];
+//        }];
         
-        UIImage *resizeImage = [Util imageWithImage:outputImage convertToWidth:self.view.bounds.size.width - 30];
+
         
-        [self uploadData:@{@"type":@"image", @"obj":UIImageJPEGRepresentation(resizeImage, 0.3f), @"thumb":resizeImage,
-                           @"imageSize":@{@"width":[NSString stringWithFormat:@"%f", resizeImage.size.width], @"height":[NSString stringWithFormat:@"%f", resizeImage.size.height]}}];
+        
+        
+        
+        
+        
+        //2
+        NSURL *imageURL = [info objectForKey:UIImagePickerControllerReferenceURL];
+        ALAssetsLibrary* library = [[ALAssetsLibrary alloc] init];
+        [library assetForURL:imageURL resultBlock:^(ALAsset *asset) {
+            ALAssetRepresentation *repr = [asset defaultRepresentation];
+            NSUInteger size = repr.size;
+            NSMutableData *data = [NSMutableData dataWithLength:size];
+            NSError *error;
+            [repr getBytes:data.mutableBytes fromOffset:0 length:size error:&error];
+            /* Now data contains the image data, if no error occurred */
+            
+            UIImage* outputImage = [info objectForKey:UIImagePickerControllerEditedImage] ? [info objectForKey:UIImagePickerControllerEditedImage] : [info objectForKey:UIImagePickerControllerOriginalImage];
+            
+            UIImage *resizeImage = [Util imageWithImage:outputImage convertToWidth:self.view.bounds.size.width - 30];
+
+            [weakSelf uploadData:@{@"type":@"image", @"obj":data, @"thumb":resizeImage,
+                               @"file_data":@{@"width":[NSString stringWithFormat:@"%f", resizeImage.size.width], @"height":[NSString stringWithFormat:@"%f", resizeImage.size.height]}}];
+            
+            [weakSelf dismissViewControllerAnimated:YES completion:nil];
+            
+            [UIView animateWithDuration:0.3f animations:^{
+                
+                [weakSelf.tbv_List scrollRectToVisible:CGRectMake(weakSelf.tbv_List.contentSize.width - 1, weakSelf.tbv_List.contentSize.height - 1, 1, 1) animated:YES];
+            }];
+
+        } failureBlock:^(NSError *error) {
+            /* handle error */
+            
+            [weakSelf dismissViewControllerAnimated:YES completion:nil];
+            
+            [UIView animateWithDuration:0.3f animations:^{
+                
+                [weakSelf.tbv_List scrollRectToVisible:CGRectMake(weakSelf.tbv_List.contentSize.width - 1, weakSelf.tbv_List.contentSize.height - 1, 1, 1) animated:YES];
+            }];
+        }];
+
+        
+        
+        
+//        NSURL *url=(NSURL*)[info objectForKey:UIImagePickerControllerReferenceURL];
+//
+//        ALAssetsLibrary *assetLibrary=[[ALAssetsLibrary alloc] init];
+//        [assetLibrary assetForURL:url resultBlock:^(ALAsset *asset) {
+//            ALAssetRepresentation *rep = [asset defaultRepresentation];
+//            Byte *buffer = (Byte*)malloc(rep.size);
+//            NSUInteger buffered = [rep getBytes:buffer fromOffset:0.0 length:rep.size error:nil];
+//
+//            NSData *data = [NSData dataWithBytesNoCopy:buffer length:buffered freeWhenDone:YES];
+//            NSLog(@"%@",data); //this is what I was expecting
+//
+//            [self uploadData:@{@"type":@"image", @"obj":data, @"thumb":resizeImage,
+//                               @"file_data":@{@"width":[NSString stringWithFormat:@"%f", resizeImage.size.width], @"height":[NSString stringWithFormat:@"%f", resizeImage.size.height]}}];
+//        }];
+        
     }
-    
-    [self dismissViewControllerAnimated:YES completion:nil];
-    
-    [UIView animateWithDuration:0.3f animations:^{
-        
-        [self.tbv_List scrollRectToVisible:CGRectMake(self.tbv_List.contentSize.width - 1, self.tbv_List.contentSize.height - 1, 1, 1) animated:YES];
-    }];
 }
 
 - (void)uploadData:(NSDictionary *)dic
@@ -10690,7 +11134,7 @@ typedef enum {
     NSString *str_CreateTime = [NSString stringWithFormat:@"%04ld%02ld%02ld%02d%02d%02d", nYear, nMonth, nDay, nHour, nMinute, nSecond];
 
     NSMutableDictionary *dic_Temp = [NSMutableDictionary dictionary];
-    [dic_Temp setObject:[NSString stringWithFormat:@"%@", [self.dic_Info objectForKey:@"questionId"]] forKey:@"questionId"];
+//    [dic_Temp setObject:[NSString stringWithFormat:@"%@", [self.dic_Info objectForKey:@"questionId"]] forKey:@"questionId"];
     [dic_Temp setObject:[dic objectForKey:@"type"] forKey:@"type"];
     [dic_Temp setObject:str_CreateTime forKey:@"createDate"];
     [dic_Temp setObject:@"YES" forKey:@"temp"];
@@ -10704,7 +11148,7 @@ typedef enum {
     else
     {
         [dic_Temp setObject:([[dic objectForKey:@"type"] isEqualToString:@"image"] || [[dic objectForKey:@"type"] isEqualToString:@"pdfQuestion"]) ? [dic objectForKey:@"obj"] : [dic objectForKey:@"thumb"] forKey:@"obj"];
-        [dic_Temp setObject:[dic objectForKey_YM:@"imageSize"] forKey:@"imageSize"];
+        [dic_Temp setObject:[dic objectForKey_YM:@"file_data"] forKey:@"file_data"];
         [dic_Temp setObject:@"YES" forKey:@"temp"];
     }
 
@@ -10739,7 +11183,7 @@ typedef enum {
     }
     else
     {
-        [self.dicM_TempMyContents setObject:dicM_Tmp forKey:[NSString stringWithFormat:@"%ld", self.messages.count]];
+//        [self.dicM_TempMyContents setObject:dicM_Tmp forKey:[NSString stringWithFormat:@"%ld", self.messages.count]];
         [self.messages addObject:dicM_Tmp];
         [self.tbv_List reloadData];
         [self.tbv_List layoutIfNeeded];
@@ -10792,8 +11236,8 @@ typedef enum {
                                                     @"reply", @"uploadItem",
                                                     [dicM objectForKey:@"type"], @"type",
                                                     nil];
-                
-                [[WebAPI sharedData] imageUpload:@"v1/attach/file/uploader"
+                //v1/chat/file/uploader
+                [[WebAPI sharedData] imageUpload:@"v1/chat/file/uploader"
                                            param:dicM_Params
                                       withImages:[NSDictionary dictionaryWithObject:[dicM objectForKey:@"obj"] forKey:@"file"]
                                        withBlock:^(id resulte, NSError *error) {
@@ -10804,45 +11248,61 @@ typedef enum {
                                                __block NSDictionary *dic_Old = [NSDictionary dictionaryWithDictionary:resulte];
                                                if( [[dic objectForKey:@"type"] isEqualToString:@"video"] )
                                                {
-                                                   NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                                                                       [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
-                                                                                       [Util getUUID], @"uuid",
-                                                                                       [resulte objectForKey:@"tempUploadId"], @"videoTempUploadId",
-                                                                                       [resulte objectForKey:@"serviceUrl"], @"videoServiceUrl",
-                                                                                       @"reply", @"uploadItem",
-                                                                                       @"image", @"type",
-                                                                                       nil];
-                                                   
-                                                   [[WebAPI sharedData] imageUpload:@"v1/attach/video/cover/image/uploader"
-                                                                              param:dicM_Params
-                                                                         withImages:[NSDictionary dictionaryWithObject:[dicM objectForKey:@"thumb"] forKey:@"file"]
-                                                                          withBlock:^(id resulte, NSError *error) {
-                                                                              
-                                                                              if( resulte )
-                                                                              {
-                                                                                  NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
-                                                                                  if( nCode == 200 )
-                                                                                  {
-                                                                                      [dicM setObject:[NSString stringWithFormat:@"%@", [dic_Old objectForKey:@"tempUploadId"]] forKey:@"tempUploadId"];
-                                                                                      [dicM setObject:[NSString stringWithFormat:@"%@", [dic_Old objectForKey:@"serviceUrl"]] forKey:@"serviceUrl"];
-                                                                                      [weakSelf upLoadContents:dicM];
-                                                                                  }
-                                                                                  else
-                                                                                  {
-                                                                                      [weakSelf.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
-                                                                                  }
-                                                                              }
-                                                                              else
-                                                                              {
-                                                                                  [weakSelf.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
-                                                                              }
-                                                                          }];
+                                                   [dicM setObject:[NSString stringWithFormat:@"%@", [resulte objectForKey:@"tempUploadId"]] forKey:@"tempUploadId"];
+                                                   [dicM setObject:[NSString stringWithFormat:@"%@", [resulte objectForKey:@"serviceUrl"]] forKey:@"serviceUrl"];
+                                                   [dicM setObject:[NSString stringWithFormat:@"%@", [dicM_Msg objectForKey:@"createDate"]] forKey:@"createDate"];
+                                                   [dicM setObject:[NSString stringWithFormat:@"%@", [dic_Old objectForKey:@"image_prefix"]] forKey:@"image_prefix"];
+                                                   [dicM setObject:[NSString stringWithFormat:@"%@", [resulte objectForKey:@"coverImgUrl"]] forKey:@"coverImgUrl"];
+                                                   [dicM setObject:[NSString stringWithFormat:@"%@", [resulte objectForKey:@"coverImgWidth"]] forKey:@"coverImgWidth"];
+                                                   [dicM setObject:[NSString stringWithFormat:@"%@", [resulte objectForKey:@"coverImgHeight"]] forKey:@"coverImgHeight"];
+
+
+                                                   [weakSelf upLoadContents:dicM];
+
+//                                                   NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+//                                                                                       [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
+//                                                                                       [Util getUUID], @"uuid",
+//                                                                                       [resulte objectForKey:@"tempUploadId"], @"videoTempUploadId",
+//                                                                                       [resulte objectForKey:@"serviceUrl"], @"videoServiceUrl",
+//                                                                                       @"reply", @"uploadItem",
+//                                                                                       @"image", @"type",
+//                                                                                       nil];
+//
+//                                                   [[WebAPI sharedData] imageUpload:@"v1/attach/video/cover/image/uploader"
+//                                                                              param:dicM_Params
+//                                                                         withImages:[NSDictionary dictionaryWithObject:[dicM objectForKey:@"thumb"] forKey:@"file"]
+//                                                                          withBlock:^(id resulte, NSError *error) {
+//
+//                                                                              if( resulte )
+//                                                                              {
+//                                                                                  NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
+//                                                                                  if( nCode == 200 )
+//                                                                                  {
+//                                                                                      [dicM setObject:[NSString stringWithFormat:@"%@", [dic_Old objectForKey:@"tempUploadId"]] forKey:@"tempUploadId"];
+//                                                                                      [dicM setObject:[NSString stringWithFormat:@"%@", [dic_Old objectForKey:@"serviceUrl"]] forKey:@"serviceUrl"];
+//                                                                                      [dicM setObject:[NSString stringWithFormat:@"%@", [resulte objectForKey:@"serviceUrl"]] forKey:@"thumb"];
+//                                                                                      [dicM setObject:[NSString stringWithFormat:@"%@", [dicM_Msg objectForKey:@"createDate"]] forKey:@"createDate"];
+//                                                                                      [dicM setObject:[NSString stringWithFormat:@"%@", [dic_Old objectForKey:@"image_prefix"]] forKey:@"image_prefix"];
+//                                                                                      [weakSelf upLoadContents:dicM];
+//                                                                                  }
+//                                                                                  else
+//                                                                                  {
+//                                                                                      [weakSelf.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
+//                                                                                  }
+//                                                                              }
+//                                                                              else
+//                                                                              {
+//                                                                                  [weakSelf.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
+//                                                                              }
+//                                                                          }];
                                                }
                                                else
                                                {
                                                    [dicM setObject:[NSString stringWithFormat:@"%@", [resulte objectForKey:@"tempUploadId"]] forKey:@"tempUploadId"];
                                                    [dicM setObject:[NSString stringWithFormat:@"%@", [resulte objectForKey:@"serviceUrl"]] forKey:@"serviceUrl"];
-                                                   
+                                                   [dicM setObject:[NSString stringWithFormat:@"%@", [dicM_Msg objectForKey:@"createDate"]] forKey:@"createDate"];
+                                                   [dicM setObject:[NSString stringWithFormat:@"%@", [dic_Old objectForKey:@"image_prefix"]] forKey:@"image_prefix"];
+
                                                    if( [[dic objectForKey:@"type"] isEqualToString:@"audio"] )
                                                    {
                                                        [dicM setObject:[NSString stringWithFormat:@"%@", [dicM objectForKey:@"duration"]] forKey:@"duration"];
@@ -10898,371 +11358,162 @@ typedef enum {
     
 }
 
+
+#pragma mark - DZImageEditingControllerDelegate
+
+- (void)imageEditingControllerDidCancel:(DZImageEditingController *)editingController
+{
+    [editingController dismissViewControllerAnimated:YES
+                                          completion:nil];
+}
+
+- (void)imageEditingController:(DZImageEditingController *)editingController
+     didFinishEditingWithImage:(UIImage *)editedImage
+{
+//    [self.imageView setImage:editedImage];
+    [editingController dismissViewControllerAnimated:YES
+                                          completion:nil];
+}
+
+
 - (void)upLoadContents:(NSDictionary *)dic
 {
-    __block NSDictionary *dic_Temp = [NSDictionary dictionaryWithDictionary:dic];
-    NSMutableString *strM = [NSMutableString string];
-    
-    if( [[dic_Temp objectForKey:@"type"] isEqualToString:@"pdfQuestion"] )
-    {
-        //        NSError * err;
-        //        NSData * jsonData = [NSJSONSerialization dataWithJSONObject:[self.dic_PdfQuestionInfo objectForKey:@"examQuestionInfos"] options:0 error:&err];
-        //        NSString *str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-        
-        NSDictionary *dic_Tmp = @{@"examQuestionInfos":[self.dic_PdfQuestionInfo objectForKey:@"examQuestionInfos"]};
-        NSData * jsonData = [NSJSONSerialization dataWithJSONObject:dic_Tmp options:0 error:nil];
-        NSString *str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-        
-        [strM appendString:@"0"];
-        [strM appendString:@"-"];
-        
-        [strM appendString:[dic objectForKey:@"type"]];
-        [strM appendString:@"-"];
-        
-        [strM appendString:@"0"];
-        [strM appendString:@"-"];
-        
-        [strM appendString:@"N"];
-        [strM appendString:@"-"];
-        
-        NSString *str_Tmp = str_Data;
-        NSString *str_NoEncoding = str_Tmp;
-        str_Tmp = [str_Tmp stringByReplacingOccurrencesOfString:@"%" withString:@"%25"];
-        str_Tmp = [str_Tmp stringByReplacingOccurrencesOfString:@"-" withString:@"%2D"];
-        str_Tmp = [str_Tmp stringByReplacingOccurrencesOfString:@"," withString:@"%2C"];
-        str_Tmp = [str_Tmp stringByReplacingOccurrencesOfString:@"+" withString:@"%2B"];
-        
-        //[]{}#%^*+=_/
-        [strM appendString:str_Tmp];
-        
-        
-        
-        
-        
-        
-        
-        //        [strM appendString:@"0"];
-        //        [strM appendString:@"-"];
-        //
-        //        [strM appendString:[dic objectForKey:@"type"]];
-        //        [strM appendString:@"-"];
-        //
-        //        [strM appendString:[NSString stringWithFormat:@"%@", [dic objectForKey:@"tempUploadId"]]];
-        //        [strM appendString:@"-"];
-        //
-        //        [strM appendString:@"N"];
-        //        [strM appendString:@"-"];
-        //
-        //        [strM appendString:[dic objectForKey:@"imageUrl"]];
-    }
-    else
-    {
-        [strM appendString:@"0"];
-        [strM appendString:@"-"];
-        
-        [strM appendString:[dic objectForKey:@"type"]];
-        [strM appendString:@"-"];
-        
-        [strM appendString:[NSString stringWithFormat:@"%@", [dic objectForKey:@"tempUploadId"]]];
-        [strM appendString:@"-"];
-        
-        [strM appendString:@"N"];
-        [strM appendString:@"-"];
-        
-        [strM appendString:[dic objectForKey:@"serviceUrl"]];
-    }
-    
-    
-    
-    NSMutableDictionary *dicM_Params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                        [[NSUserDefaults standardUserDefaults] objectForKey:@"apiToken"], @"apiToken",
-                                        [Util getUUID], @"uuid",
-                                        [NSString stringWithFormat:@"%@", [self.dic_Info objectForKey:@"questionId"]], @"questionId",
-                                        strM, @"replyContents",
-                                        @"qna", @"replyType",   //질문, 답변 여부 [qna-질문, replay-답글)
-                                        @"0", @"replyId",     // [질문일 경우 0, 답변일 경우 해당 질문의 qnaId]
-                                        @"0", @"groupId",
-                                        nil];
-    
-    [self.v_CommentKeyboardAccView removeContents];
-    [self.view endEditing:YES];
-    self.v_CommentKeyboardAccView.lc_Bottom.constant = 0;
-    self.v_CommentKeyboardAccView.btn_TempleteKeyboard.hidden = YES;
+//    serviceUrl = "/c_edujm/temp/138/8736cf148fd933029baf2ba961e4bc9d.jpg";
+//    tempIdx = 2;
+//    tempUploadId = 5186;
+//    thumb = "<UIImage: 0x6080002b0e60> size {345, 230.5} orientation 0 scale 2.000000";
+//    type = image;
+//    imageSize =     {
+//        height = "230.500000";
+//        width = "345.000000";
+//    };
 
-    [UIView animateWithDuration:0.25f animations:^{
-        [self.view layoutIfNeeded];
-    }];
+    __block NSString *str_CreateDate = [NSString stringWithFormat:@"%@", [dic objectForKey:@"createDate"]];
+    NSMutableDictionary *dicM = [NSMutableDictionary dictionary];
+    NSMutableDictionary *dicM_FileInfo = [NSMutableDictionary dictionary];
+
+    NSString *str_CustomType = @"";
+    NSString *str_Msg = @"";
+    if( [[dic objectForKey:@"type"] isEqualToString:@"image"] )
+    {
+        str_CustomType = @"image";
+        NSString *str_FilePrefix = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"image_prefix"]];
+        NSString *str_ServiceUrl = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"serviceUrl"]];
+        if( [str_ServiceUrl hasPrefix:@"/"] )
+        {
+            NSMutableString *strM = [NSMutableString stringWithString:str_ServiceUrl];
+            [strM deleteCharactersInRange:NSMakeRange(0, 1)];
+            str_ServiceUrl = [NSString stringWithFormat:@"%@", strM];
+        }
+        str_Msg = [NSString stringWithFormat:@"%@%@", str_FilePrefix, str_ServiceUrl];
+//        str_Msg = @"이미지를 전송 했습니다";
+
+        //1
+        [dicM setObject:[Util contentTypeForImageData:[dic objectForKey:@"obj"]] forKey:@"file_ext"];
+
+        NSDictionary *dic_SizeInfo = [dic objectForKey:@"file_data"];
+        NSString *str_Width = [NSString stringWithFormat:@"%f", [[dic_SizeInfo objectForKey:@"width"] floatValue]];
+        NSString *str_Height = [NSString stringWithFormat:@"%f", [[dic_SizeInfo objectForKey:@"height"] floatValue]];
+        [dicM_FileInfo setObject:str_Width forKey:@"width"];
+        [dicM_FileInfo setObject:str_Height forKey:@"height"];
+    }
+    else if( [[dic objectForKey:@"type"] isEqualToString:@"audio"] )
+    {
+        str_CustomType = @"audio";
+//        str_Msg = @"음성을 전송 했습니다";
+        NSString *str_FilePrefix = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"image_prefix"]];
+        NSString *str_ServiceUrl = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"serviceUrl"]];
+        if( [str_ServiceUrl hasPrefix:@"/"] )
+        {
+            NSMutableString *strM = [NSMutableString stringWithString:str_ServiceUrl];
+            [strM deleteCharactersInRange:NSMakeRange(0, 1)];
+            str_ServiceUrl = [NSString stringWithFormat:@"%@", strM];
+        }
+        
+        str_Msg = [NSString stringWithFormat:@"%@%@", str_FilePrefix, str_ServiceUrl];
+
+        NSString *str_PlayTime = [NSString stringWithFormat:@"%@", [dic objectForKey:@"duration"]];
+        NSNumber *playTime = [NSNumber numberWithFloat:[str_PlayTime floatValue]];
+        [dicM_FileInfo setObject:playTime forKey:@"playtime"];
+        [dicM_FileInfo setObject:str_PlayTime forKey:@"playtime_string"];
+    }
+    else if( [[dic objectForKey:@"type"] isEqualToString:@"pdfQuestion"] )
+    {
+        str_CustomType = @"pdfQuestion";
+        str_Msg = @"새로운 질문이 등록 되었습니다";
+    }
+    else if( [[dic objectForKey:@"type"] isEqualToString:@"video"] )
+    {
+        str_CustomType = @"video";
+//        str_Msg = @"동영상을 전송 했습니다";
+        
+        NSString *str_FilePrefix = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"image_prefix"]];
+        NSString *str_ServiceUrl = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"serviceUrl"]];
+        if( [str_ServiceUrl hasPrefix:@"/"] )
+        {
+            NSMutableString *strM = [NSMutableString stringWithString:str_ServiceUrl];
+            [strM deleteCharactersInRange:NSMakeRange(0, 1)];
+            str_ServiceUrl = [NSString stringWithFormat:@"%@", strM];
+        }
+        
+        str_Msg = [NSString stringWithFormat:@"%@%@", str_FilePrefix, str_ServiceUrl];
+
+        [dicM setObject:@"mp4" forKey:@"file_ext"];
+        [dicM_FileInfo setObject:[dic objectForKey_YM:@"coverImgUrl"] forKey:@"coverImgUrl"];
+        //        [dicM_FileInfo setObject:[dic objectForKey_YM:@"coverImgUrl"] forKey:@"coverImgUrl"];
+        
+        NSDictionary *dic_SizeInfo = [dic objectForKey:@"file_data"];
+        NSString *str_Width = [NSString stringWithFormat:@"%f", [[dic_SizeInfo objectForKey:@"width"] floatValue]];
+        NSString *str_Height = [NSString stringWithFormat:@"%f", [[dic_SizeInfo objectForKey:@"height"] floatValue]];
+        [dicM_FileInfo setObject:str_Width forKey:@"width"];
+        [dicM_FileInfo setObject:str_Height forKey:@"height"];
+        [dicM_FileInfo setObject:[NSString stringWithFormat:@"%f", [[dic objectForKey:@"coverImgWidth"] floatValue]] forKey:@"coverImgWidth"];
+        [dicM_FileInfo setObject:[NSString stringWithFormat:@"%f", [[dic objectForKey:@"coverImgHeight"] floatValue]] forKey:@"coverImgHeight"];
+    }
 
     __weak __typeof(&*self)weakSelf = self;
-    
-    NSString *str_Key = [NSString stringWithFormat:@"DefaultChannelId_%@", [[NSUserDefaults standardUserDefaults] objectForKey:@"userId"]];
-    NSString *str_DefaultChannelId = [[NSUserDefaults standardUserDefaults] objectForKey:str_Key];
-    if( str_DefaultChannelId && str_DefaultChannelId.length > 0 )
-    {
-        [dicM_Params setObject:str_DefaultChannelId forKey:@"managerChannelId"];
-    }
-    
-    [[WebAPI sharedData] callAsyncWebAPIBlock:@"v1/add/reply/question/and/view"
-                                        param:dicM_Params
-                                   withMethod:@"POST"
-                                    withBlock:^(id resulte, NSError *error) {
-                                        
-                                        [MBProgressHUD hide];
-                                        
-                                        if( resulte )
-                                        {
-                                            NSInteger nCode = [[resulte objectForKey:@"response_code"] integerValue];
-                                            if( nCode == 200 )
-                                            {
-                                                //                                                NSMutableDictionary *dicM = [NSMutableDictionary dictionaryWithDictionary:resulte];
-                                                //                                                [dicM setObject:@"Y" forKey:@"isDone"];
-                                                //                                                [weakSelf.arM_List addObject:dicM];
-                                                //                                                nLastMyIdx = weakSelf.arM_List.count - 1;
-                                                //                                                [weakSelf setMiddleDate];
-                                                //                                                [weakSelf.tbv_List reloadData];
-                                                
-                                                
-                                                
-                                                
-                                                //                                                NSDictionary *dic_DataMap = [resulte objectForKey:@"dataMap"];
-                                                NSArray *ar_Body = [resulte objectForKey:@"qnaBody"];
-                                                NSDictionary *dic_DataMap = [ar_Body firstObject];
-                                                
-                                                if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"pdfQuestion"] )
-                                                {
-                                                    //PDF문제 질문일 경우 데이터 만들어 주기
-                                                    //examTitle, examNo, examId
-                                                    NSMutableDictionary *dicM_Tmp = [NSMutableDictionary dictionaryWithDictionary:resulte];
-                                                    [dicM_Tmp setObject:self.str_ExamTitle forKey:@"examTitle"];
-                                                    [dicM_Tmp setObject:self.str_ExamNo forKey:@"examNo"];
-                                                    [dicM_Tmp setObject:self.str_ExamId forKey:@"examId"];
-                                                    [dicM_Tmp setObject:self.str_PdfPage forKey:@"pdfPage"];
-                                                    [dicM_Tmp setObject:self.str_QuestinId forKey:@"questionId"];
-                                                    //                                                    [dicM_Tmp setObject:[self.dic_PdfQuestionInfo objectForKey:@"examQuestionInfos"] forKey:@"qnaBody"];
-                                                    
-                                                    //                                                    NSDictionary *dic_Tmp = @{@"examQuestionInfos":[self.dic_PdfQuestionInfo objectForKey:@"examQuestionInfos"]};
-                                                    //                                                    NSData * jsonData = [NSJSONSerialization dataWithJSONObject:dic_Tmp options:0 error:nil];
-                                                    //                                                    NSString *str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-                                                    
-                                                    //                                                    NSMutableDictionary *dicM_DataMap = [NSMutableDictionary dictionaryWithDictionary:[resulte objectForKey:@"dataMap"]];
-                                                    //                                                    [dicM_DataMap setObject:str_Data forKey:@"qnaBody"];
-                                                    //                                                    [dicM_Tmp setObject:dicM_DataMap forKey:@"dataMap"];
-                                                    //
-                                                    //                                                    NSMutableDictionary *dicM_Data = [NSMutableDictionary dictionaryWithDictionary:[resulte objectForKey:@"data"]];
-                                                    //                                                    [dicM_Data setObject:str_Data forKey:@"qnaBody"];
-                                                    //                                                    [dicM_Tmp setObject:dicM_Data forKey:@"data"];
-                                                    //
-                                                    //                                                    NSMutableDictionary *dicM_QnaData = [NSMutableDictionary dictionaryWithDictionary:[resulte objectForKey:@"qnaBody"]];
-                                                    //                                                    [dicM_QnaData setObject:str_Data forKey:@"qnaBody"];
-                                                    //                                                    [dicM_Tmp setObject:dicM_QnaData forKey:@"qnaBody"];
-                                                    
-                                                    
-                                                    self.dic_PdfQuestionInfo = nil;
-                                                    
-                                                    resulte = [NSDictionary dictionaryWithDictionary:dicM_Tmp];
-                                                }
-                                                else if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"audio"] )
-                                                {
-                                                    NSMutableDictionary *dicM_Tmp = [NSMutableDictionary dictionaryWithDictionary:resulte];
-                                                    [dicM_Tmp setObject:[dic_Temp objectForKey:@"duration"] forKey:@"duration"];
-                                                    
-                                                    resulte = [NSDictionary dictionaryWithDictionary:dicM_Tmp];
-                                                }
-                                                
-                                                NSError * err;
-                                                NSData * jsonData = [NSJSONSerialization dataWithJSONObject:resulte options:0 error:&err];
-                                                NSString *str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-                                                //                                                __block NSString *str_Msg = [dic_DataMap objectForKey:@"qnaBody"];
-                                                
-                                                NSArray *ar_Tmp = [self.dicM_TempMyContents allKeys];
-                                                NSString *str_FindKey = nil;
-                                                for( NSInteger i = 0; i < ar_Tmp.count; i++ )
-                                                {
-                                                    NSString *str_Key = ar_Tmp[i];
-                                                    id tmp = [self.dicM_TempMyContents objectForKey:str_Key];
-                                                    if( [tmp isKindOfClass:[NSDictionary class]] )
-                                                    {
-                                                        NSDictionary *dic_Tmp = (NSDictionary *)tmp;
-                                                        NSString *str_TmpType = [dic_Tmp objectForKey:@"type"];
-                                                        NSString *str_IsTmp = [dic_Tmp objectForKey:@"temp"];
-                                                        if( ([str_TmpType isEqualToString:@"image"] || [str_TmpType isEqualToString:@"video"] || [str_TmpType isEqualToString:@"audio"]) && [str_IsTmp isEqualToString:@"YES"] )
-                                                        {
-                                                            str_FindKey = str_Key;
-                                                            [self.dicM_TempMyContents removeObjectForKey:str_Key];
-                                                            break;
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                NSLog(@"%@", [dic_DataMap objectForKey:@"qnaType"]);
-                                                NSString *str_CustomType = @"";
-                                                NSString *str_Msg = @"";
-                                                if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"image"] )
-                                                {
-                                                    str_CustomType = @"image";
-                                                    str_Msg = @"이미지를 전송 했습니다";
-                                                }
-                                                if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"audio"] )
-                                                {
-                                                    str_CustomType = @"audio";
-                                                    str_Msg = @"음성을 전송 했습니다";
-                                                }
-                                                else if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"pdfQuestion"] )
-                                                {
-                                                    str_CustomType = @"pdfQuestion";
-                                                    str_Msg = @"새로운 질문이 등록 되었습니다";
-                                                }
-                                                else
-                                                {
-                                                    str_CustomType = @"video";
-                                                    str_Msg = @"동영상을 전송 했습니다";
-                                                }
-                                                
-                                                //                                                if( [[dic objectForKey_YM:@"mode"] isEqualToString:@"pdf"] )
-                                                //                                                {
-                                                //                                                    str_CustomType = @"pdfQuestion";
-                                                //                                                }
-                                                //                                                else if( [[dic objectForKey_YM:@"mode"] isEqualToString:@"normal"] )
-                                                //                                                {
-                                                //                                                    //일반문제
-                                                //
-                                                //                                                }
-                                                [self.channel sendUserMessage:str_Msg
-                                                                         data:str_Data
-                                                                   customType:str_CustomType
-                                                            completionHandler:^(SBDUserMessage * _Nullable userMessage, SBDError * _Nullable error) {
-                                                                
-                                                                for( id message in self.messages )
-                                                                {
-                                                                    if( [message isKindOfClass:[NSDictionary class]] )
-                                                                    {
-                                                                        NSDictionary *dic_Message = (NSDictionary *)message;
-                                                                        if( [[dic_Message objectForKey_YM:@"temp"] isEqualToString:@"YES"] && [[dic_Message objectForKey:@"type"] isEqualToString:@"pdfQuestion"] )
-                                                                        {
-                                                                            [self.messages removeObject:message];
-                                                                            break;
-                                                                        }
-                                                                    }
-                                                                }
-                                                                
-                                                                if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"pdfQuestion"] )
-                                                                {
-                                                                    [self.messages addObject:userMessage];
-                                                                }
-                                                                else
-                                                                {
-                                                                    [self.messages replaceObjectAtIndex:[str_FindKey integerValue] withObject:userMessage];
-                                                                }
-                                                                
-                                                                dispatch_async(dispatch_get_main_queue(), ^{
-                                                                    [self.tbv_List reloadData];
-                                                                    [self.tbv_List layoutIfNeeded];
-                                                                });
-                                                                
-                                                                if( [[dic_Temp objectForKey:@"type"] isEqualToString:@"pdfQuestion"] )
-                                                                {
-                                                                    [MBProgressHUD hideHUDForView:weakSelf.view animated:YES];
-                                                                    [weakSelf.navigationController.view makeToast:@"질문을 등록했습니다" withPosition:kPositionCenter];
-                                                                    
-                                                                    [self sendMsg:[dic objectForKey:@"msg"]];
-                                                                }
-                                                                
-                                                                //                                                                [self.channel updateUserMessage:userMessage
-                                                                //                                                                                    messageText:@""
-                                                                //                                                                                           data:str_Data
-                                                                //                                                                                     customType:str_CustomType
-                                                                //                                                                              completionHandler:^(SBDUserMessage * _Nullable userMessage, SBDError * _Nullable error) {
-                                                                //
-                                                                //                                                                                  [self.messages replaceObjectAtIndex:[str_FindKey integerValue] withObject:userMessage];
-                                                                //                                                                                  dispatch_async(dispatch_get_main_queue(), ^{
-                                                                //                                                                                      [self.tbv_List reloadData];
-                                                                //                                                                                      [self.tbv_List layoutIfNeeded];
-                                                                //                                                                                  });
-                                                                //                                                                }];
-                                                                ////                                                                [self sendPush:resulte];
-                                                                
-                                                            }];
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                
-                                                //                                                NSError * err;
-                                                //                                                NSData * jsonData = [NSJSONSerialization dataWithJSONObject:resulte options:0 error:&err];
-                                                //                                                NSString *str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-                                                //                                                NSDictionary *dic_DataMap = [resulte objectForKey:@"dataMap"];
-                                                //                                                [SBDGroupChannel getChannelWithUrl:self.channel.channelUrl
-                                                //                                                                 completionHandler:^(SBDGroupChannel * _Nullable channel, SBDError * _Nullable error) {
-                                                //
-                                                //                                                                     NSLog(@"%@", [dic_DataMap objectForKey:@"qnaType"]);
-                                                //                                                                     NSString *str_CustomType = @"";
-                                                //                                                                     if( [[dic_DataMap objectForKey:@"qnaType"] isEqualToString:@"image"] )
-                                                //                                                                     {
-                                                //                                                                         str_CustomType = @"image";
-                                                //                                                                     }
-                                                //                                                                     else
-                                                //                                                                     {
-                                                //                                                                         str_CustomType = @"video";
-                                                //                                                                     }
-                                                //
-                                                //                                                                     [channel sendUserMessage:@"" data:str_Data customType:str_CustomType
-                                                //                                                                            completionHandler:^(SBDUserMessage * _Nullable userMessage, SBDError * _Nullable error) {
-                                                //
-                                                //                                                                     }];
-                                                //                                                                 }];
-                                                
-                                                NSInteger nFindIdx = [[dic_Temp objectForKey:@"tempIdx"] integerValue] - 1;
-                                                if( nFindIdx > -1 )
-                                                {
-                                                    [self.arM_List replaceObjectAtIndex:nFindIdx withObject:resulte];
-                                                    
-                                                    NSDictionary *dic_Result = @{@"resulte":resulte, @"idx":[NSString stringWithFormat:@"%ld", nFindIdx]};
-                                                    [weakSelf performSelector:@selector(messageCheckInteval:) withObject:dic_Result afterDelay:0.1f];
-                                                }
-                                                
-                                                //                                                NSData *jsonData = [NSJSONSerialization dataWithJSONObject:@{@"questionId":[resulte objectForKey:@"questionId"],
-                                                //                                                                                                             @"eId":[resulte objectForKey:@"qnaId"],
-                                                //                                                                                                             @"userId":[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"],
-                                                //                                                                                                             @"channelUrl":self.str_ChannelUrl,
-                                                //                                                                                                             @"result":resulte}
-                                                //
-                                                //                                                                                                   options:NSJSONWritingPrettyPrinted
-                                                //                                                                                                     error:&error];
-                                                //
-                                                //                                                NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-                                                ////                                                [SendBird sendMessage:@"regist-qna" withData:jsonString];
-                                                
-                                                //                                                NSArray *ar_Body = [NSArray arrayWithArray:[resulte objectForKey:@"qnaBody"]];
-                                                //                                                if( ar_Body.count > 0 )
-                                                //                                                {
-                                                //                                                    NSDictionary *dic = [ar_Body firstObject];
-                                                //                                                    NSMutableDictionary *dicM_Resulte = [NSMutableDictionary dictionaryWithDictionary:resulte];
-                                                //                                                    [dicM_Resulte setObject:[dic objectForKey:@"qnaType"] forKey:@"msgType"];
-                                                //                                                    [self sendDashboardUpdate:dicM_Resulte];
-                                                //                                                }
-                                                
-                                                //                                                [weakSelf.arM_List addObject:resulte];
-                                                //                                                [weakSelf setMiddleDate];
-                                                //                                                [weakSelf.tbv_List reloadData];
-                                                
-                                                if (weakSelf.tbv_List.contentSize.height > weakSelf.tbv_List.frame.size.height)
-                                                {
-                                                    CGPoint offset = CGPointMake(0, weakSelf.tbv_List.contentSize.height - weakSelf.tbv_List.frame.size.height);
-                                                    [self.tbv_List setContentOffset:offset animated:YES];
-                                                }
-                                            }
-                                            else
-                                            {
-                                                [weakSelf.navigationController.view makeToast:[resulte objectForKey:@"error_message"] withPosition:kPositionCenter];
-                                            }
-                                            
-                                            //                                            [self.view endEditing:YES];
-                                        }
-                                    }];
+
+    NSString *str_FilePrefix = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"image_prefix"]];
+    [dicM setObject:@"chat" forKey:@"itemType"];
+    [dicM setObject:str_FilePrefix forKey:@"data_prefix"];
+    [dicM setObject:str_FilePrefix forKey:@"userImg_prefix"];
+//    [dicM setObject:[NSString stringWithFormat:@"%@%@", @"http://chatapi.thoting.com/", str_ServiceUrl] forKey:@"data_prefix"];
+//    [dicM setObject:@"http://chatapi.thoting.com" forKey:@"userImg_prefix"];
+    [dicM setObject:@"user" forKey:@"userType"];
+    [dicM setObject:dicM_FileInfo forKey:@"file_data"];
+
+    NSError * err;
+    NSData * jsonData = [NSJSONSerialization dataWithJSONObject:dicM options:0 error:&err];
+    NSString *str_Data = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+
+    [self.channel sendUserMessage:str_Msg
+                             data:str_Data
+                       customType:[dic objectForKey:@"type"]
+                completionHandler:^(SBDUserMessage * _Nullable userMessage, SBDError * _Nullable error) {
+
+                    for( NSInteger i = 0; i < weakSelf.messages.count; i++ )
+                    {
+                        id message = weakSelf.messages[i];
+                        if( [message isKindOfClass:[NSDictionary class]] )
+                        {
+                            NSDictionary *dic_Message = (NSDictionary *)message;
+                            if( [[dic_Message objectForKey_YM:@"temp"] isEqualToString:@"YES"] )
+                            {
+                                NSString *str_CurrentCreateDate = [NSString stringWithFormat:@"%@", [dic_Message objectForKey:@"createDate"]];
+                                if( [str_CreateDate isEqualToString:str_CurrentCreateDate] )
+                                {
+                                    [weakSelf.messages replaceObjectAtIndex:i withObject:userMessage];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [weakSelf.tbv_List reloadData];
+                        [weakSelf.tbv_List layoutIfNeeded];
+                    });
+                }];
 }
 
 
@@ -12004,17 +12255,36 @@ typedef enum {
     UIView *view = gesture.view;
     //    NSDictionary *dic = self.arM_List[view.tag];
     SBDUserMessage *message = self.messages[view.tag];
-    
-    UIStoryboard *storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
-    MyMainViewController *vc = [storyboard instantiateViewControllerWithIdentifier:@"MyMainViewController"];
-    //    vc.isManagerView = YES;
-    //    vc.isPermission = YES;
     SBDUser *user = (SBDUser *)message.sender;
-    vc.str_UserIdx = user.userId;
-    vc.isShowNavi = YES;
-    vc.isAnotherUser = YES;
-    //    vc.hidesBottomBarWhenPushed = NO;
+
+    KikMyViewController *vc = [kMyBoard instantiateViewControllerWithIdentifier:@"KikMyViewController"];
+//    vc.str_UserIdx = user.userId;
+    vc.user = user;
+    vc.channel = self.channel;
+    if( self.channel.memberCount == 2 )
+    {
+        vc.isOneOneChatIng = YES;
+    }
+    else
+    {
+        vc.isOneOneChatIng = NO;
+    }
     [self.navigationController pushViewController:vc animated:YES];
+
+//    UIView *view = gesture.view;
+//    //    NSDictionary *dic = self.arM_List[view.tag];
+//    SBDUserMessage *message = self.messages[view.tag];
+//
+//    UIStoryboard *storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
+//    MyMainViewController *vc = [storyboard instantiateViewControllerWithIdentifier:@"MyMainViewController"];
+//    //    vc.isManagerView = YES;
+//    //    vc.isPermission = YES;
+//    SBDUser *user = (SBDUser *)message.sender;
+//    vc.str_UserIdx = user.userId;
+//    vc.isShowNavi = YES;
+//    vc.isAnotherUser = YES;
+//    //    vc.hidesBottomBarWhenPushed = NO;
+//    [self.navigationController pushViewController:vc animated:YES];
 }
 
 
@@ -12053,41 +12323,155 @@ typedef enum {
         NSLog(@"%@", data.message);
         NSLog(@"%@", data.customType);
         NSLog(@"%@", data.data);
+
+//        if( [data.message rangeOfString:@"정답을 알려주세요"].location != NSNotFound || [data.message rangeOfString:@"해설을"].location != NSNotFound )
+//        {
+//            for( NSInteger i = 0; i < self.arM_AutoAnswer.count; i++ )
+//            {
+//                NSDictionary *dic = self.arM_AutoAnswer[i];
+//                NSString *str = [dic objectForKey_YM:@"title"];
+//                if( [str isEqualToString:data.message] )
+//                {
+//                    [self.arM_AutoAnswer removeObjectAtIndex:i];
+//                    [self.tbv_TempleteList reloadData];
+//                    break;
+//                }
+//            }
+//        }
+        
+        if( [data.customType isEqualToString:@"enterBotRoom"] )
+        {
+            return;
+        }
+        
+        nAutoAnswerIdx = -1;
+
         
         NSString *str_Data = data.data;
         NSData *jsonData = [str_Data dataUsingEncoding:NSUTF8StringEncoding];
         NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil];
-        NSString *str_Action = [dic objectForKey_YM:@"mesgAction"];
+        NSDictionary *dic_BotData = [dic objectForKey:@"bot_data"];
+        
+        NSDictionary *dic_BotDataTmp = [dic objectForKey:@"bot_data"];
+        if( dic_BotDataTmp == nil || [dic_BotDataTmp isKindOfClass:[NSNull class]] || [dic_BotDataTmp isKindOfClass:[NSDictionary class]] == NO )
+        {
+//            [Util showToast:@"데이터 오류"];
+            return;
+        }
+
+        NSString *str_Action = [dic_BotData objectForKey_YM:@"mesgAction"];
+
+        NSLog(@"printQuestionId: %@", [dic objectForKey:@"printQuestionId"]);
+        NSLog(@"printQuestionId_botData: %@", [dic_BotData objectForKey:@"printQuestionId"]);
+        NSString *str_QuestionId = [NSString stringWithFormat:@"%@", [dic_BotData objectForKey:@"printQuestionId"]];
+        if( [str_QuestionId intValue] > 0 )
+        {
+            str_MsgQuestionId = str_QuestionId;
+        }
+        else
+        {
+            str_MsgQuestionId = @"";
+        }
+
+        NSString *str_TesterId = [NSString stringWithFormat:@"%@", [dic_BotData objectForKey:@"testerId"]];
+        if( [str_TesterId intValue] > 0 )
+        {
+            str_MsgTesterId = str_TesterId;
+        }
+        else
+        {
+            str_MsgTesterId = @"";
+        }
+
+        NSString *str_ExamId = [NSString stringWithFormat:@"%@", [dic_BotData objectForKey:@"examId"]];
+        if( [str_TesterId intValue] > 0 )
+        {
+            str_MsgExamId = str_ExamId;
+        }
+        else
+        {
+            str_MsgExamId = @"";
+        }
+
+        NSString *str_CorrectAnswer = [NSString stringWithFormat:@"%@", [dic_BotData objectForKey:@"correctAnswer"]];
+        if( [str_CorrectAnswer intValue] > 0 )
+        {
+            str_MsgCorrectAnswer = str_CorrectAnswer;
+        }
+        else
+        {
+            str_MsgCorrectAnswer = @"";
+        }
+
+        
+        NSString *str_BotId = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"botUserId"]];
+        if( [data.message hasPrefix:@"@"] )
+        {
+            //상대방이 누군갈 초대했을때
+            if( str_BotId.length > 0 )
+            {
+                self.dic_BotInfo = @{@"userId":str_BotId};
+                [self updateTopData];
+                [self updateAtList:@"user"];
+            }
+        }
+        
+
         if( [str_Action isEqualToString:@"wellcomeMesg"] )
         {
             [self.arM_AutoAnswer removeAllObjects];
             
             self.autoChatMode = kPrintExam;
             
-            NSString *str_ExamList = [dic objectForKey:@"examList"];
-            if( str_ExamList != nil )
+            NSDictionary *dic_BotData = [dic objectForKey:@"bot_data"];
+            NSArray *ar_ExamList = [dic_BotData objectForKey:@"btnInfo"];
+            self.arM_AutoAnswer = [NSMutableArray arrayWithArray:ar_ExamList];
+            [self showTempleteKeyboard];
+        }
+        else if( [str_Action isEqualToString:@"apiBotMessage"] )
+        {
+            NSLog(@"%@", dic);
+            
+            [self.arM_AutoAnswer removeAllObjects];
+
+            self.autoChatMode = kEtc;
+            
+            NSArray *ar = [dic_BotData objectForKey:@"btnInfo"];
+            if( ar && ar.count > 0 )
             {
-                NSData *jsonData = [str_ExamList dataUsingEncoding:NSUTF8StringEncoding];
-                NSArray *ar_ExamList = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil];
-                for( NSInteger i = 0; i < ar_ExamList.count; i++ )
-                {
-                    NSDictionary *dic_ExamList = ar_ExamList[i];
-                    [self.arM_AutoAnswer addObject:dic_ExamList];
-                }
+                self.arM_AutoAnswer = [NSMutableArray arrayWithArray:ar];
                 
-//                [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
                 [self showTempleteKeyboard];
             }
         }
+        else if( [str_Action isEqualToString:@"selectSolveType"] )
+        {
+            NSLog(@"%@", dic);
+            
+            self.autoChatMode = kEtc;
+            
+            NSData *jsonData = [[dic objectForKey:@"btnInfo"] dataUsingEncoding:NSUTF8StringEncoding];
+            self.ar_AutoAnswerBtnInfo = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil];
+            NSLog(@"%@", self.ar_AutoAnswerBtnInfo);
+            
+            for( NSInteger i = 0; i < self.ar_AutoAnswerBtnInfo.count; i++ )
+            {
+                NSDictionary *dic_BtnInfo = self.ar_AutoAnswerBtnInfo[i];
+                [self.arM_AutoAnswer addObject:@{@"title":[dic_BtnInfo objectForKey:@"btnLabel"]}];
+            }
+
+            [self showTempleteKeyboard];
+        }
         else if( [str_Action isEqualToString:@"selectNextStep"] || [data.message isEqualToString:@"계속 풀겠습니까?"] )
         {
+            NSLog(@"계속 풀겠습니까 샌드버드 받음");
+            
             [self.arM_AutoAnswer removeAllObjects];
             
             self.autoChatMode = kPrintContinue;
-            self.dic_PrintItemInfo = dic;
+//            self.dic_PrintItemInfo = dic;
             
-            [self.arM_AutoAnswer addObject:@{@"title":@"계속 풀기"}];
-            [self.arM_AutoAnswer addObject:@{@"title":@"다른 문제로"}];
+            self.arM_AutoAnswer = [NSMutableArray arrayWithArray:[dic_BotData objectForKey_YM:@"btnInfo"]];
 
 //            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
             [self showTempleteKeyboard];
@@ -12097,8 +12481,8 @@ typedef enum {
             [self.arM_AutoAnswer removeAllObjects];
             
             self.autoChatMode = kPrintItem;
-            self.dic_PrintItemInfo = dic;
-            self.arM_AutoAnswer = [NSMutableArray arrayWithArray:[dic objectForKey_YM:@"itemInfo"]];
+//            self.dic_PrintItemInfo = dic;
+            self.arM_AutoAnswer = [NSMutableArray arrayWithArray:[dic_BotData objectForKey_YM:@"btnInfo"]];
 //            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
             [self showTempleteKeyboard];
         }
@@ -12108,33 +12492,35 @@ typedef enum {
             
             [self.arM_AutoAnswer removeAllObjects];
             
-            self.dic_PrintItemInfo = dic;
+//            self.dic_PrintItemInfo = dic;
             
-            NSString *str_IsExplain = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"existExplain"]];    //해설 여부
-            NSString *str_IsCorrect = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"isCorrect"]];       //정답 여부
-            
-            if( [str_IsCorrect isEqualToString:@"N"] )
-            {
-                //오답일 경우
-                [self.arM_AutoAnswer addObject:@{@"title":@"정답을 알려주세요"}];
-                
-                if( [str_IsExplain isEqualToString:@"Y"] )
-                {
-                    [self.arM_AutoAnswer addObject:@{@"title":@"해설을 보여주세요"}];
-                }
-                
-                [self.arM_AutoAnswer addObject:@{@"title":@"다음 문제"}];
-            }
-            else
-            {
-                //정답일 경우
-                if( [str_IsExplain isEqualToString:@"Y"] )
-                {
-                    [self.arM_AutoAnswer addObject:@{@"title":@"해설을 보여주세요"}];
-                }
-                
-                [self.arM_AutoAnswer addObject:@{@"title":@"다음 문제"}];
-            }
+            self.arM_AutoAnswer = [NSMutableArray arrayWithArray:[dic_BotData objectForKey_YM:@"btnInfo"]];
+
+//            NSString *str_IsExplain = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"existExplain"]];    //해설 여부
+//            NSString *str_IsCorrect = [NSString stringWithFormat:@"%@", [dic objectForKey_YM:@"isCorrect"]];       //정답 여부
+//
+//            if( [str_IsCorrect isEqualToString:@"N"] )
+//            {
+//                //오답일 경우
+//                [self.arM_AutoAnswer addObject:@{@"title":@"정답을 알려주세요"}];
+//
+//                if( [str_IsExplain isEqualToString:@"Y"] )
+//                {
+//                    [self.arM_AutoAnswer addObject:@{@"title":@"해설을 보여주세요"}];
+//                }
+//
+//                [self.arM_AutoAnswer addObject:@{@"title":@"다음 문제"}];
+//            }
+//            else
+//            {
+//                //정답일 경우
+//                if( [str_IsExplain isEqualToString:@"Y"] )
+//                {
+//                    [self.arM_AutoAnswer addObject:@{@"title":@"해설을 보여주세요"}];
+//                }
+//
+//                [self.arM_AutoAnswer addObject:@{@"title":@"다음 문제"}];
+//            }
             
             [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
             [self showTempleteKeyboard];
@@ -12146,12 +12532,20 @@ typedef enum {
             
             [self.arM_AutoAnswer removeAllObjects];
             
-            self.dic_PrintItemInfo = dic;
+//            self.dic_PrintItemInfo = dic;
             
-            [self.arM_AutoAnswer addObject:@{@"title":@"다음 문제"}];
-            
-//            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
-            [self showTempleteKeyboard];
+            NSArray *ar = [NSArray arrayWithArray:[dic_BotData objectForKey:@"btnInfo"]];
+            if( ar.count > 0 )
+            {
+                self.arM_AutoAnswer = [NSMutableArray arrayWithArray:[dic_BotData objectForKey_YM:@"btnInfo"]];
+                
+                //            [self.v_CommentKeyboardAccView.tv_Contents becomeFirstResponder];
+                [self showTempleteKeyboard];
+            }
+            else
+            {
+                nAutoAnswerIdx = -1;
+            }
         }
         
         if( [data.customType isEqualToString:@"audio"] )
@@ -12192,46 +12586,34 @@ typedef enum {
 //                [self.dicM_NextPlayInfo setObject:url forKey:@"url"];
             }
         }
+        else if( [data.customType isEqualToString:@"videoLink"] )
+        {
+            
+        }
+        
         
         [self.channel markAsRead];
         
         if( [message isKindOfClass:[SBDAdminMessage class]] )
         {
-            SBDUserMessage *userMessage = (SBDUserMessage *)message;
-            if( [userMessage.customType isEqualToString:@"cmd"] )
+            SBDAdminMessage *adminMessage = (SBDAdminMessage *)message;
+            if( [adminMessage.customType isEqualToString:@"USER_ENTER"] )
             {
-                NSLog(@"%@", userMessage.data);
-                NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+                NSData *data = [adminMessage.data dataUsingEncoding:NSUTF8StringEncoding];
                 id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-                NSLog(@"%@", json);
                 
-                if( [[json objectForKey:@"type"] isEqualToString:@"USER_ENTER"] )
+                NSDictionary *dic_Sender = [json objectForKey:@"sender"];
+                NSInteger senderUserId = [[dic_Sender objectForKey:@"user_id"] integerValue];
+                NSInteger nMyId = [[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"] integerValue];
+                if( nMyId != senderUserId )
                 {
-                    NSDictionary *dic_Sender = nil;
-                    id sender = [json objectForKey:@"sender"];
-                    if( [sender isKindOfClass:[NSDictionary class]] )
-                    {
-                        dic_Sender = sender;
-                    }
-                    else if( [sender isKindOfClass:[NSArray class]] )
-                    {
-                        dic_Sender = [sender firstObject];
-                    }
-                    else if( [sender isKindOfClass:[NSString class]] )
-                    {
-                        dic_Sender = [NSJSONSerialization JSONObjectWithData:[sender dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
-                    }
-                    
-                    NSInteger nMyId = [[[NSUserDefaults standardUserDefaults] objectForKey:@"userId"] integerValue];
-                    if( nMyId != [[dic_Sender objectForKey:@"user_id"] integerValue] )
-                    {
-                        NSString *str_Msg = [NSString stringWithFormat:@"%@님이 입장하였습니다", [dic_Sender objectForKey:@"nickname"]];
-                        [self.navigationController.view makeToast:str_Msg withPosition:kPositionCenter];
-                    }
-                    
-                    return;
+                    [self.navigationController.view makeToast:[json objectForKey:@"message"] withPosition:kPositionCenter];
                 }
                 
+                return;
+            }
+            else
+            {
                 [self.channel markAsRead];
                 
                 [self.messages addObject:message];
@@ -12464,7 +12846,7 @@ typedef enum {
                 if (ms.messageId == messageId)
                 {
                     //                    [self.navigationController.view makeToast:@"삭제 되었습니다" withPosition:kPositionCenter];
-                    [ALToastView toastInView:self.navigationController.view withText:@"삭제 되었습니다"];
+//                    [ALToastView toastInView:self.navigationController.view withText:@"삭제 되었습니다"];
                     
                     [self.messages removeObject:message];
                     dispatch_async(dispatch_get_main_queue(), ^{
@@ -12815,6 +13197,65 @@ typedef enum {
 //    
 //}
 
+- (IBAction)goRoomInfo:(id)sender
+{
+    NSString *str_CoverUrl = [self.dic_Info objectForKey_YM:@"roomCoverUrl"];
+
+    KikRoomInfoViewController *vc = [kMyBoard instantiateViewControllerWithIdentifier:@"KikRoomInfoViewController"];
+    vc.str_RoomTitle = self.channel.name;
+    vc.dic_Info = self.dic_Info;
+    vc.channel = self.channel;
+    vc.isFromRoom = YES;
+     
+    if( self.dic_BotInfo )
+    {
+        vc.roomType = kBot;
+    }
+    
+    vc.str_QuestionId = [NSString stringWithFormat:@"%@", [self.dic_Info objectForKey:@"questionId"]];
+    if( str_CoverUrl && str_CoverUrl.length > 0 )
+    {
+        vc.str_RoomThumb = [NSString stringWithFormat:@"%@%@",
+                            str_UserImagePrefix, str_CoverUrl];
+    }
+    
+    if( self.channel.memberCount <= 2 )
+    {
+        vc.str_RoomThumb = [NSString stringWithFormat:@"%@%@",
+                            str_UserImagePrefix, str_TargetUserImageUrl];
+        vc.str_TargetUserName = str_TargetUserName;
+    }
+    
+    vc.str_MemberCount = [NSString stringWithFormat:@"%ld", self.channel.memberCount];
+    vc.bgColor = self.roomColor ? self.roomColor : [UIColor colorWithHexString:@"9ED8EB"];
+
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)onAddInputBotName:(UIButton *)btn
+{
+    SBDBaseMessage *baseMessage = self.messages[btn.tag];
+    SBDUserMessage *userMessage = (SBDUserMessage *)baseMessage;
+    NSData *data = [userMessage.data dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    NSDictionary *dic_BtnInfo = [dic objectForKey:@"btnInfo"];
+    self.v_CommentKeyboardAccView.tv_Contents.textColor = kMainColor;
+    self.v_CommentKeyboardAccView.tv_Contents.text = [NSString stringWithFormat:@"@%@", [dic_BtnInfo objectForKey:@"btnLabel"]];
+    
+    NSDictionary *dic_BotData = [dic objectForKey:@"bot_data"];
+    NSInteger nTargetUserId = [[dic_BotData objectForKey:@"botUserId"] integerValue];
+    
+    for( NSInteger i = 0; i < self.arM_AtListBackUp.count; i++ )
+    {
+        NSDictionary *dic_Sub = self.arM_AtListBackUp[i];
+        NSInteger nUserId = [[dic_Sub objectForKey:@"userId"] integerValue];
+        if( nTargetUserId == nUserId )
+        {
+            self.dic_SelectedMention = dic_Sub;
+            break;
+        }
+    }
+}
 
 @end
 

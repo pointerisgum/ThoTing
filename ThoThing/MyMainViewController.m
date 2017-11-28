@@ -2044,4 +2044,18 @@ typedef enum {
     [self updateList];
 }
 
+- (void)leftBackSideMenuButtonPressed:(UIButton *)btn
+{
+    if( self.isModalMode )
+    {
+        [self dismissViewControllerAnimated:YES completion:^{
+            
+        }];
+    }
+    else
+    {
+        [self.navigationController popViewControllerAnimated:YES];
+    }
+}
+
 @end

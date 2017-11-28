@@ -342,15 +342,50 @@ static ReaderDocument *document = nil;
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     NSString *documentsDirectory = [paths objectAtIndex:0];
     NSFileManager *fileManager = [NSFileManager defaultManager];
+
     NSError *error;
     NSDirectoryEnumerator* en = [fileManager enumeratorAtPath:documentsDirectory];
     NSString* file;
     while (file = [en nextObject])
     {
+//        NSLog(@"%@", file);
         if( [file hasSuffix:@".pdf"] || [file hasSuffix:@".PDF"] )
         {
-            NSLog(@"%@", file);
+            NSLog(@"remove %@", file);
             [fileManager removeItemAtPath:[documentsDirectory stringByAppendingPathComponent:file]  error:&error];
+        }
+        else if( [file hasSuffix:@".m4a"] || [file hasSuffix:@".mp3"] )
+        {
+            NSLog(@"remove %@", file);
+            [fileManager removeItemAtPath:[documentsDirectory stringByAppendingPathComponent:file]  error:&error];
+        }
+        else if( [file hasSuffix:@".zip"] )
+        {
+            NSLog(@"remove %@", file);
+            NSDictionary* attrs = [fileManager attributesOfItemAtPath:[documentsDirectory stringByAppendingPathComponent:file] error:nil];
+            NSDate *createDate = (NSDate*)[attrs objectForKey: NSFileCreationDate];
+
+            NSDateFormatter *format1 = [[NSDateFormatter alloc] init];
+            [format1 setDateFormat:@"yyyy-MM-dd HH:mm:ss +0000"];
+
+            NSDate *date = [NSDate date];
+            NSCalendar* calendar = [NSCalendar currentCalendar];
+            NSDateComponents* components = [calendar components:NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay|NSCalendarUnitHour|NSCalendarUnitMinute|NSCalendarUnitSecond fromDate:date];
+            NSInteger nYear = [components year];
+            NSInteger nMonth = [components month];
+            NSInteger nDay = [components day];
+            NSInteger nHour = [components hour];
+            NSInteger nMinute = [components minute];
+            NSInteger nSecond = [components second];
+            NSDate *currentTime = [format1 dateFromString:[NSString stringWithFormat:@"%04ld-%02ld-%02ld %02ld:%02ld:%02ld", nYear, nMonth, nDay, nHour, nMinute, nSecond]];
+            
+            NSTimeInterval diff = [currentTime timeIntervalSinceDate:createDate];
+            
+            NSTimeInterval nWriteTime = diff;
+            if( nWriteTime > ((60 * 60 * 24) * 14) )
+            {
+                [fileManager removeItemAtPath:[documentsDirectory stringByAppendingPathComponent:file]  error:&error];
+            }
         }
     }
 }
