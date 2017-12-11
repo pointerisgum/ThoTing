@@ -13,6 +13,7 @@
 		98084A3A1F552455000C83BA /* OnlineBotCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 98084A391F552455000C83BA /* OnlineBotCell.m */; };
 		98099F411FBE651700EC6A9D /* TwoOtherChatCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 98099F401FBE651700EC6A9D /* TwoOtherChatCell.m */; };
 		980A0E591FC70D5600090A86 /* kik_image_edit_refresh@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 980A0E581FC70D5500090A86 /* kik_image_edit_refresh@2x.png */; };
+		980B7F561FDA744D005132D2 /* YouTubePlayerCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 980B7F551FDA744D005132D2 /* YouTubePlayerCell.m */; };
 		980CF8F31F757F6A00F6634C /* My.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 980CF8F21F757F6A00F6634C /* My.storyboard */; };
 		980CF8F61F757F8F00F6634C /* KikMyViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 980CF8F51F757F8F00F6634C /* KikMyViewController.m */; };
 		980CF8FE1F75846400F6634C /* KikMyCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 980CF8FD1F75846400F6634C /* KikMyCell.m */; };
@@ -25,6 +26,11 @@
 		980DE3ED1F7CA1FC0019221B /* KikGroupsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 980DE3EC1F7CA1FC0019221B /* KikGroupsViewController.m */; };
 		980DE3F01F7CA2150019221B /* KikGroupsHeaderCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 980DE3EF1F7CA2150019221B /* KikGroupsHeaderCell.m */; };
 		980DE3F61F7CA28B0019221B /* KikGroupsCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 980DE3F51F7CA28B0019221B /* KikGroupsCell.m */; };
+		980EADB81FCE51DD00CD455B /* HelpBotCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 980EADB71FCE51DD00CD455B /* HelpBotCell.m */; };
+		980EADC11FCE560200CD455B /* BotListHeaderCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 980EADC01FCE560200CD455B /* BotListHeaderCell.m */; };
+		980EADC41FCE86AA00CD455B /* HelpBotVericalCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 980EADC31FCE86AA00CD455B /* HelpBotVericalCell.m */; };
+		980EADC91FCECA8C00CD455B /* kik_bot_sort_underline@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 980EADC81FCECA8500CD455B /* kik_bot_sort_underline@2x.png */; };
+		980EADCC1FCED4B200CD455B /* KikBotTagSearchCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 980EADCB1FCED4B200CD455B /* KikBotTagSearchCell.m */; };
 		980ECB6F1FA20F60006B9A28 /* kik_roominfo_bubble@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 980ECB6E1FA20F5D006B9A28 /* kik_roominfo_bubble@2x.png */; };
 		980F7F201F29D2650077654D /* make_chat_room@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 980F7F1F1F29D2650077654D /* make_chat_room@2x.png */; };
 		980F7F221F29D34F0077654D /* make_chat_room2@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 980F7F211F29D34F0077654D /* make_chat_room2@2x.png */; };
@@ -36,6 +42,8 @@
 		9811493B1F4FD8A200536346 /* InputChannelInfoViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9811493A1F4FD8A200536346 /* InputChannelInfoViewController.m */; };
 		9811493D1F4FDAF800536346 /* camera_icon_30@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 9811493C1F4FDAF800536346 /* camera_icon_30@2x.png */; };
 		981149401F500F0600536346 /* MainChannelEmptyCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 9811493F1F500F0600536346 /* MainChannelEmptyCell.m */; };
+		9811F9171FCF9D15009CF5A1 /* KikBotMainSearchViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9811F9161FCF9D15009CF5A1 /* KikBotMainSearchViewController.m */; };
+		9811F91A1FCFF9F4009CF5A1 /* RelationCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 9811F9191FCFF9F4009CF5A1 /* RelationCell.m */; };
 		9812334A1F78BE0400DCA3CE /* kik_menu_libary@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 981233491F78BD0A00DCA3CE /* kik_menu_libary@2x.png */; };
 		9812334C1F78C2C900DCA3CE /* kik_library_blue_bg@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 9812334B1F78C2C600DCA3CE /* kik_library_blue_bg@2x.png */; };
 		9812334E1F79394500DCA3CE /* kik_search@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 9812334D1F79393F00DCA3CE /* kik_search@2x.png */; };
@@ -64,6 +72,7 @@
 		982B4A9F1F7A1287009C194B /* ChatIngUserCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 982B4A9E1F7A1287009C194B /* ChatIngUserCell.m */; };
 		982B4AA11F7A14AA009C194B /* kik_no_user_30@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 982B4AA01F7A14A8009C194B /* kik_no_user_30@2x.png */; };
 		982B4AA41F7A2D8B009C194B /* UIAlertController+Blocks.m in Sources */ = {isa = PBXBuildFile; fileRef = 982B4AA31F7A2D8B009C194B /* UIAlertController+Blocks.m */; };
+		982D07021FD92C5500B623F2 /* KikCloseGroupMainViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 982D07011FD92C5500B623F2 /* KikCloseGroupMainViewController.m */; };
 		982FF4D71F8228020049B3AC /* KikBotMainViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 982FF4D61F8228020049B3AC /* KikBotMainViewController.m */; };
 		982FF4DA1F8228190049B3AC /* KikBotMainCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 982FF4D91F8228190049B3AC /* KikBotMainCell.m */; };
 		982FF4DD1F822AFD0049B3AC /* KikMakeBotsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 982FF4DC1F822AFD0049B3AC /* KikMakeBotsViewController.m */; };
@@ -73,6 +82,9 @@
 		983369811FA07DC700FBB285 /* kik_bot@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 983369801FA07DC700FBB285 /* kik_bot@2x.png */; };
 		983369831FA07DEE00FBB285 /* kik_setting@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 983369821FA07DED00FBB285 /* kik_setting@2x.png */; };
 		9848B14A1F9886FB00E28E83 /* kik_sync@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 9848B1491F9886FB00E28E83 /* kik_sync@2x.png */; };
+		985324B41FDD727F00C417A0 /* join_check_empty@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 985324B21FDD726D00C417A0 /* join_check_empty@2x.png */; };
+		985324B51FDD727F00C417A0 /* join_check_fill@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 985324B31FDD727600C417A0 /* join_check_fill@2x.png */; };
+		985324BB1FDD87F200C417A0 /* NSDate+TCUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = 985324BA1FDD87F100C417A0 /* NSDate+TCUtils.m */; };
 		9853C9521F4B454A00EF7131 /* feed_write@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 9853C9511F4B454A00EF7131 /* feed_write@2x.png */; };
 		986164BD1F43EE5B00A1EF7B /* home_n@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 986164BC1F43EE5B00A1EF7B /* home_n@2x.png */; };
 		986164C01F43F07100A1EF7B /* HomeMainViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 986164BF1F43F07100A1EF7B /* HomeMainViewController.m */; };
@@ -94,6 +106,10 @@
 		986DA48A1FC2DCC200D682D6 /* HelpMenuViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 986DA4891FC2DCC200D682D6 /* HelpMenuViewController.m */; };
 		986DA48C1FC3227700D682D6 /* kik_chat_bollon@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 986DA48B1FC3227700D682D6 /* kik_chat_bollon@2x.png */; };
 		986DA48F1FC323D100D682D6 /* HelpMenuCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 986DA48E1FC323D100D682D6 /* HelpMenuCell.m */; };
+		987822761FD52BEA0076C6E9 /* kik_group_plus@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 987822751FD52BE30076C6E9 /* kik_group_plus@2x.png */; };
+		987822781FD52CED0076C6E9 /* kik_group_alram@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 987822771FD52CE70076C6E9 /* kik_group_alram@2x.png */; };
+		9878227B1FD556440076C6E9 /* KikMyGroupsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9878227A1FD556440076C6E9 /* KikMyGroupsViewController.m */; };
+		9878227E1FD5B4340076C6E9 /* OpenGroupTagSearchCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 9878227D1FD5B4340076C6E9 /* OpenGroupTagSearchCell.m */; };
 		9879A6961F6B520800028DFF /* mic_pause.png in Resources */ = {isa = PBXBuildFile; fileRef = 9879A6941F6B520800028DFF /* mic_pause.png */; };
 		9879A6971F6B520800028DFF /* mic_play.png in Resources */ = {isa = PBXBuildFile; fileRef = 9879A6951F6B520800028DFF /* mic_play.png */; };
 		9887F7291F1F35C600671F22 /* NormalQuestionCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 9887F7281F1F35C600671F22 /* NormalQuestionCell.m */; };
@@ -110,6 +126,8 @@
 		9893434A1F45A216003F958C /* 토팅@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 989343431F45A216003F958C /* 토팅@2x.png */; };
 		9893434B1F45A216003F958C /* 피드@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 989343441F45A216003F958C /* 피드@2x.png */; };
 		9893434C1F45A216003F958C /* 홈@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 989343451F45A216003F958C /* 홈@2x.png */; };
+		9895E8341FD782430011AF50 /* kik_multi_user@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 9895E8331FD7823F0011AF50 /* kik_multi_user@2x.png */; };
+		9895E8371FD7DBE90011AF50 /* KikCloseGroupMemberListViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 9895E8361FD7DBE90011AF50 /* KikCloseGroupMemberListViewController.m */; };
 		9896CD9A1F5647720083AC9A /* auto_audio_bg.png in Resources */ = {isa = PBXBuildFile; fileRef = 9896CD961F5647720083AC9A /* auto_audio_bg.png */; };
 		9896CD9B1F5647720083AC9A /* auto_audio_play.png in Resources */ = {isa = PBXBuildFile; fileRef = 9896CD971F5647720083AC9A /* auto_audio_play.png */; };
 		9896CD9D1F5647720083AC9A /* auto_audio_stop.png in Resources */ = {isa = PBXBuildFile; fileRef = 9896CD991F5647720083AC9A /* auto_audio_stop.png */; };
@@ -125,6 +143,7 @@
 		9898CD081F690E3A001C9AF6 /* button_ani_9.png in Resources */ = {isa = PBXBuildFile; fileRef = 9898CCFF1F690E3A001C9AF6 /* button_ani_9.png */; };
 		9898CD091F690E3A001C9AF6 /* button_ani_8.png in Resources */ = {isa = PBXBuildFile; fileRef = 9898CD001F690E3A001C9AF6 /* button_ani_8.png */; };
 		9898CD0C1F6915A1001C9AF6 /* AudioSessionManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 9898CD0B1F6915A1001C9AF6 /* AudioSessionManager.m */; };
+		989D92111FD0E872001EA598 /* ImageViewBorderRound.m in Sources */ = {isa = PBXBuildFile; fileRef = 989D92101FD0E872001EA598 /* ImageViewBorderRound.m */; };
 		989FB06B1EF79FD4007523AA /* check_black_15@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 989FB06A1EF79FD4007523AA /* check_black_15@2x.png */; };
 		98A0BB911F93A062008DD3A3 /* kik_search_24@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 98A0BB901F93A050008DD3A3 /* kik_search_24@2x.png */; };
 		98A1727E1F67E3130050AD6F /* ChatDateCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 98A1727D1F67E3120050AD6F /* ChatDateCell.m */; };
@@ -133,6 +152,10 @@
 		98A172861F68E9620050AD6F /* mic0-red-bold.png in Resources */ = {isa = PBXBuildFile; fileRef = 98A172811F68E9620050AD6F /* mic0-red-bold.png */; };
 		98A172871F68E9620050AD6F /* mic1-bold@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 98A172821F68E9620050AD6F /* mic1-bold@2x.png */; };
 		98A172881F68E9620050AD6F /* mic1-red-bold.png in Resources */ = {isa = PBXBuildFile; fileRef = 98A172831F68E9620050AD6F /* mic1-red-bold.png */; };
+		98A63D5E1FDD62CA0002D957 /* join_bg@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 98A63D5D1FDD62C30002D957 /* join_bg@2x.png */; };
+		98A63D621FDD65170002D957 /* JoinAndLoginSelectViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 98A63D611FDD65170002D957 /* JoinAndLoginSelectViewController.m */; };
+		98A63D651FDD65240002D957 /* JoinViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 98A63D641FDD65240002D957 /* JoinViewController.m */; };
+		98A63D681FDD65390002D957 /* Login2ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 98A63D671FDD65390002D957 /* Login2ViewController.m */; };
 		98AE52451F90537E00CC489F /* main_menu_plus@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 98AE52441F90537C00CC489F /* main_menu_plus@2x.png */; };
 		98AE52481F9054D700CC489F /* main_menu_close@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 98AE52461F9054A200CC489F /* main_menu_close@2x.png */; };
 		98AE52491F9054D700CC489F /* main_search@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 98AE52471F9054B300CC489F /* main_search@2x.png */; };
@@ -888,6 +911,8 @@
 		98099F3F1FBE651700EC6A9D /* TwoOtherChatCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TwoOtherChatCell.h; sourceTree = "<group>"; };
 		98099F401FBE651700EC6A9D /* TwoOtherChatCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TwoOtherChatCell.m; sourceTree = "<group>"; };
 		980A0E581FC70D5500090A86 /* kik_image_edit_refresh@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_image_edit_refresh@2x.png"; sourceTree = "<group>"; };
+		980B7F541FDA744D005132D2 /* YouTubePlayerCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = YouTubePlayerCell.h; sourceTree = "<group>"; };
+		980B7F551FDA744D005132D2 /* YouTubePlayerCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = YouTubePlayerCell.m; sourceTree = "<group>"; };
 		980CF8F21F757F6A00F6634C /* My.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = My.storyboard; sourceTree = "<group>"; };
 		980CF8F41F757F8F00F6634C /* KikMyViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KikMyViewController.h; sourceTree = "<group>"; };
 		980CF8F51F757F8F00F6634C /* KikMyViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KikMyViewController.m; sourceTree = "<group>"; };
@@ -905,6 +930,15 @@
 		980DE3EF1F7CA2150019221B /* KikGroupsHeaderCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KikGroupsHeaderCell.m; sourceTree = "<group>"; };
 		980DE3F41F7CA28B0019221B /* KikGroupsCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KikGroupsCell.h; sourceTree = "<group>"; };
 		980DE3F51F7CA28B0019221B /* KikGroupsCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KikGroupsCell.m; sourceTree = "<group>"; };
+		980EADB61FCE51DD00CD455B /* HelpBotCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HelpBotCell.h; sourceTree = "<group>"; };
+		980EADB71FCE51DD00CD455B /* HelpBotCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HelpBotCell.m; sourceTree = "<group>"; };
+		980EADBF1FCE560200CD455B /* BotListHeaderCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BotListHeaderCell.h; sourceTree = "<group>"; };
+		980EADC01FCE560200CD455B /* BotListHeaderCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BotListHeaderCell.m; sourceTree = "<group>"; };
+		980EADC21FCE86AA00CD455B /* HelpBotVericalCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HelpBotVericalCell.h; sourceTree = "<group>"; };
+		980EADC31FCE86AA00CD455B /* HelpBotVericalCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HelpBotVericalCell.m; sourceTree = "<group>"; };
+		980EADC81FCECA8500CD455B /* kik_bot_sort_underline@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_bot_sort_underline@2x.png"; sourceTree = "<group>"; };
+		980EADCA1FCED4B200CD455B /* KikBotTagSearchCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KikBotTagSearchCell.h; sourceTree = "<group>"; };
+		980EADCB1FCED4B200CD455B /* KikBotTagSearchCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KikBotTagSearchCell.m; sourceTree = "<group>"; };
 		980ECB6E1FA20F5D006B9A28 /* kik_roominfo_bubble@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_roominfo_bubble@2x.png"; sourceTree = "<group>"; };
 		980F7F1F1F29D2650077654D /* make_chat_room@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "make_chat_room@2x.png"; sourceTree = "<group>"; };
 		980F7F211F29D34F0077654D /* make_chat_room2@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "make_chat_room2@2x.png"; sourceTree = "<group>"; };
@@ -920,6 +954,10 @@
 		9811493C1F4FDAF800536346 /* camera_icon_30@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "camera_icon_30@2x.png"; sourceTree = "<group>"; };
 		9811493E1F500F0600536346 /* MainChannelEmptyCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MainChannelEmptyCell.h; sourceTree = "<group>"; };
 		9811493F1F500F0600536346 /* MainChannelEmptyCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MainChannelEmptyCell.m; sourceTree = "<group>"; };
+		9811F9151FCF9D15009CF5A1 /* KikBotMainSearchViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KikBotMainSearchViewController.h; sourceTree = "<group>"; };
+		9811F9161FCF9D15009CF5A1 /* KikBotMainSearchViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KikBotMainSearchViewController.m; sourceTree = "<group>"; };
+		9811F9181FCFF9F4009CF5A1 /* RelationCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RelationCell.h; sourceTree = "<group>"; };
+		9811F9191FCFF9F4009CF5A1 /* RelationCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RelationCell.m; sourceTree = "<group>"; };
 		981233491F78BD0A00DCA3CE /* kik_menu_libary@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_menu_libary@2x.png"; sourceTree = "<group>"; };
 		9812334B1F78C2C600DCA3CE /* kik_library_blue_bg@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_library_blue_bg@2x.png"; sourceTree = "<group>"; };
 		9812334D1F79393F00DCA3CE /* kik_search@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_search@2x.png"; sourceTree = "<group>"; };
@@ -964,6 +1002,8 @@
 		982B4AA01F7A14A8009C194B /* kik_no_user_30@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_no_user_30@2x.png"; sourceTree = "<group>"; };
 		982B4AA21F7A2D8B009C194B /* UIAlertController+Blocks.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "UIAlertController+Blocks.h"; sourceTree = "<group>"; };
 		982B4AA31F7A2D8B009C194B /* UIAlertController+Blocks.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "UIAlertController+Blocks.m"; sourceTree = "<group>"; };
+		982D07001FD92C5500B623F2 /* KikCloseGroupMainViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KikCloseGroupMainViewController.h; sourceTree = "<group>"; };
+		982D07011FD92C5500B623F2 /* KikCloseGroupMainViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KikCloseGroupMainViewController.m; sourceTree = "<group>"; };
 		982FF4D51F8228020049B3AC /* KikBotMainViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KikBotMainViewController.h; sourceTree = "<group>"; };
 		982FF4D61F8228020049B3AC /* KikBotMainViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KikBotMainViewController.m; sourceTree = "<group>"; };
 		982FF4D81F8228190049B3AC /* KikBotMainCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KikBotMainCell.h; sourceTree = "<group>"; };
@@ -978,6 +1018,10 @@
 		983369801FA07DC700FBB285 /* kik_bot@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_bot@2x.png"; sourceTree = "<group>"; };
 		983369821FA07DED00FBB285 /* kik_setting@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_setting@2x.png"; sourceTree = "<group>"; };
 		9848B1491F9886FB00E28E83 /* kik_sync@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_sync@2x.png"; sourceTree = "<group>"; };
+		985324B21FDD726D00C417A0 /* join_check_empty@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "join_check_empty@2x.png"; sourceTree = "<group>"; };
+		985324B31FDD727600C417A0 /* join_check_fill@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "join_check_fill@2x.png"; sourceTree = "<group>"; };
+		985324B91FDD87F100C417A0 /* NSDate+TCUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSDate+TCUtils.h"; sourceTree = "<group>"; };
+		985324BA1FDD87F100C417A0 /* NSDate+TCUtils.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSDate+TCUtils.m"; sourceTree = "<group>"; };
 		9853C9511F4B454A00EF7131 /* feed_write@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "feed_write@2x.png"; sourceTree = "<group>"; };
 		986164BC1F43EE5B00A1EF7B /* home_n@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "home_n@2x.png"; sourceTree = "<group>"; };
 		986164BE1F43F07100A1EF7B /* HomeMainViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HomeMainViewController.h; sourceTree = "<group>"; };
@@ -1014,6 +1058,12 @@
 		986DA48B1FC3227700D682D6 /* kik_chat_bollon@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_chat_bollon@2x.png"; sourceTree = "<group>"; };
 		986DA48D1FC323D100D682D6 /* HelpMenuCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HelpMenuCell.h; sourceTree = "<group>"; };
 		986DA48E1FC323D100D682D6 /* HelpMenuCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HelpMenuCell.m; sourceTree = "<group>"; };
+		987822751FD52BE30076C6E9 /* kik_group_plus@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_group_plus@2x.png"; sourceTree = "<group>"; };
+		987822771FD52CE70076C6E9 /* kik_group_alram@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_group_alram@2x.png"; sourceTree = "<group>"; };
+		987822791FD556440076C6E9 /* KikMyGroupsViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KikMyGroupsViewController.h; sourceTree = "<group>"; };
+		9878227A1FD556440076C6E9 /* KikMyGroupsViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KikMyGroupsViewController.m; sourceTree = "<group>"; };
+		9878227C1FD5B4340076C6E9 /* OpenGroupTagSearchCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OpenGroupTagSearchCell.h; sourceTree = "<group>"; };
+		9878227D1FD5B4340076C6E9 /* OpenGroupTagSearchCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OpenGroupTagSearchCell.m; sourceTree = "<group>"; };
 		9879A6941F6B520800028DFF /* mic_pause.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = mic_pause.png; sourceTree = "<group>"; };
 		9879A6951F6B520800028DFF /* mic_play.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = mic_play.png; sourceTree = "<group>"; };
 		9887F7271F1F35C600671F22 /* NormalQuestionCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NormalQuestionCell.h; sourceTree = "<group>"; };
@@ -1032,6 +1082,9 @@
 		989343431F45A216003F958C /* 토팅@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "토팅@2x.png"; sourceTree = "<group>"; };
 		989343441F45A216003F958C /* 피드@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "피드@2x.png"; sourceTree = "<group>"; };
 		989343451F45A216003F958C /* 홈@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "홈@2x.png"; sourceTree = "<group>"; };
+		9895E8331FD7823F0011AF50 /* kik_multi_user@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_multi_user@2x.png"; sourceTree = "<group>"; };
+		9895E8351FD7DBE90011AF50 /* KikCloseGroupMemberListViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KikCloseGroupMemberListViewController.h; sourceTree = "<group>"; };
+		9895E8361FD7DBE90011AF50 /* KikCloseGroupMemberListViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KikCloseGroupMemberListViewController.m; sourceTree = "<group>"; };
 		9896CD961F5647720083AC9A /* auto_audio_bg.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = auto_audio_bg.png; sourceTree = "<group>"; };
 		9896CD971F5647720083AC9A /* auto_audio_play.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = auto_audio_play.png; sourceTree = "<group>"; };
 		9896CD991F5647720083AC9A /* auto_audio_stop.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = auto_audio_stop.png; sourceTree = "<group>"; };
@@ -1048,6 +1101,8 @@
 		9898CD001F690E3A001C9AF6 /* button_ani_8.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = button_ani_8.png; sourceTree = "<group>"; };
 		9898CD0A1F6915A1001C9AF6 /* AudioSessionManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AudioSessionManager.h; sourceTree = "<group>"; };
 		9898CD0B1F6915A1001C9AF6 /* AudioSessionManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = AudioSessionManager.m; sourceTree = "<group>"; };
+		989D920F1FD0E872001EA598 /* ImageViewBorderRound.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ImageViewBorderRound.h; sourceTree = "<group>"; };
+		989D92101FD0E872001EA598 /* ImageViewBorderRound.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ImageViewBorderRound.m; sourceTree = "<group>"; };
 		989FB06A1EF79FD4007523AA /* check_black_15@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "check_black_15@2x.png"; sourceTree = "<group>"; };
 		98A0BB901F93A050008DD3A3 /* kik_search_24@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "kik_search_24@2x.png"; sourceTree = "<group>"; };
 		98A1727C1F67E3120050AD6F /* ChatDateCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ChatDateCell.h; sourceTree = "<group>"; };
@@ -1057,6 +1112,13 @@
 		98A172811F68E9620050AD6F /* mic0-red-bold.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "mic0-red-bold.png"; sourceTree = "<group>"; };
 		98A172821F68E9620050AD6F /* mic1-bold@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "mic1-bold@2x.png"; sourceTree = "<group>"; };
 		98A172831F68E9620050AD6F /* mic1-red-bold.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "mic1-red-bold.png"; sourceTree = "<group>"; };
+		98A63D5D1FDD62C30002D957 /* join_bg@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "join_bg@2x.png"; sourceTree = "<group>"; };
+		98A63D601FDD65170002D957 /* JoinAndLoginSelectViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = JoinAndLoginSelectViewController.h; sourceTree = "<group>"; };
+		98A63D611FDD65170002D957 /* JoinAndLoginSelectViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = JoinAndLoginSelectViewController.m; sourceTree = "<group>"; };
+		98A63D631FDD65240002D957 /* JoinViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = JoinViewController.h; sourceTree = "<group>"; };
+		98A63D641FDD65240002D957 /* JoinViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = JoinViewController.m; sourceTree = "<group>"; };
+		98A63D661FDD65390002D957 /* Login2ViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Login2ViewController.h; sourceTree = "<group>"; };
+		98A63D671FDD65390002D957 /* Login2ViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Login2ViewController.m; sourceTree = "<group>"; };
 		98AE52441F90537C00CC489F /* main_menu_plus@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "main_menu_plus@2x.png"; sourceTree = "<group>"; };
 		98AE52461F9054A200CC489F /* main_menu_close@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "main_menu_close@2x.png"; sourceTree = "<group>"; };
 		98AE52471F9054B300CC489F /* main_search@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "main_search@2x.png"; sourceTree = "<group>"; };
@@ -2364,6 +2426,19 @@
 			name = MyAccount;
 			sourceTree = "<group>";
 		};
+		98A63D5F1FDD64EA0002D957 /* Join&Login */ = {
+			isa = PBXGroup;
+			children = (
+				98A63D601FDD65170002D957 /* JoinAndLoginSelectViewController.h */,
+				98A63D611FDD65170002D957 /* JoinAndLoginSelectViewController.m */,
+				98A63D631FDD65240002D957 /* JoinViewController.h */,
+				98A63D641FDD65240002D957 /* JoinViewController.m */,
+				98A63D661FDD65390002D957 /* Login2ViewController.h */,
+				98A63D671FDD65390002D957 /* Login2ViewController.m */,
+			);
+			name = "Join&Login";
+			sourceTree = "<group>";
+		};
 		98EE89A31F7808430008E0AD /* LGPlusButtonsView */ = {
 			isa = PBXGroup;
 			children = (
@@ -2648,6 +2723,8 @@
 			children = (
 				B4B3CC041E0D739D00F17539 /* ChatFeedViewController.h */,
 				B4B3CC051E0D739D00F17539 /* ChatFeedViewController.m */,
+				980B7F541FDA744D005132D2 /* YouTubePlayerCell.h */,
+				980B7F551FDA744D005132D2 /* YouTubePlayerCell.m */,
 				981E5ABC1F6A2E9800B85C11 /* MyAudioCell.h */,
 				981E5ABD1F6A2E9800B85C11 /* MyAudioCell.m */,
 				98A1727C1F67E3120050AD6F /* ChatDateCell.h */,
@@ -2774,6 +2851,8 @@
 				98EE89AD1F7809560008E0AD /* KikMenuViewController.m */,
 				980CF8FC1F75846400F6634C /* KikMyCell.h */,
 				980CF8FD1F75846400F6634C /* KikMyCell.m */,
+				982D07001FD92C5500B623F2 /* KikCloseGroupMainViewController.h */,
+				982D07011FD92C5500B623F2 /* KikCloseGroupMainViewController.m */,
 				982B4A9D1F7A1287009C194B /* ChatIngUserCell.h */,
 				982B4A9E1F7A1287009C194B /* ChatIngUserCell.m */,
 				9812334F1F793E1200DCA3CE /* KikOneOnOneViewController.h */,
@@ -2788,24 +2867,43 @@
 				982AA1281F7B63D200A00EBE /* KikRoomInfoViewController.m */,
 				9891807D1FC8126E00402F4B /* KikRoomModifyViewController.h */,
 				9891807E1FC8126E00402F4B /* KikRoomModifyViewController.m */,
+				9895E8351FD7DBE90011AF50 /* KikCloseGroupMemberListViewController.h */,
+				9895E8361FD7DBE90011AF50 /* KikCloseGroupMemberListViewController.m */,
 				98275FD91F80C34F0050C9E3 /* RoomInfoUserCell.h */,
 				98275FDA1F80C34F0050C9E3 /* RoomInfoUserCell.m */,
 				982AA12A1F7B9AC500A00EBE /* ChatMemberListViewController.h */,
 				982AA12B1F7B9AC500A00EBE /* ChatMemberListViewController.m */,
 				980DE3EB1F7CA1FC0019221B /* KikGroupsViewController.h */,
 				980DE3EC1F7CA1FC0019221B /* KikGroupsViewController.m */,
+				987822791FD556440076C6E9 /* KikMyGroupsViewController.h */,
+				9878227A1FD556440076C6E9 /* KikMyGroupsViewController.m */,
 				980DE3F41F7CA28B0019221B /* KikGroupsCell.h */,
 				980DE3F51F7CA28B0019221B /* KikGroupsCell.m */,
 				980DE3EE1F7CA2150019221B /* KikGroupsHeaderCell.h */,
 				980DE3EF1F7CA2150019221B /* KikGroupsHeaderCell.m */,
 				982FF4D51F8228020049B3AC /* KikBotMainViewController.h */,
 				982FF4D61F8228020049B3AC /* KikBotMainViewController.m */,
+				9811F9151FCF9D15009CF5A1 /* KikBotMainSearchViewController.h */,
+				9811F9161FCF9D15009CF5A1 /* KikBotMainSearchViewController.m */,
+				9878227C1FD5B4340076C6E9 /* OpenGroupTagSearchCell.h */,
+				9878227D1FD5B4340076C6E9 /* OpenGroupTagSearchCell.m */,
+				9811F9181FCFF9F4009CF5A1 /* RelationCell.h */,
+				9811F9191FCFF9F4009CF5A1 /* RelationCell.m */,
+				980EADC21FCE86AA00CD455B /* HelpBotVericalCell.h */,
+				980EADC31FCE86AA00CD455B /* HelpBotVericalCell.m */,
+				980EADB61FCE51DD00CD455B /* HelpBotCell.h */,
+				980EADB71FCE51DD00CD455B /* HelpBotCell.m */,
+				980EADBF1FCE560200CD455B /* BotListHeaderCell.h */,
+				980EADC01FCE560200CD455B /* BotListHeaderCell.m */,
 				982FF4D81F8228190049B3AC /* KikBotMainCell.h */,
 				982FF4D91F8228190049B3AC /* KikBotMainCell.m */,
+				980EADCA1FCED4B200CD455B /* KikBotTagSearchCell.h */,
+				980EADCB1FCED4B200CD455B /* KikBotTagSearchCell.m */,
 				982FF4DB1F822AFD0049B3AC /* KikMakeBotsViewController.h */,
 				982FF4DC1F822AFD0049B3AC /* KikMakeBotsViewController.m */,
 				98E8A5381FB9E88F001B3D3A /* KikAddMemberViewController.h */,
 				98E8A5391FB9E88F001B3D3A /* KikAddMemberViewController.m */,
+				98A63D5F1FDD64EA0002D957 /* Join&Login */,
 				986DA4751FC2DC2700D682D6 /* MyAccount */,
 				B496320A1ECBC95600A63AEA /* Question.storyboard */,
 				B4F72B891D1A49C800B086C7 /* Main.storyboard */,
@@ -3166,9 +3264,11 @@
 		B4F72BD11D1A4AA400B086C7 /* Common */ = {
 			isa = PBXGroup;
 			children = (
+				B4F72BD41D1A4AA400B086C7 /* Defines.h */,
 				B4F72BD21D1A4AA400B086C7 /* Common.h */,
 				B4F72BD31D1A4AA400B086C7 /* Common.m */,
-				B4F72BD41D1A4AA400B086C7 /* Defines.h */,
+				989D920F1FD0E872001EA598 /* ImageViewBorderRound.h */,
+				989D92101FD0E872001EA598 /* ImageViewBorderRound.m */,
 				B4F72BD51D1A4AA400B086C7 /* KeyboardAccView.h */,
 				B4F72BD61D1A4AA400B086C7 /* KeyboardAccView.m */,
 				B4F72BD71D1A4AA400B086C7 /* KeyboardAccView.xib */,
@@ -3275,6 +3375,8 @@
 		B4F72C0A1D1A4AA400B086C7 /* Lib */ = {
 			isa = PBXGroup;
 			children = (
+				985324B91FDD87F100C417A0 /* NSDate+TCUtils.h */,
+				985324BA1FDD87F100C417A0 /* NSDate+TCUtils.m */,
 				986CA0211FC57F290019B5D5 /* DZImageEditing */,
 				98EE89A31F7808430008E0AD /* LGPlusButtonsView */,
 				9898CD0A1F6915A1001C9AF6 /* AudioSessionManager.h */,
@@ -3972,6 +4074,13 @@
 		B4F72D8B1D1A4AA400B086C7 /* Resource */ = {
 			isa = PBXGroup;
 			children = (
+				985324B21FDD726D00C417A0 /* join_check_empty@2x.png */,
+				985324B31FDD727600C417A0 /* join_check_fill@2x.png */,
+				98A63D5D1FDD62C30002D957 /* join_bg@2x.png */,
+				9895E8331FD7823F0011AF50 /* kik_multi_user@2x.png */,
+				987822771FD52CE70076C6E9 /* kik_group_alram@2x.png */,
+				987822751FD52BE30076C6E9 /* kik_group_plus@2x.png */,
+				980EADC81FCECA8500CD455B /* kik_bot_sort_underline@2x.png */,
 				981B45B71FCC58ED000D8D7B /* kik_star_empty@2x.png */,
 				981B45B61FCC58E8000D8D7B /* kik_star_fill@2x.png */,
 				989180801FC813E900402F4B /* kik_add_image_blue_big_icon@2x.png */,
@@ -4372,6 +4481,7 @@
 				B4BB53C61D349FF500E66C77 /* 5_circle_on_red@2x.png in Resources */,
 				B4D1529E1E681DBE002A58F1 /* wrong_right@2x.png in Resources */,
 				B4D634511D20C0610034D47D /* eye@2x.png in Resources */,
+				987822781FD52CED0076C6E9 /* kik_group_alram@2x.png in Resources */,
 				B4F72E8F1D1A4AA400B086C7 /* Reader-Button-N.png in Resources */,
 				98F300501F297CA20012D6C8 /* add_button@2x.png in Resources */,
 				B4FF7F5E1E643CBE007EA0CD /* QuestionStarTitleView.xib in Resources */,
@@ -4382,6 +4492,7 @@
 				982B4A8D1F79E939009C194B /* kik_add_image_red_icon@2x.png in Resources */,
 				B484A23A1D38A13700938C2E /* play_white@2x.png in Resources */,
 				B42B24931EE1676000B1E5E3 /* follower_icon@2x.png in Resources */,
+				987822761FD52BEA0076C6E9 /* kik_group_plus@2x.png in Resources */,
 				B4BB53C31D349FF500E66C77 /* 4_circle_off_red@2x.png in Resources */,
 				B4BB53B31D349FF500E66C77 /* 2_circle_off_blue@2x.png in Resources */,
 				B42D93F21D80156F00405791 /* bubble_5@2x.png in Resources */,
@@ -4419,6 +4530,7 @@
 				9812334E1F79394500DCA3CE /* kik_search@2x.png in Resources */,
 				980F7F201F29D2650077654D /* make_chat_room@2x.png in Resources */,
 				B4F72B901D1A49C800B086C7 /* LaunchScreen.storyboard in Resources */,
+				985324B41FDD727F00C417A0 /* join_check_empty@2x.png in Resources */,
 				9898CD011F690E3A001C9AF6 /* button_ani_1.png in Resources */,
 				B4154EE01E2F0BF700B457BA /* Etc.storyboard in Resources */,
 				B455B39D1E1D4FAC00525AA7 /* no_thum_error@2x.png in Resources */,
@@ -4455,6 +4567,7 @@
 				B4F72B8D1D1A49C800B086C7 /* Assets.xcassets in Resources */,
 				B4B9C7FB1DE580D5008E00E7 /* icon_shared@2x.png in Resources */,
 				9898CD021F690E3A001C9AF6 /* button_ani_2.png in Resources */,
+				9895E8341FD782430011AF50 /* kik_multi_user@2x.png in Resources */,
 				B427A55D1D87D59D00BDD66D /* check_on@2x.png in Resources */,
 				B42D93FB1D8022D900405791 /* bubble_min_reverse_6@2x.png in Resources */,
 				9896CD9A1F5647720083AC9A /* auto_audio_bg.png in Resources */,
@@ -4468,6 +4581,7 @@
 				B4FF7F551E64389D007EA0CD /* QuestionWrongTitleView.xib in Resources */,
 				B40ACA5D1E6019C200FEDA6E /* rect_red@2x.png in Resources */,
 				B44D78B51D5CCD9100BF100E /* GoogleService-Info.plist in Resources */,
+				980EADC91FCECA8C00CD455B /* kik_bot_sort_underline@2x.png in Resources */,
 				983369831FA07DEE00FBB285 /* kik_setting@2x.png in Resources */,
 				B4F72E941D1A4AA400B086C7 /* Reader-Email@3x.png in Resources */,
 				9812334A1F78BE0400DCA3CE /* kik_menu_libary@2x.png in Resources */,
@@ -4653,6 +4767,7 @@
 				B46CA53A1D1BC8BA00619461 /* info@2x.png in Resources */,
 				B4EF36581DC8C8FE009F67FC /* circle_black_fill@2x.png in Resources */,
 				B40ACA631E60329E00FEDA6E /* star_red_fill@2x.png in Resources */,
+				985324B51FDD727F00C417A0 /* join_check_fill@2x.png in Resources */,
 				98F54B4A1F16D5120004B249 /* chat_check_fail@2x.png in Resources */,
 				98A172871F68E9620050AD6F /* mic1-bold@2x.png in Resources */,
 				B4BB53E51D34E27200E66C77 /* my0@2x.png in Resources */,
@@ -4661,6 +4776,7 @@
 				B4C75EF21EE84149008F83C4 /* disk_icon@2x.png in Resources */,
 				986164BD1F43EE5B00A1EF7B /* home_n@2x.png in Resources */,
 				9898CD061F690E3A001C9AF6 /* button_ani_6.png in Resources */,
+				98A63D5E1FDD62CA0002D957 /* join_bg@2x.png in Resources */,
 				B4BB53CB1D349FF500E66C77 /* 2_circle_off_yellow@2x.png in Resources */,
 				B4F72DC91D1A4AA400B086C7 /* KeyboardAccViewNonArrow.xib in Resources */,
 				B44865AF1D938173007A6883 /* chat_tutorial.png in Resources */,
@@ -4724,13 +4840,16 @@
 			files = (
 			);
 			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
 			);
 			name = "[CP] Check Pods Manifest.lock";
 			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-ThoThing-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n";
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
 		465C8D09F996546F5397FC6A /* [CP] Embed Pods Frameworks */ = {
@@ -4739,9 +4858,14 @@
 			files = (
 			);
 			inputPaths = (
+				"${SRCROOT}/Pods/Target Support Files/Pods-ThoThing/Pods-ThoThing-frameworks.sh",
+				"${PODS_ROOT}/SendBirdSDK/SendBirdSDK.framework",
+				"${PODS_ROOT}/SendBirdSDK/SendBirdSDK.framework.dSYM",
 			);
 			name = "[CP] Embed Pods Frameworks";
 			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/SendBirdSDK.framework",
+				"${DWARF_DSYM_FOLDER_PATH}/SendBirdSDK.framework.dSYM",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -4767,9 +4891,12 @@
 			files = (
 			);
 			inputPaths = (
+				"${SRCROOT}/Pods/Target Support Files/Pods-ThoThing/Pods-ThoThing-resources.sh",
+				"${PODS_ROOT}/youtube-ios-player-helper/youtube-ios-player-helper/Assets.bundle",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -4839,6 +4966,7 @@
 				B4F72E0D1D1A4AA400B086C7 /* BSNumberedSelectionView.m in Sources */,
 				B4F72E5F1D1A4AA400B086C7 /* PSTCollectionViewLayout.m in Sources */,
 				B4F72DB01D1A4AA400B086C7 /* AbstractActionSheetPicker.m in Sources */,
+				98A63D621FDD65170002D957 /* JoinAndLoginSelectViewController.m in Sources */,
 				B48319A61D324EF500245B53 /* ChannelMannagerListCell.m in Sources */,
 				B4F72E151D1A4AA400B086C7 /* UIImage+CropRotate.m in Sources */,
 				B4C75EF51EE8594C008F83C4 /* UploadListViewController.m in Sources */,
@@ -4853,6 +4981,7 @@
 				B4F72E311D1A4AA400B086C7 /* SBJsonTokeniser.m in Sources */,
 				B4F72E861D1A4AA400B086C7 /* PDFView.m in Sources */,
 				B4F72E221D1A4AA400B086C7 /* UIViewController+MRFlipTransitino.m in Sources */,
+				982D07021FD92C5500B623F2 /* KikCloseGroupMainViewController.m in Sources */,
 				B41101DD1E44053A001162EE /* QuestionVerticalOneItemCell.m in Sources */,
 				B4F72DE51D1A4AA400B086C7 /* AFHTTPRequestOperation.m in Sources */,
 				B4F72DB11D1A4AA400B086C7 /* ActionSheetCustomPicker.m in Sources */,
@@ -4874,6 +5003,7 @@
 				B4F72DC41D1A4AA400B086C7 /* UIWebView+JavascriptAlert.m in Sources */,
 				B4F72E211D1A4AA400B086C7 /* MRFlipTransition.m in Sources */,
 				B4F72E271D1A4AA400B086C7 /* IQActionSheetViewController.m in Sources */,
+				9811F9171FCF9D15009CF5A1 /* KikBotMainSearchViewController.m in Sources */,
 				B4EC1AF41E14E985006F14F6 /* MyImageCell.m in Sources */,
 				B43FBA531D23D9CB0000D26B /* QuestionDiscriptionViewController.m in Sources */,
 				B4F72E751D1A4AA400B086C7 /* UIImageView+WebCache.m in Sources */,
@@ -4895,7 +5025,9 @@
 				B492075D1E31ECEF00E485DE /* ActionSheetBottomCell.m in Sources */,
 				980CF8FE1F75846400F6634C /* KikMyCell.m in Sources */,
 				B4F72EB71D1A6A8900B086C7 /* MyMainViewController.m in Sources */,
+				9895E8371FD7DBE90011AF50 /* KikCloseGroupMemberListViewController.m in Sources */,
 				B4F72DBD1D1A4AA400B086C7 /* UIDevice-Hardware.m in Sources */,
+				9878227E1FD5B4340076C6E9 /* OpenGroupTagSearchCell.m in Sources */,
 				B4F72E7D1D1A4AA400B086C7 /* PushCat.m in Sources */,
 				B42B24841EE14C2000B1E5E3 /* MainSideMenuViewController.m in Sources */,
 				B4FF7F531E643898007EA0CD /* QuestionWrongTitleView.m in Sources */,
@@ -4916,7 +5048,9 @@
 				B4F72E7E1D1A4AA400B086C7 /* RMOutlineBox.m in Sources */,
 				B49F8E0D1D4A1B2200BD5D30 /* ReportPopUpListCell.m in Sources */,
 				B463EB041D33A98D002835BB /* SelectSchoolCell.m in Sources */,
+				980EADCC1FCED4B200CD455B /* KikBotTagSearchCell.m in Sources */,
 				B4F72DD21D1A4AA400B086C7 /* RoundButton.m in Sources */,
+				985324BB1FDD87F200C417A0 /* NSDate+TCUtils.m in Sources */,
 				B4F72E471D1A4AA400B086C7 /* ReaderMainPagebar.m in Sources */,
 				B4F72E7C1D1A4AA400B086C7 /* SWUtilityButtonView.m in Sources */,
 				B464CFFE1DEED4B500240EC7 /* ChannelSelectCell.m in Sources */,
@@ -5000,10 +5134,12 @@
 				B43FBA5C1D2408810000D26B /* AnswerDiscripCell.m in Sources */,
 				B4F72E321D1A4AA400B086C7 /* SBJsonUTF8Stream.m in Sources */,
 				B40ACA671E60335F00FEDA6E /* WrongAndStarCell.m in Sources */,
+				9878227B1FD556440076C6E9 /* KikMyGroupsViewController.m in Sources */,
 				B4F72E731D1A4AA400B086C7 /* UIImage+WebP.m in Sources */,
 				B4F72DDC1D1A4AA400B086C7 /* YM_MPMoviePlayerController.m in Sources */,
 				B49189961D51C49900F72BFE /* DiscripFooterView.m in Sources */,
 				B4F72E621D1A4AA400B086C7 /* PSTGridLayoutItem.m in Sources */,
+				980B7F561FDA744D005132D2 /* YouTubePlayerCell.m in Sources */,
 				B44F76D61EEE79C80007CF83 /* QuestionMainTagCell.m in Sources */,
 				B45EFB291D757D49007A70EE /* Red8RoundButton.m in Sources */,
 				B42E6F361D1CCB6600362A8F /* QuestionMainCellView.m in Sources */,
@@ -5011,6 +5147,7 @@
 				B4F72DBB1D1A4AA400B086C7 /* UIButton+Blocks.m in Sources */,
 				B40ACA601E602C9000FEDA6E /* WrongAnsStarViewController.m in Sources */,
 				B43E9FEF1D2F825300259181 /* ReportDateHeaderCell.m in Sources */,
+				9811F91A1FCFF9F4009CF5A1 /* RelationCell.m in Sources */,
 				B41101E51E446F0C001162EE /* StarView.m in Sources */,
 				B4F72E0F1D1A4AA400B086C7 /* BSSpeechBubbleView.m in Sources */,
 				B465CF781D87A38500B9B4E4 /* InRoomMemberListViewController.m in Sources */,
@@ -5110,6 +5247,7 @@
 				B4F72DDB1D1A4AA400B086C7 /* UnderLineButton.m in Sources */,
 				B491006D1D2B76F00067D4C5 /* YmExtendButton.m in Sources */,
 				B4F72E121D1A4AA400B086C7 /* TOActivityCroppedImageProvider.m in Sources */,
+				980EADC41FCE86AA00CD455B /* HelpBotVericalCell.m in Sources */,
 				B4D6345C1D20C7530034D47D /* QuestionListTitleView.m in Sources */,
 				B4F72E0A1D1A4AA400B086C7 /* BSImagePickerSettings.m in Sources */,
 				B466ABA01DA54D6400323472 /* QnaMainViewController.m in Sources */,
@@ -5121,7 +5259,9 @@
 				9891807F1FC8126E00402F4B /* KikRoomModifyViewController.m in Sources */,
 				B4F72EA81D1A4B8100B086C7 /* LoginViewController.m in Sources */,
 				B49919551D29FD4300A52D15 /* PinkRoundButton.m in Sources */,
+				980EADB81FCE51DD00CD455B /* HelpBotCell.m in Sources */,
 				B4F72DC31D1A4AA400B086C7 /* UIViewController+ScrollingNavbar.m in Sources */,
+				98A63D651FDD65240002D957 /* JoinViewController.m in Sources */,
 				B4F72DE71D1A4AA400B086C7 /* AFJSONRequestOperation.m in Sources */,
 				B4696F471EA9194D00110A12 /* OtherDirectChatMsgCell.m in Sources */,
 				B4F72DFF1D1A4AA400B086C7 /* BSPhotosController+PrivateMethods.m in Sources */,
@@ -5144,6 +5284,7 @@
 				B4F72E891D1A4AA400B086C7 /* VerticallyAlignedLabel.m in Sources */,
 				B4F72DBA1D1A4AA400B086C7 /* UIAlertView+NSCookbook.m in Sources */,
 				B443C9AB1D8F8B9700EB2336 /* FeedChatCell.m in Sources */,
+				980EADC11FCE560200CD455B /* BotListHeaderCell.m in Sources */,
 				B4F72E761D1A4AA400B086C7 /* UIView+WebCacheOperation.m in Sources */,
 				B4F72E881D1A4AA400B086C7 /* UIView+Image.m in Sources */,
 				B4B1EDEC1D24E7F600AEEFB9 /* AnswerSubjectiveCell.m in Sources */,
@@ -5178,8 +5319,10 @@
 				B43E9FE31D2F300500259181 /* StarListViewController.m in Sources */,
 				B46B0CE31D1EAD290045D131 /* SampleView.m in Sources */,
 				986DA48F1FC323D100D682D6 /* HelpMenuCell.m in Sources */,
+				989D92111FD0E872001EA598 /* ImageViewBorderRound.m in Sources */,
 				B46490871D5347C90020DDE5 /* AddDiscriptionContentsCell.m in Sources */,
 				B4F72E181D1A4AA400B086C7 /* TOCropScrollView.m in Sources */,
+				98A63D681FDD65390002D957 /* Login2ViewController.m in Sources */,
 				B4F72EA51D1A4AA400B086C7 /* Util.m in Sources */,
 				B48AB30C1E24DFB7001ADC1F /* ChatReportViewController.m in Sources */,
 				986164C01F43F07100A1EF7B /* HomeMainViewController.m in Sources */,

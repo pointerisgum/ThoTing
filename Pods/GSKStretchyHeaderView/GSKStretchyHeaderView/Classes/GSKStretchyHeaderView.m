@@ -1,5 +1,5 @@
 // GSKStretchyHeaderView.m
-// Copyright (c) 2016 Jose Alcalá Correa ( http://github.com/gskbyte )
+// Copyright (c) 2016, 2017 Jose Alcalá Correa ( http://github.com/gskbyte )
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,12 +28,15 @@ NS_ASSUME_NONNULL_BEGIN
 static const CGFloat kNibDefaultMaximumContentHeight = 240;
 
 @interface GSKStretchyHeaderView ()
+
 @property (nonatomic) BOOL needsLayoutContentView;
 @property (nonatomic) BOOL arrangingSelfInScrollView;
+
 @property (nonatomic, weak) UIScrollView *scrollView;
 @property (nonatomic) BOOL observingScrollView;
 @property (nonatomic, weak) id<GSKStretchyHeaderViewStretchDelegate> stretchDelegate;
 @property (nonatomic) CGFloat stretchFactor;
+
 @end
 
 @interface GSKStretchyHeaderContentView : UIView
@@ -68,6 +71,7 @@ static const CGFloat kNibDefaultMaximumContentHeight = 240;
     self.contentExpands = YES;
     self.contentShrinks = YES;
     self.manageScrollViewInsets = YES;
+    self.manageScrollViewSubviewHierarchy = YES;
 }
 
 - (void)setupContentView {
@@ -136,6 +140,17 @@ static const CGFloat kNibDefaultMaximumContentHeight = 240;
     }
 }
 
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    if (!self.manageScrollViewSubviewHierarchy) {
+        return;
+    }
+    
+    if (@available(iOS 11.0, *)) { // it has to be used like this :/
+        [self.scrollView gsk_fixZPositionsForStretchyHeaderView:self];
+    }
+}
+
 - (void)didMoveToSuperview {
     [super didMoveToSuperview];
     
@@ -170,7 +185,6 @@ static const CGFloat kNibDefaultMaximumContentHeight = 240;
 }
 
 - (void)removeFromSuperview {
-
     [self stopObservingScrollView];
 
     [super removeFromSuperview];
@@ -191,16 +205,22 @@ static const CGFloat kNibDefaultMaximumContentHeight = 240;
                       ofObject:(nullable id)object
                         change:(nullable NSDictionary<NSString *, NSValue *> *)change
                        context:(nullable void *)context {
-    if (object == self.scrollView &&
-        [keyPath isEqualToString:NSStringFromSelector(@selector(contentOffset))]) {
+    if (object == self.scrollView) {
+        if (![keyPath isEqualToString:@"contentOffset"]) {
+            NSAssert(NO, @"keyPath '%@' is not being observed", keyPath);
+        }
+
         CGPoint contentOffset = change[NSKeyValueChangeNewKey].CGPointValue;
         CGPoint previousContentOffset = change[NSKeyValueChangeOldKey].CGPointValue;
         [self.scrollView gsk_layoutStretchyHeaderView:self
                                         contentOffset:contentOffset
                                 previousContentOffset:previousContentOffset];
-    } else if (object == self.scrollView.layer &&
-               [keyPath isEqualToString:NSStringFromSelector(@selector(sublayers))]) {
-        if (!self.arrangingSelfInScrollView) {
+    } else if (object == self.scrollView.layer) {
+        if (![keyPath isEqualToString:@"sublayers"]) {
+            NSAssert(NO, @"keyPath '%@' is not being observed", keyPath);
+        }
+        
+        if (!self.arrangingSelfInScrollView && self.manageScrollViewSubviewHierarchy) {
             self.arrangingSelfInScrollView = YES;
             [self.scrollView gsk_arrangeStretchyHeaderView:self];
             self.arrangingSelfInScrollView = NO;

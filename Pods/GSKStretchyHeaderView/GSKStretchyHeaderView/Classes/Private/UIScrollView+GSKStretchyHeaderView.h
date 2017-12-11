@@ -1,5 +1,5 @@
 // UIScrollView+GSKStretchyHeaderView.h
-// Copyright (c) 2016 Jose Alcalá Correa ( http://github.com/gskbyte )
+// Copyright (c) 2016, 2017 Jose Alcalá Correa ( http://github.com/gskbyte )
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,8 @@
 @class GSKStretchyHeaderView;
 
 @interface UIScrollView (GSKStretchyHeaderView)
+
+- (void)gsk_fixZPositionsForStretchyHeaderView:(GSKStretchyHeaderView *)headerView;
 
 - (void)gsk_arrangeStretchyHeaderView:(GSKStretchyHeaderView *)headerView;
 - (void)gsk_layoutStretchyHeaderView:(GSKStretchyHeaderView *)headerView

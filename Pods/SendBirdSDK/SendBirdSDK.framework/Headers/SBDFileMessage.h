@@ -60,6 +60,11 @@
  */
 @property (nonatomic, readonly) CGSize realSize;
 
+/**
+ Internal use only.
+ */
+@property (atomic, readonly) BOOL requireAuth;
+
 
 /**
  Returns url
@@ -67,6 +72,11 @@
  @return Image url.
  */
 - (nonnull NSString *)url;
+
+/**
+ *  Internal use only.
+ */
+- (nullable NSDictionary *)_toDictionary;
 
 
 @end
@@ -123,6 +133,11 @@
  Image thumbnails.
  */
 @property (strong, nonatomic, readonly, nullable) NSArray<SBDThumbnail *> *thumbnails;
+
+/**
+ Internal use only.
+ */
+@property (atomic, readonly) BOOL requireAuth;
 
 - (nullable instancetype)initWithDictionary:(NSDictionary * _Nonnull)dict;
 
@@ -181,5 +196,10 @@
  @return Sender of the message.
  */
 - (nonnull SBDUser *)sender;
+
+/**
+ *  Internal use only.
+ */
+- (nullable NSDictionary *)_toDictionary;
 
 @end

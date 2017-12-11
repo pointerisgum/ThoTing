@@ -1,5 +1,5 @@
 // UIScrollView+GSKStretchyHeaderView.m
-// Copyright (c) 2016 Jose Alcalá Correa ( http://github.com/gskbyte )
+// Copyright (c) 2016, 2017 Jose Alcalá Correa ( http://github.com/gskbyte )
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,15 @@
 @end
 
 @implementation UIScrollView (GSKStretchyHeaderView)
+
+- (void)gsk_fixZPositionsForStretchyHeaderView:(GSKStretchyHeaderView *)headerView {
+    headerView.layer.zPosition = 1;
+    for (UIView *subview in self.subviews) {
+        if (![subview gsk_shouldBeBelowStretchyHeaderView]) {
+            subview.layer.zPosition = 2;
+        }
+    }
+}
 
 - (void)gsk_arrangeStretchyHeaderView:(GSKStretchyHeaderView *)headerView {
     NSAssert(headerView.superview == self, @"The provided header view must be a subview of %@", self);
@@ -66,7 +75,7 @@
     CGFloat headerViewHeight = CGRectGetHeight(headerView.bounds);
     switch (headerView.expansionMode) {
         case GSKStretchyHeaderViewExpansionModeTopOnly: {
-            if (contentOffset.y + headerView.maximumHeight < 0) { // bigger than default
+            if (contentOffset.y + headerView.maximumHeight <= 0) { // bigger than default
                 headerViewHeight = -contentOffset.y;
             } else {
                 headerViewHeight = MIN(headerView.maximumHeight, MAX(-contentOffset.y, headerView.minimumHeight));
@@ -75,7 +84,7 @@
         }
         case GSKStretchyHeaderViewExpansionModeImmediate: {
             CGFloat scrollDelta = contentOffset.y - previousContentOffset.y;
-            if (contentOffset.y + headerView.maximumHeight < 0) { // bigger than default
+            if (contentOffset.y + headerView.maximumHeight <= 0) { // bigger than default
                 headerViewHeight = -contentOffset.y;
             } else {
                 headerViewHeight -= scrollDelta;
@@ -103,8 +112,8 @@
 
 - (BOOL)gsk_shouldBeBelowStretchyHeaderView {
     return [self isKindOfClass:[UITableViewCell class]] ||
-        [self isKindOfClass:[UITableViewHeaderFooterView class]] ||
-        [self isKindOfClass:[UICollectionReusableView class]];
+           [self isKindOfClass:[UITableViewHeaderFooterView class]] ||
+           [self isKindOfClass:[UICollectionReusableView class]];
 }
 
 @end

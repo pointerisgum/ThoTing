@@ -14,6 +14,7 @@
 #import "SBDAdminMessage.h"
 #import "SBDFileMessage.h"
 #import "SBDError.h"
+#import "SBDMember.h"
 
 @class SBDPreviousMessageListQuery;
 @class SBDThumbnailSize;
@@ -45,6 +46,8 @@
  *  * Receives an event when the property of the [`SBDBaseChannel`](../Classes/SBDBaseChannel.html) was changed.
  *  * Receives an event when the [`SBDBaseChannel`](../Classes/SBDBaseChannel.html) was deleted.
  *  * Receives an event when a message in the [`SBDBaseChannel`](../Classes/SBDBaseChannel.html) was deleted.
+ *  * Receives an event when meta data in the [`SBDBaseChannel`](../Classes/SBDBaseChannel.html) was changed.
+ *  * Receives an event when meta counters in the [`SBDBaseChannel`](../Classes/SBDBaseChannel.html) were changed.
  */
 @protocol SBDChannelDelegate <NSObject>
 
@@ -80,6 +83,26 @@
  *  @param sender The group channel where the typing status updated.
  */
 - (void)channelDidUpdateTypingStatus:(SBDGroupChannel * _Nonnull)sender;
+
+
+/**
+ A callback when users are invited by inviter.
+
+ @param sender The group channel where the invitation is occured.
+ @param inviter Inviter. It can be nil.
+ @param invitees Invitees.
+ */
+- (void)channel:(SBDGroupChannel * _Nonnull)sender didReceiveInvitation:(NSArray<SBDUser *> * _Nullable)invitees inviter:(SBDUser * _Nullable)inviter;
+
+
+/**
+ A callback when user declined the invitation.
+
+ @param sender The group channel where the invitation is occured.
+ @param invitee Inviter. It can be nil.
+ @param inviter Invitee.
+ */
+- (void)channel:(SBDGroupChannel * _Nonnull)sender didDeclineInvitation:(SBDUser * _Nonnull)invitee inviter:(SBDUser * _Nullable)inviter;
 
 /**
  *  A callback when new member joined to the group channel.
@@ -180,6 +203,62 @@
  *  @param messageId The message ID which was removed.
  */
 - (void)channel:(SBDBaseChannel * _Nonnull)sender messageWasDeleted:(long long)messageId;
+
+/**
+ A callback when meta data was created in the channel.
+
+ @param sender The channel that the meta data was created.
+ @param createdMetaData The created meta data.
+ */
+- (void)channel:(SBDBaseChannel * _Nonnull)sender createdMetaData:(NSDictionary<NSString *, NSString *> * _Nullable)createdMetaData;
+
+/**
+ A callback when meta data was updated in the channel.
+
+ @param sender The channel that the meta data was updated.
+ @param updatedMetaData The updated meta data.
+ */
+- (void)channel:(SBDBaseChannel * _Nonnull)sender updatedMetaData:(NSDictionary<NSString *, NSString *> * _Nullable)updatedMetaData;
+
+/**
+ A callback when meta data was deleted in the channel.
+ 
+ @param sender The channel that the meta data was deleted.
+ @param deletedMetaDataKeys The keys of the deleted meta data.
+ */
+- (void)channel:(SBDBaseChannel * _Nonnull)sender deletedMetaDataKeys:(NSArray<NSString *> * _Nullable)deletedMetaDataKeys;
+
+/**
+ A callback when meta counters were created in the channel.
+
+ @param sender The channel that the meta counters were created.
+ @param createdMetaCounters The created meta counters.
+ */
+- (void)channel:(SBDBaseChannel * _Nonnull)sender createdMetaCounters:(NSDictionary<NSString *, NSNumber *> * _Nullable)createdMetaCounters;
+
+/**
+ A callback when meta counters were updated in the channel.
+ 
+ @param sender The channel that the meta counters were updated.
+ @param updatedMetaCounters The updated meta counters.
+ */
+- (void)channel:(SBDBaseChannel * _Nonnull)sender updatedMetaCounters:(NSDictionary<NSString *, NSNumber *> * _Nullable)updatedMetaCounters;
+
+/**
+ A callback when meta counters were deleted in the channel.
+ 
+ @param sender The channel that the meta counters were deleted.
+ @param deletedMetaCountersKeys The keys of the deleted meta counters.
+ */
+- (void)channel:(SBDBaseChannel * _Nonnull)sender deletedMetaCountersKeys:(NSArray<NSString *> * _Nullable)deletedMetaCountersKeys;
+
+
+/**
+ A callback when the channel was hidden on the other device or by Platform API.
+
+ @param sender The channel that was hidden on the other device or by Platform API.
+ */
+- (void)channelWasHidden:(SBDGroupChannel * _Nonnull)sender;
 
 @end
 
@@ -792,5 +871,41 @@
  @param completionHandler The handler block to execute. If the `result` is `YES`, then the uploading task of the `requestId` has been cancelled.
  */
 + (void)cancelUploadingFileMessageWithRequestId:(NSString * _Nonnull)requestId completionHandler:(nullable void (^)(BOOL result, SBDError * _Nullable error))completionHandler;
+
+
+/**
+ Copies a user message to the target channel.
+
+ @param message User message object.
+ @param targetChannel Target channel object.
+ @param completionHandler The handler block to execute. The `userMessage` is a user message which is returned from the SendBird server. The message has a message ID.
+ @return Returns the temporary user message with a request ID. It doesn't have a message ID.
+ */
+- (SBDUserMessage * _Nullable)copyUserMessage:(SBDUserMessage * _Nonnull)message toTargetChannel:(SBDBaseChannel * _Nonnull)targetChannel completionHandler:(nullable void (^)(SBDUserMessage * _Nullable userMessage, SBDError * _Nullable error))completionHandler;
+
+
+/**
+ Copies a file message to the target channel.
+
+ @param message File message object.
+ @param targetChannel Target channel object.
+ @param completionHandler The handler block to execute. The `fileMessage` is a user message which is returned from the SendBird server. The message has a message ID.
+ @return Returns the temporary file message with a request ID. It doesn't have a message ID.
+ */
+- (SBDFileMessage * _Nullable)copyFileMessage:(SBDFileMessage * _Nonnull)message toTargetChannel:(SBDBaseChannel * _Nonnull)targetChannel completionHandler:(nullable void (^)(SBDFileMessage * _Nullable fileMessage,  SBDError * _Nullable error))completionHandler;
+
+
+/**
+ Gets the changelogs of the messages with token.
+
+ @param token The token that is used to get more changelogs.
+ @param completionHandler The handler block to execute. The `updatedMessages` is the messages that were updated. The `deletedMessageIds` is the list of the deleted message IDs. If there are more changelogs that are not returned yet, the `hasMore` is YES. The `token` can be used to get more changedlogs.
+ */
+- (void)getMessageChangeLogsWithToken:(NSString * _Nullable)token completionHandler:(nullable void (^)(NSArray<SBDBaseMessage *> * _Nullable updatedMessages, NSArray<NSNumber *> * _Nullable deletedMessageIds, BOOL hasMore, NSString * _Nullable token, SBDError * _Nullable error))completionHandler;
+
+/**
+ *  Internal use only.
+ */
+- (nullable NSDictionary *)_toDictionary;
 
 @end

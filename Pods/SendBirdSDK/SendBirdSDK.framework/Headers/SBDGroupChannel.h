@@ -10,8 +10,10 @@
 #import "SBDGroupChannelListQuery.h"
 #import "SBDBaseMessage.h"
 #import "SBDUser.h"
+#import "SBDMember.h"
 
 @class SBDUser;
+@class SBDMember;
 @class SBDGroupChannel;
 @class SBDGroupChannelListQuery;
 
@@ -48,7 +50,7 @@
 /**
  *  Channel <span>members</span>.
  */
-@property (strong, nonatomic, readonly, nullable) NSMutableArray<SBDUser *> *members;
+@property (strong, nonatomic, readonly, nullable) NSMutableArray<SBDMember *> *members;
 
 /**
  *  The number of <span>members</span>.
@@ -66,6 +68,11 @@
  *  Represents push notification is on or off. If true, push notification is on.
  */
 @property (atomic, readonly) BOOL isPushEnabled;
+
+/**
+ *  Represents this channel is hidden or not.
+ */
+@property (atomic) BOOL isHidden;
 
 /**
  Internal use only.
@@ -392,8 +399,18 @@
  *  Hides the group channel. The channel will be hid from the channel list, but it will be appeared again when the other user send a message in the channel.
  *
  *  @param completionHandler The handler block to execute.
+ *
+ *  @deprecated in v3.0.63.
  */
-- (void)hideChannelWithCompletionHandler:(nullable void (^)(SBDError *_Nullable error))completionHandler;
+- (void)hideChannelWithCompletionHandler:(nullable void (^)(SBDError *_Nullable error))completionHandler DEPRECATED_ATTRIBUTE;
+
+/**
+ *  Hides the group channel. The channel will be hid from the channel list, but it will be appeared again when the other user send a message in the channel.
+ *
+ *  @param hidePreviousMessages The option to hide the previous message of this channel when the channel will be appeared again.
+ *  @param completionHandler The handler block to execute.
+ */
+- (void)hideChannelWithHidePreviousMessages:(BOOL)hidePreviousMessages completionHandler:(nullable void (^)(SBDError *_Nullable error))completionHandler;
 
 /**
  *  Leaves the group channel. The channel will be disappeared from the channel list. If join the channel, the invitation is required.
@@ -480,7 +497,7 @@
  *
  *  @return Members who read the message.
  */
-- (nullable NSArray<SBDUser *> *)getReadMembersWithMessage:(SBDBaseMessage * _Nonnull)message;
+- (nullable NSArray<SBDMember *> *)getReadMembersWithMessage:(SBDBaseMessage * _Nonnull)message;
 
 /**
  *  Returns the <span>members</span> who didn't read the message.
@@ -489,7 +506,7 @@
  *
  *  @return Members who don't read the message.
  */
-- (nullable NSArray<SBDUser *> *)getUnreadMemebersWithMessage:(SBDBaseMessage * _Nonnull)message;
+- (nullable NSArray<SBDMember *> *)getUnreadMemebersWithMessage:(SBDBaseMessage * _Nonnull)message;
 
 /**
  *  Returns the read status.
@@ -525,7 +542,7 @@
  *
  *  @return The <span>members</span> who are typing now.
  */
-- (nullable NSArray<SBDUser *> *)getTypingMembers;
+- (nullable NSArray<SBDMember *> *)getTypingMembers;
 
 /**
  *  Internal use only.
@@ -540,12 +557,12 @@
 /**
  *  Internal use only.
  */
-- (void)addMember:(SBDUser * _Nonnull)user;
+- (void)addMember:(SBDMember * _Nonnull)user;
 
 /**
  *  Internal use only.
  */
-- (void)removeMember:(SBDUser * _Nonnull)user;
+- (nullable SBDMember *)removeMember:(SBDMember * _Nonnull)user;
 
 /**
  *  Internal use only.
@@ -627,6 +644,55 @@
  @param userId User ID.
  @return `SBDUser` object as a member. If there is a member who has the `userId`, returns nil.
  */
-- (nullable SBDUser *)getMember:(NSString * _Nonnull)userId;
+- (nullable SBDMember *)getMember:(NSString * _Nonnull)userId;
+
+
+/**
+ Accpets the invitation.
+
+ @param completionHandler The handler block to execute.
+ */
+- (void)acceptInvitationWithCompletionHandler:(nullable void (^)(SBDError * _Nullable error))completionHandler;
+
+
+/**
+ Declines the invitation.
+
+ @param completionHandler The handler block to execute.
+ */
+- (void)declineInvitationWithCompletionHandler:(nullable void (^)(SBDError * _Nullable error))completionHandler;
+
+
+/**
+ Gets the inviter.
+
+ @return Inviter.
+ */
+- (nullable SBDUser *)getInviter;
+
+/**
+ *  Internal use only.
+ */
+- (nullable NSDictionary *)_toDictionary;
+
+/**
+ *  Internal use only.
+ */
++ (nullable NSArray<SBDGroupChannel *> *)getCachedChannels;
+
+/**
+ Resets the history in this channel.
+
+ @param completionHandler The handler block to execute.
+ */
+- (void)resetMyHistoryWithCompletionHandler:(nullable void (^)(SBDError * _Nullable error))completionHandler;
+
+/**
+ Gets the group channel count.
+
+ @param memberStateFilter The member state of the current user in the channels that are counted.
+ @param completionHandler The handler block to execute.
+ */
++ (void)getChannelCountWithMemberStateFilter:(SBDMemberStateFilter)memberStateFilter completionHandler:(nullable void (^)(NSUInteger groupChannelCount, SBDError * _Nullable error))completionHandler;
 
 @end

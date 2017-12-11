@@ -90,9 +90,9 @@
  */
 @property (nonatomic, strong, readonly, nullable) NSMapTable<NSString *, id<SBDChannelDelegate>> *channelDelegatesDictionary;
 
-@property (nonatomic, strong, nullable) void (^backgroundSessionCompletionHandler)();
+@property (nonatomic, strong, nullable) void (^backgroundSessionCompletionHandler)(void);
 
-@property (strong, nonatomic, nonnull) NSMutableArray<void (^)()> *backgroundTaskBlock;
+@property (strong, nonatomic, nonnull) NSMutableArray<void (^)(void)> *backgroundTaskBlock;
 
 @property (atomic) int URLSessionDidFinishEventsForBackgroundURLSession;
 
@@ -151,8 +151,10 @@
  *  Initializes `SBDMain` singleton instance with SendBird Application ID. The Application ID is on SendBird dashboard. This method has to be run first in order to user SendBird.
  *
  *  @param applicationId The Applicatin ID of SendBird. It can be founded on SendBird Dashboard.
+ *
+ *  @return If YES, the applicationId is set.
  */
-+ (void)initWithApplicationId:(NSString * _Nonnull)applicationId;
++ (BOOL)initWithApplicationId:(NSString * _Nonnull)applicationId;
 
 /**
  *  SendBird internal use only.
@@ -198,7 +200,7 @@
  *
  *  @param completionHandler The handler block to execute.
  */
-+ (void)disconnectWithCompletionHandler:(nullable void (^)())completionHandler;
++ (void)disconnectWithCompletionHandler:(nullable void (^)(void))completionHandler;
 
 /**
  *  Adds the `SBDConnectionDelegate`.
@@ -454,6 +456,21 @@
  */
 + (void)getDoNotDisturbWithCompletionHandler:(nullable void (^)(BOOL isDoNotDisturbOn, int startHour, int startMin, int endHour, int endMin, NSString * _Nonnull timezone, SBDError * _Nullable error))completionHandler;
 
+/**
+ Sets push sound
+ 
+ @param sound Push sound
+ */
++ (void)setPushSound:(NSString * _Nonnull)sound completionHandler:(nullable void (^)(SBDError * _Nullable error))completionHandler;
+
+
+/**
+ Gets push shound
+
+ @param completionHandler The handler block to execute.
+ */
++ (void)getPushSoundWithCompletionHandler:(nullable void (^)(NSString * _Nullable sound, SBDError * _Nullable error))completionHandler;
+
 
 /**
  Sets a push template of the current user.
@@ -506,5 +523,22 @@
  Internal use only.
  */
 + (nullable NSString *)getCustomWsHost;
+
+
+/**
+ Sets group channel invitation preference for auto acceptance.
+
+ @param autoAccept If YES, the current user will accept the group channel invitation automatically.
+ @param completionHandler The handler block to execute.
+ */
++ (void)setChannelInvitationPreferenceAutoAccept:(BOOL)autoAccept completionHandler:(nullable void (^)(SBDError * _Nullable error))completionHandler;
+
+
+/**
+ Gets group channel inviation preference for auto acceptance.
+
+ @param completionHandler The handler block to execute.
+ */
++ (void)getChannelInvitationPreferenceAutoAcceptWithCompletionHandler:(nullable void (^)(BOOL autoAccept, SBDError * _Nullable error))completionHandler;
 
 @end

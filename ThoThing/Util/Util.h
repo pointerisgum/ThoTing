@@ -162,4 +162,6 @@
 
 + (NSString *)contentTypeForImageData:(NSData *)data;   //마인타입 가져오기
 
++ (NSString *)getSharpName:(NSString *)aName;
+
 @end

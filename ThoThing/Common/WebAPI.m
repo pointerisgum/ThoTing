@@ -381,7 +381,15 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             {
 //                str_MineType = @"image/jpg";
                 str_MineType = [self contentTypeForImageData:imageData];
-                str_FileName = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld%@.jpg", (long)nYear, (long)nMonth, (long)nDay, (long)nHour, (long)nMinute, (long)nSecond, str_MillSec];
+                
+//                NSString *str_Type = @"jpg";
+//                NSArray *ar_Sep = [str_MineType componentsSeparatedByString:@"/"];
+//                if( ar_Sep.count == 2 )
+//                {
+//                    str_Type = ar_Sep[1];
+//                }
+                
+                str_FileName = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld%@.%@", (long)nYear, (long)nMonth, (long)nDay, (long)nHour, (long)nMinute, (long)nSecond, str_MillSec, [Util contentTypeForImageData:imageData]];
             }
             
             NSLog(@"%@", str_FileName);
@@ -1656,6 +1664,47 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
         }];
         
         NSMutableString *strM_CallUrl = [NSMutableString stringWithFormat:@"https://api.sendbird.com%@?", path];
+        NSArray *ar_AllKeys = [params allKeys];
+        for( int i = 0; i < [ar_AllKeys count]; i++ )
+        {
+            NSString *str_Key = [ar_AllKeys objectAtIndex:i];
+            NSString *str_Val = [params objectForKey:str_Key];
+            [strM_CallUrl appendString:[NSString stringWithFormat:@"%@=%@&", str_Key, str_Val]];
+        }
+        
+        if( [strM_CallUrl hasSuffix:@"&"] )
+        {
+            [strM_CallUrl deleteCharactersInRange:NSMakeRange([strM_CallUrl length]-1, 1)];
+        }
+        
+        NSLog(@"%@", strM_CallUrl);
+    }
+    else if( [aMethod isEqualToString:@"PUT"] )
+    {
+        //        [MBProgressHUD show];
+        [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
+        NSLog(@"params: %@", params);
+        [sendBirdclient putPath:path parameters:params success:^(AFHTTPRequestOperation *operation, id responseObject) {
+            
+            nRetry = 0;
+
+            completion(responseObject, nil);
+            
+            [MBProgressHUD hide];
+            [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+            
+        }failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+            
+            [MBProgressHUD hide];
+            [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+            
+            if( operation.cancelled )
+            {
+                return ;
+            }
+        }];
+        
+        NSMutableString *strM_CallUrl = [NSMutableString stringWithFormat:@"%@%@?", kBaseUrl, params];
         NSArray *ar_AllKeys = [params allKeys];
         for( int i = 0; i < [ar_AllKeys count]; i++ )
         {

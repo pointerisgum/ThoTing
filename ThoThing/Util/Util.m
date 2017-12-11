@@ -929,7 +929,7 @@ static UIView *v_Indi = nil;
         return [NSURL URLWithString:@""];
     }
     
-    if( [aFooter hasPrefix:@"http"] )
+    if( [aFooter hasPrefix:@"http"] || [aFooter hasPrefix:@"https"] )
     {
         return [NSURL URLWithString:aFooter];
     }
@@ -937,6 +937,11 @@ static UIView *v_Indi = nil;
     if( aHeader == nil || aHeader.length <= 0 )
     {
         aHeader = [[NSUserDefaults standardUserDefaults] objectForKey:@"img_prefix"];
+    }
+    
+    if( aHeader == nil || aHeader.length <= 0 )
+    {
+        aHeader = [[NSUserDefaults standardUserDefaults] objectForKey:@"userImg_prefix"];
     }
     
     NSString *str_ImageUrl = [NSString stringWithFormat:@"%@%@", aHeader, aFooter];
@@ -1311,6 +1316,16 @@ static UIView *v_Indi = nil;
     }
     
     return nil;
+}
+
++ (NSString *)getSharpName:(NSString *)aName
+{
+    if( [aName hasPrefix:@"#"] == NO )
+    {
+        aName = [NSString stringWithFormat:@"#%@", aName];
+    }
+    
+    return aName;
 }
 
 @end
