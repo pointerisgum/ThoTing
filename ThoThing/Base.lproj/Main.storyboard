@@ -113,7 +113,7 @@
         <!--토팅-->
         <scene sceneID="PLZ-KC-f5x">
             <objects>
-                <navigationController storyboardIdentifier="ChatMainNavi" navigationBarHidden="YES" id="rjm-rq-Vw2" sceneMemberID="viewController">
+                <navigationController storyboardIdentifier="ChatMainNavi" navigationBarHidden="YES" id="rjm-rq-Vw2" customClass="YmNavigationViewController" sceneMemberID="viewController">
                     <extendedEdge key="edgesForExtendedLayout"/>
                     <tabBarItem key="tabBarItem" title="토팅" image="토팅.png" selectedImage="토팅.png" id="3wh-wQ-SZg">
                         <inset key="imageInsets" minX="0.0" minY="2" maxX="0.0" maxY="-2"/>

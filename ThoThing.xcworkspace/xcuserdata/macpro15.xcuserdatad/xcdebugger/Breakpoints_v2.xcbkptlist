@@ -218,7 +218,7 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/KikGroupMakeViewController.m"
-                  timestampString = "534645911.946971"
+                  timestampString = "534926265.065612"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
                   startingLineNumber = "1059"
@@ -233,7 +233,7 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/KikGroupMakeViewController.m"
-                  timestampString = "534645911.948592"
+                  timestampString = "534926265.067655"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
                   startingLineNumber = "1059"
@@ -330,7 +330,7 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/ChatFeedMemeberInviteViewController.m"
-                  timestampString = "534645911.969599"
+                  timestampString = "534926265.089814"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
                   startingLineNumber = "839"
@@ -345,7 +345,7 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/ChatFeedMemeberInviteViewController.m"
-                  timestampString = "534645911.972813"
+                  timestampString = "534926265.091793"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
                   startingLineNumber = "839"
@@ -378,7 +378,7 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/KikGroupMakeViewController.m"
-                  timestampString = "534645911.97682"
+                  timestampString = "534926265.096656"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
                   startingLineNumber = "1351"
@@ -393,7 +393,7 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/KikGroupMakeViewController.m"
-                  timestampString = "534645911.978331"
+                  timestampString = "534926265.098765"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
                   startingLineNumber = "1351"
@@ -474,7 +474,7 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/KikGroupMakeViewController.m"
-                  timestampString = "534645911.993459"
+                  timestampString = "534926265.115733"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
                   startingLineNumber = "1011"
@@ -489,7 +489,7 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/KikGroupMakeViewController.m"
-                  timestampString = "534645911.99516"
+                  timestampString = "534926265.117779"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
                   startingLineNumber = "1013"
@@ -554,7 +554,7 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/KikRoomInfoViewController.m"
-            timestampString = "534645911.587858"
+            timestampString = "534790749.213877"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "556"
@@ -570,11 +570,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588319"
+            timestampString = "534926264.66639"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "11121"
-            endingLineNumber = "11121"
+            startingLineNumber = "11537"
+            endingLineNumber = "11537"
             landmarkName = "-mediaItemToData:"
             landmarkType = "7">
          </BreakpointContent>
@@ -586,11 +586,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588376"
+            timestampString = "534926264.666922"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1350"
-            endingLineNumber = "1350"
+            startingLineNumber = "1620"
+            endingLineNumber = "1620"
             landmarkName = "-addTmpNormalQuestion"
             landmarkType = "7">
          </BreakpointContent>
@@ -602,11 +602,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588419"
+            timestampString = "534926264.667238"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1385"
-            endingLineNumber = "1385"
+            startingLineNumber = "1655"
+            endingLineNumber = "1655"
             landmarkName = "-addTmpImage"
             landmarkType = "7">
          </BreakpointContent>
@@ -618,11 +618,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588461"
+            timestampString = "534926264.667621"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "10082"
-            endingLineNumber = "10082"
+            startingLineNumber = "10495"
+            endingLineNumber = "10495"
             landmarkName = "-sendPush:"
             landmarkType = "7">
          </BreakpointContent>
@@ -634,11 +634,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588501"
+            timestampString = "534926264.667959"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "10087"
-            endingLineNumber = "10087"
+            startingLineNumber = "10500"
+            endingLineNumber = "10500"
             landmarkName = "-sendPush:"
             landmarkType = "7">
          </BreakpointContent>
@@ -650,11 +650,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588539"
+            timestampString = "534926264.668291"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "10097"
-            endingLineNumber = "10097"
+            startingLineNumber = "10510"
+            endingLineNumber = "10510"
             landmarkName = "-sendPush:"
             landmarkType = "7">
             <Locations>
@@ -666,11 +666,11 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/ChatFeedViewController.m"
-                  timestampString = "534645912.033613"
+                  timestampString = "534926265.161972"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "10102"
-                  endingLineNumber = "10102"
+                  startingLineNumber = "10515"
+                  endingLineNumber = "10515"
                   offsetFromSymbolStart = "1286">
                </Location>
                <Location
@@ -681,11 +681,11 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/ChatFeedViewController.m"
-                  timestampString = "534645912.036771"
+                  timestampString = "534926265.163916"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "10104"
-                  endingLineNumber = "10104"
+                  startingLineNumber = "10517"
+                  endingLineNumber = "10517"
                   offsetFromSymbolStart = "75">
                </Location>
             </Locations>
@@ -698,11 +698,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588576"
+            timestampString = "534926264.668659"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "10165"
-            endingLineNumber = "10165"
+            startingLineNumber = "10578"
+            endingLineNumber = "10578"
             landmarkName = "-onSendMsgInterval3:"
             landmarkType = "7">
          </BreakpointContent>
@@ -714,11 +714,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588613"
+            timestampString = "534926264.66902"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "10170"
-            endingLineNumber = "10170"
+            startingLineNumber = "10583"
+            endingLineNumber = "10583"
             landmarkName = "-onSendMsgInterval3:"
             landmarkType = "7">
          </BreakpointContent>
@@ -730,11 +730,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588649"
+            timestampString = "534926264.669388"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "10180"
-            endingLineNumber = "10180"
+            startingLineNumber = "10593"
+            endingLineNumber = "10593"
             landmarkName = "-onSendMsgInterval3:"
             landmarkType = "7">
             <Locations>
@@ -746,11 +746,11 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/ChatFeedViewController.m"
-                  timestampString = "534645912.047281"
+                  timestampString = "534926265.177634"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "10181"
-                  endingLineNumber = "10181"
+                  startingLineNumber = "10594"
+                  endingLineNumber = "10594"
                   offsetFromSymbolStart = "2333">
                </Location>
                <Location
@@ -761,11 +761,11 @@
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/ChatFeedViewController.m"
-                  timestampString = "534645912.048895"
+                  timestampString = "534926265.179857"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "10181"
-                  endingLineNumber = "10181"
+                  startingLineNumber = "10594"
+                  endingLineNumber = "10594"
                   offsetFromSymbolStart = "19">
                </Location>
             </Locations>
@@ -778,11 +778,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588691"
+            timestampString = "534926264.669759"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "10533"
-            endingLineNumber = "10533"
+            startingLineNumber = "10949"
+            endingLineNumber = "10949"
             landmarkName = "-onSendMsgInterval3:"
             landmarkType = "7">
             <Locations>
@@ -790,30 +790,30 @@
                   shouldBeEnabled = "Yes"
                   ignoreCount = "0"
                   continueAfterRunningActions = "No"
-                  symbolName = "__45-[ChatFeedViewController onSendMsgInterval3:]_block_invoke.2158"
+                  symbolName = "__45-[ChatFeedViewController onSendMsgInterval3:]_block_invoke.2190"
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/ChatFeedViewController.m"
-                  timestampString = "534645912.056116"
+                  timestampString = "534926265.184888"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "10533"
-                  endingLineNumber = "10533"
-                  offsetFromSymbolStart = "18317">
+                  startingLineNumber = "10949"
+                  endingLineNumber = "10949"
+                  offsetFromSymbolStart = "19324">
                </Location>
                <Location
                   shouldBeEnabled = "Yes"
                   ignoreCount = "0"
                   continueAfterRunningActions = "No"
-                  symbolName = "__45-[ChatFeedViewController onSendMsgInterval3:]_block_invoke.2221"
+                  symbolName = "__45-[ChatFeedViewController onSendMsgInterval3:]_block_invoke.2253"
                   moduleName = "ThoThing"
                   usesParentBreakpointCondition = "Yes"
                   urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/ChatFeedViewController.m"
-                  timestampString = "534645912.05847"
+                  timestampString = "534926265.187007"
                   startingColumnNumber = "9223372036854775807"
                   endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "10533"
-                  endingLineNumber = "10533"
+                  startingLineNumber = "10949"
+                  endingLineNumber = "10949"
                   offsetFromSymbolStart = "19">
                </Location>
             </Locations>
@@ -826,11 +826,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.58873"
+            timestampString = "534926264.670122"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "10538"
-            endingLineNumber = "10538"
+            startingLineNumber = "10954"
+            endingLineNumber = "10954"
             landmarkName = "-onSendMsgInterval3:"
             landmarkType = "7">
          </BreakpointContent>
@@ -842,11 +842,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588768"
+            timestampString = "534926264.670489"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1356"
-            endingLineNumber = "1356"
+            startingLineNumber = "1626"
+            endingLineNumber = "1626"
             landmarkName = "ChatFeedViewController"
             landmarkType = "3">
          </BreakpointContent>
@@ -858,11 +858,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.588831"
+            timestampString = "534926264.67092"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "2087"
-            endingLineNumber = "2087"
+            startingLineNumber = "2460"
+            endingLineNumber = "2460"
             landmarkName = "-updateList:"
             landmarkType = "7">
          </BreakpointContent>
@@ -890,7 +890,7 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/AppDelegate.m"
-            timestampString = "534617847.534097"
+            timestampString = "534924945.229527"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "1021"
@@ -922,7 +922,7 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/KikRoomInfoViewController.m"
-            timestampString = "534645911.588916"
+            timestampString = "534790749.220761"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "561"
@@ -954,11 +954,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/Common/WebAPI.m"
-            timestampString = "534207496.403269"
+            timestampString = "534759249.207732"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1689"
-            endingLineNumber = "1689"
+            startingLineNumber = "1737"
+            endingLineNumber = "1737"
             landmarkName = "-callAsyncSendBirdAPIBlock:param:withMethod:withBlock:"
             landmarkType = "7">
          </BreakpointContent>
@@ -1002,7 +1002,7 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/AppDelegate.m"
-            timestampString = "534617847.534713"
+            timestampString = "534924945.229985"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "307"
@@ -1018,7 +1018,7 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/AppDelegate.m"
-            timestampString = "534617847.534788"
+            timestampString = "534924945.230257"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "427"
@@ -1034,7 +1034,7 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/AppDelegate.m"
-            timestampString = "534617847.534834"
+            timestampString = "534924945.230506"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "368"
@@ -1098,13 +1098,349 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "ThoThing/ChatFeedViewController.m"
-            timestampString = "534645911.5893"
+            timestampString = "534926264.671507"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "3722"
-            endingLineNumber = "3722"
+            startingLineNumber = "4095"
+            endingLineNumber = "4095"
             landmarkName = "-tableView:cellForRowAtIndexPath:"
             landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.67202"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "11882"
+            endingLineNumber = "11882"
+            landmarkName = "-uploadData:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.672554"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "12165"
+            endingLineNumber = "12165"
+            landmarkName = "-upLoadContents:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.673037"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "12132"
+            endingLineNumber = "12132"
+            landmarkName = "-upLoadContents:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/Common/WebAPI.m"
+            timestampString = "534759249.208331"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "384"
+            endingLineNumber = "384"
+            landmarkName = "-imageUpload:param:withImages:withBlock:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.673452"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "264"
+            endingLineNumber = "264"
+            landmarkName = "-shouldAutorotate"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.673766"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "269"
+            endingLineNumber = "269"
+            landmarkName = "-shouldAutorotateToInterfaceOrientation:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.674066"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "456"
+            endingLineNumber = "456"
+            landmarkName = "-application:supportedInterfaceOrientationsForWindow:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/Helper/YmNavigationViewController.m"
+            timestampString = "534926264.67437"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "56"
+            endingLineNumber = "56"
+            landmarkName = "-shouldAutorotateToInterfaceOrientation:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.674416"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "7000"
+            endingLineNumber = "7000"
+            landmarkName = "-normalQuestionCell:forRowAtIndexPath:withMy:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/Helper/YmNavigationViewController.m"
+            timestampString = "534926264.67478"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "97"
+            endingLineNumber = "97"
+            landmarkName = "-application:supportedInterfaceOrientationsForWindow:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/Lib/TWTSideMenuViewController.m"
+            timestampString = "534838345.893154"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "116"
+            endingLineNumber = "116"
+            landmarkName = "-supportedInterfaceOrientations"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/Common/UIViewController+YM.m"
+            timestampString = "534865597.301275"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "552"
+            endingLineNumber = "552"
+            landmarkName = "-application:supportedInterfaceOrientationsForWindow:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/Helper/YmNavigationViewController.m"
+            timestampString = "534926264.67491"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "90"
+            endingLineNumber = "90"
+            landmarkName = "-supportedInterfaceOrientations"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.674965"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "1168"
+            endingLineNumber = "1168"
+            landmarkName = "-showTempleteKeyboard"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.675314"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "1172"
+            endingLineNumber = "1172"
+            landmarkName = "-showTempleteKeyboard"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.675651"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "13728"
+            endingLineNumber = "13728"
+            landmarkName = "-goMic:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.676035"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "13735"
+            endingLineNumber = "13735"
+            landmarkName = "-goMic:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.676394"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "13739"
+            endingLineNumber = "13739"
+            landmarkName = "-goMic:"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "ThoThing/ChatFeedViewController.m"
+            timestampString = "534926264.676759"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "802"
+            endingLineNumber = "802"
+            landmarkName = "-viewDidLoad"
+            landmarkType = "7">
+            <Locations>
+               <Location
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "__37-[ChatFeedViewController viewDidLoad]_block_invoke.253"
+                  moduleName = "ThoThing"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/ChatFeedViewController.m"
+                  timestampString = "534926265.347625"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "802"
+                  endingLineNumber = "802"
+                  offsetFromSymbolStart = "654">
+               </Location>
+               <Location
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "__37-[ChatFeedViewController viewDidLoad]_block_invoke.253"
+                  moduleName = "ThoThing"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Volumes/Seagate%20Backup%20Plus%20Drive/YM/ThoThing/ThoThing/ChatFeedViewController.m"
+                  timestampString = "534926265.349603"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "802"
+                  endingLineNumber = "802"
+                  offsetFromSymbolStart = "736">
+               </Location>
+            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

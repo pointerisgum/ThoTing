@@ -1306,13 +1306,42 @@ static UIView *v_Indi = nil;
     switch (c) {
         case 0xFF:
             return @"jpeg";
+            break;
         case 0x89:
             return @"png";
+            break;
         case 0x47:
             return @"gif";
+            break;
         case 0x49:
         case 0x4D:
             return @"tiff";
+            break;
+        case 0x25:
+            return @"pdf";
+            break;
+        case 0xD0:
+            return @"vnd";
+            break;
+        case 0x46:
+            return @"plain";
+            break;
+            //        case 0x52:
+            //            // R as RIFF for WEBP
+            //            if ([data length] < 12) {
+            //                return nil;
+            //            }
+            //
+            //            NSString *testString = [[NSString alloc] initWithData:[data subdataWithRange:NSMakeRange(0, 12)] encoding:NSASCIIStringEncoding];
+            //            if ([testString hasPrefix:@"RIFF"] && [testString hasSuffix:@"WEBP"]) {
+            //                return @"image/webp";
+            //            }
+            //
+            //            return nil;
+            
+        default:
+            //            return @"application/octet-stream";
+            return @"jpg";
     }
     
     return nil;

@@ -7,6 +7,7 @@
 //
 
 #import "YmNavigationViewController.h"
+#import "ChatFeedViewController.h"
 
 @interface YmNavigationViewController ()
 
@@ -45,7 +46,9 @@
 
 - (BOOL)shouldAutorotate
 {
-    return NO;
+    return [super shouldAutorotate];
+    
+//    return YES;
 }
 
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
@@ -53,17 +56,51 @@
     NSLog(@"%ld", interfaceOrientation);
     //[[UIDevice currentDevice] setValue:[NSNumber numberWithInteger:UIInterfaceOrientationPortrait] forKey:@"orientation"];
     
+//    id lastVc = [self.viewControllers lastObject];
+//    if( [lastVc isKindOfClass:[ChatFeedViewController class]] )
+//    {
+//        [super shouldAutorotateToInterfaceOrientation:interfaceOrientation];
+////        return YES;
+//    }
+    
     [[UIApplication sharedApplication] setStatusBarOrientation: UIInterfaceOrientationPortrait];
     return (interfaceOrientation == UIInterfaceOrientationPortrait);
 }
 
 - (NSUInteger)supportedInterfaceOrientations
 {
+    id lastVc = [self.viewControllers lastObject];
+    [lastVc supportedInterfaceOrientations];
+
+    NSString *str_ClassName = NSStringFromClass([lastVc class]);
+
+    if( [str_ClassName isEqualToString:@"ChatFeedViewController"] )
+//    if( [lastVc isKindOfClass:[ChatFeedViewController class]] )
+    {
+//        [lastVc supportedInterfaceOrientations];
+        
+//        return [super supportedInterfaceOrientations];
+        
+//        return UIInterfaceOrientationMaskPortrait;
+//        return UIInterfaceOrientationMaskAll;
+    }
+    else if( [str_ClassName isEqualToString:@"AVFullScreenViewController"] )
+    {
+//        return UIInterfaceOrientationMaskAll;
+    }
+    
     return UIInterfaceOrientationMaskPortrait;
 }
 
 - (NSUInteger)application:(UIApplication *)application supportedInterfaceOrientationsForWindow:(UIWindow *)window
 {
+    id lastVc = [self.viewControllers lastObject];
+
+    if( [lastVc isKindOfClass:[ChatFeedViewController class]] )
+    {
+        return UIInterfaceOrientationMaskAll;
+    }
+
     return UIInterfaceOrientationMaskPortrait;
 }
 

@@ -380,8 +380,24 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
             else
             {
 //                str_MineType = @"image/jpg";
-                str_MineType = [self contentTypeForImageData:imageData];
+                NSString *str_Exe = [Util contentTypeForImageData:imageData];
+                if( [str_Exe isEqualToString:@"gif"] )
+                {
+                    str_MineType = @"image/gif";
+                }
+                else
+                {
+                    str_MineType = @"image/jpg";
+
+                    UIImage *image = [UIImage imageWithData:imageData];
+                    NSData *tmpData = UIImageJPEGRepresentation(image, 0.5f);
+                    imageData = [NSData dataWithData:tmpData];
+
+                }
+//                str_MineType = [self contentTypeForImageData:imageData];
+//                NSLog(@"str_MineType: %@", str_MineType);
                 
+
 //                NSString *str_Type = @"jpg";
 //                NSArray *ar_Sep = [str_MineType componentsSeparatedByString:@"/"];
 //                if( ar_Sep.count == 2 )
@@ -389,7 +405,7 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
 //                    str_Type = ar_Sep[1];
 //                }
                 
-                str_FileName = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld%@.%@", (long)nYear, (long)nMonth, (long)nDay, (long)nHour, (long)nMinute, (long)nSecond, str_MillSec, [Util contentTypeForImageData:imageData]];
+                str_FileName = [NSString stringWithFormat:@"%04ld%02ld%02ld%02ld%02ld%02ld%@.%@", (long)nYear, (long)nMonth, (long)nDay, (long)nHour, (long)nMinute, (long)nSecond, str_MillSec, str_Exe];
             }
             
             NSLog(@"%@", str_FileName);
@@ -454,17 +470,49 @@ typedef void (^WebSuccessBlock)(id resulte, NSError *error);
     uint8_t c;
     [data getBytes:&c length:1];
     
-    switch (c) {
+    switch (c)
+    {
         case 0xFF:
             return @"image/jpeg";
+            break;
         case 0x89:
             return @"image/png";
+            break;
         case 0x47:
             return @"image/gif";
+            break;
         case 0x49:
         case 0x4D:
             return @"image/tiff";
+            break;
+        case 0x25:
+            return @"application/pdf";
+            break;
+        case 0xD0:
+            return @"application/vnd";
+            break;
+        case 0x46:
+            return @"text/plain";
+            break;
+//        case 0x52:
+//            // R as RIFF for WEBP
+//            if ([data length] < 12) {
+//                return nil;
+//            }
+//            
+//            NSString *testString = [[NSString alloc] initWithData:[data subdataWithRange:NSMakeRange(0, 12)] encoding:NSASCIIStringEncoding];
+//            if ([testString hasPrefix:@"RIFF"] && [testString hasSuffix:@"WEBP"]) {
+//                return @"image/webp";
+//            }
+//            
+//            return nil;
+
+        default:
+//            return @"application/octet-stream";
+            return @"image/jpg";
+
     }
+
     return nil;
 }
 

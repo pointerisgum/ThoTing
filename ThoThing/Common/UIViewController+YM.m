@@ -13,6 +13,7 @@
 //#import "MWPhotoBrowser.h"
 #import "QuestionViewController.h"
 
+
 @implementation UIViewController (YM)
 
 //- (void)viewWillAppear:(BOOL)animated
@@ -518,6 +519,9 @@
     id rootController = [[(AppDelegate*)[[UIApplication sharedApplication]delegate] window] rootViewController];
     NSLog(@"%@", rootController);
     
+    
+    NSString *str_ClassName = NSStringFromClass([self class]);
+    
     if( [self isKindOfClass:[UINavigationController class]] )
     {
         UINavigationController *navi = (UINavigationController *)self;
@@ -531,8 +535,16 @@
     {
         return UIInterfaceOrientationMaskAll;
     }
-    
-    return UIInterfaceOrientationMaskPortrait;
+    else if( [str_ClassName isEqualToString:@"AVFullScreenViewController"] )
+    {
+        return UIInterfaceOrientationMaskAll;
+    }
+//    else if( [str_ClassName isEqualToString:@"UIViewController"] )
+//    {
+//        return UIInterfaceOrientationMaskAll;
+//    }
+
+    return UIInterfaceOrientationMaskAll;
 }
 
 - (NSUInteger)application:(UIApplication *)application supportedInterfaceOrientationsForWindow:(UIWindow *)window
